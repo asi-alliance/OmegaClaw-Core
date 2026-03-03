@@ -7,7 +7,7 @@
 (= (initLoop)
    (progn (configure maxLoops 10)
           (configure sleepInterval 1)
-          (configure LLM gpt-5.2)
+          (configure LLM gpt-5)
           (configure maxOutputToken 3000)
           (configure reasoningMode high)
           (change-state! &prevmsg "")
