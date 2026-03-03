@@ -9,7 +9,7 @@
           (configure sleepInterval 1)
           (configure LLM gpt-5)
           (configure maxOutputToken 3000)
-          (configure reasoningMode high)
+          (configure reasoningMode medium)
           (change-state! &prevmsg "")
           (change-state! &loops (maxLoops))))
 
