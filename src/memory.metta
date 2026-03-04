@@ -6,7 +6,7 @@
 (= (initMemory)
    (progn (println! "Initializing memory")
           (configure maxMemory 2000)
-          (configure maxRecallItems 5)
+          (configure maxRecallItems 10)
           (configure maxHistory 5000)))
 
 (= (getPrompt)
