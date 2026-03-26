@@ -2,7 +2,7 @@
 #
 # Includes:  PeTTa, MORK, PathMap
 
-FROM docker.io/library/swipl:latest
+FROM docker.io/library/swipl:latest as os
 
 # Install system build tools, Python, etc
 RUN apt-get update \
@@ -20,6 +20,8 @@ RUN apt-get update \
       cmake \
  && rm -rf /var/lib/apt/lists/*
 
+FROM os as build
+
 # 👇 RUST INSTALL
 # -----------------------------------------
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2026-03-19
@@ -35,19 +37,9 @@ RUN git clone --depth 1 https://github.com/trueagi-io/MORK.git /MORK
 WORKDIR /MORK/kernel
 RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
 
-# 👇 Install janus-swi system-wide
-RUN pip3 install --no-cache-dir --break-system-packages janus-swi 
-
 # 👇 PETTA INSTALL
 #    Clone PeTTa repository directly into /PeTTa
 RUN git clone --depth 1 https://github.com/patham9/PeTTa.git /PeTTa
-WORKDIR /PeTTa
-
-# 👇 METTACLAW INSTALL
-RUN mkdir -p repos
-RUN git clone --depth 1 https://github.com/patham9/mettaclaw repos/mettaclaw
-RUN python3 -m pip install --no-cache-dir --break-system-packages openai
-
 
 # 👇 Install facebook research Faiss, contains several methods for similarity search.
 RUN apt-get update \
@@ -67,6 +59,20 @@ RUN cmake --install build
 # Build foreign function interfaces for PeTTa to utilize MORK and FAISS
 WORKDIR /PeTTa
 RUN sh build.sh
+
+FROM os
+
+# 👇 Copy artifacts from build stage
+COPY --from=build /PeTTa /PeTTa
+
+# 👇 Install janus-swi system-wide
+RUN pip3 install --no-cache-dir --break-system-packages janus-swi
+
+# 👇 METTACLAW INSTALL
+WORKDIR /PeTTa
+RUN mkdir -p repos
+RUN git clone --depth 1 https://github.com/patham9/mettaclaw repos/mettaclaw
+RUN python3 -m pip install --no-cache-dir --break-system-packages openai
 
 # 👇 Pytorch install
 RUN pip install torch --no-cache-dir --break-system-package \
