@@ -22,19 +22,18 @@ RUN apt-get update \
 
 # 👇 RUST INSTALL
 # -----------------------------------------
-# RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
-# ENV PATH="/root/.cargo/bin:${PATH}"
-# -----------------------------------------
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # 👇 PATHMAP INSTALL
-# RUN git clone https://github.com/Adam-Vandervorst/PathMap.git /PathMap
-# WORKDIR /PathMap
-# RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
+RUN git clone https://github.com/Adam-Vandervorst/PathMap.git /PathMap
+WORKDIR /PathMap
+RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 # 👇 MORK INSTALL
-# RUN git clone https://github.com/trueagi-io/MORK.git /MORK
-# WORKDIR /MORK/kernel
-# RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
+RUN git clone https://github.com/trueagi-io/MORK.git /MORK
+WORKDIR /MORK/kernel
+RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 # 👇 Install janus-swi system-wide
 RUN pip3 install --no-cache-dir --break-system-packages janus-swi 
@@ -43,8 +42,11 @@ RUN pip3 install --no-cache-dir --break-system-packages janus-swi
 #    Clone PeTTa repository directly into /PeTTa
 RUN git clone https://github.com/patham9/PeTTa.git /PeTTa
 WORKDIR /PeTTa
+
+# 👇 METTACLAW INSTALL
 RUN mkdir -p repos
 RUN git clone https://github.com/patham9/mettaclaw repos/mettaclaw
+RUN python3 -m pip install --no-cache-dir --break-system-packages openai
 
 
 # 👇 Install facebook research Faiss, contains several methods for similarity search.
@@ -72,14 +74,6 @@ RUN pip install torch --no-cache-dir --break-system-package \
      --index-url https://download.pytorch.org/whl/cpu
 
 
-WORKDIR /PeTTa/src
+WORKDIR /PeTTa
 
-# LD_PRELOAD needed for MORK
-#ENV LD_PRELOAD=/PeTTa/mork_ffi/target/release/libmork_ffi.so
-
-# Start swipl with mwj.pl. If user connects an atomspace, mwj.pl loads.
-# User needs to use the /PeTTa/mount directory for all file mounts.
-# Use stateless_only as the last parm in the docker run command to
-# bypass atomspace load and run in a purely stateless mode.
-#ENTRYPOINT ["swipl","--stack_limit=8g","-q","-s", "mwj.pl","--"]
-#CMD ["../mount/atomspace.metta","mork"]
+CMD ["/bin/bash"]
