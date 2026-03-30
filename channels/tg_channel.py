@@ -19,30 +19,32 @@ class _TelegramChannel:
         self.loop = None
         self.application = None
         self.last_message = None
+        self.reply_to = None
         self.chat_id = None
         self.msg_lock = threading.Lock()
         self.connected = False
 
-    def set_last(self, msg):
+    def set_last(self, msg, message_id=None):
         """Store a message as the most recent received message, thread-safe."""
         with self.msg_lock:
             self.last_message = msg
+            self.reply_to = message_id
 
     def get_last_message(self):
         """Retrieve the most recent received message, thread-safe."""
         with self.msg_lock:
             return self.last_message
 
-    async def _start_cmd(self, update: Update):
-        """Handle the /start command and register the chat ID."""
-        if update.effective_chat is not None:
-            self.chat_id = update.effective_chat.id
+    async def _start_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle the /start command."""
         if update.message is not None:
             await update.message.reply_text("Telegram channel ready.")
 
-    async def _on_message(self, update: Update):
-        """Capture incoming text messages and store them with the sender's name."""
+    async def _on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Capture group messages and store them for the agent loop."""
         if update.message is None or update.message.text is None:
+            return
+        if update.message.from_user and update.message.from_user.is_bot:
             return
         if update.effective_chat is not None:
             self.chat_id = update.effective_chat.id
@@ -51,7 +53,7 @@ class _TelegramChannel:
             name = "unknown user"
         else:
             name = user.full_name or user.username or str(user.id)
-        self.set_last(f"{name}: {update.message.text}")
+        self.set_last(f"{name}: {update.message.text}", update.message.message_id)
 
     async def _runner(self, token):
         """Build the Telegram application, start polling, and run until stopped."""
@@ -115,7 +117,11 @@ class _TelegramChannel:
         ):
             return
         fut = asyncio.run_coroutine_threadsafe(
-            self.application.bot.send_message(chat_id=self.chat_id, text=text),
+            self.application.bot.send_message(
+                chat_id=self.chat_id,
+                text=text,
+                reply_to_message_id=self.reply_to,
+            ),
             self.loop,
         )
         try:
@@ -132,7 +138,7 @@ def getLastMessage():
     return _channel.get_last_message()
 
 
-def start_telegram(bot_token, chat_id=None):
+def start_telegram(bot_token, chat_id):
     """Initialize and start the Telegram bot with the given token."""
     return _channel.start(bot_token, chat_id)
 
