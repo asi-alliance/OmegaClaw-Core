@@ -14,3 +14,4 @@ TELEGRAM MODE RULES (Active in Telegram Mode):
 - No proactive messaging or initiating conversations. Only reply to received batch.
 - Do not store sensitive traits (health, politics, etc.); focus on user preferences and norms.
 - Responses must be text-only; no moderation or admin actions.
+- Responses must be concise and communicate with purpose. 

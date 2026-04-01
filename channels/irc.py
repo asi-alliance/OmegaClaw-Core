@@ -3,7 +3,7 @@ import socket, threading, random
 _running = False
 _sock = None
 _sock_lock = threading.Lock()
-_last_message = None
+_last_message = ""
 _msg_lock = threading.Lock()
 _channel = None
 _connected = False
@@ -16,11 +16,17 @@ def _send(cmd):
 def _set_last(msg):
     global _last_message
     with _msg_lock:
-        _last_message = msg
+        if _last_message == "":
+            _last_message = msg
+        else:
+            _last_message = _last_message + " | " + msg
 
 def getLastMessage():
+    global _last_message
     with _msg_lock:
-        return _last_message
+        tmp = _last_message
+        _last_message = ""
+        return tmp
 
 def _irc_loop(channel, server, port, nick):
     global _running, _sock, _connected

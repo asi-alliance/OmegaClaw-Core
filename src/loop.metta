@@ -16,7 +16,7 @@
 
 (= (getContext)
    (string-safe (py-str ("PROMPT: " (getPrompt) " SKILLS: " (getSkills)
-                         " OUTPUT_FORMAT: Output a ((skillName1 args1) (skillName2 args2) (skillName3 args3) (skillName4 args4) (skillName5 args5)) S-expression of up to 5 sexpr commands, double-check the parentheses it must me (cmd1 ... cmdn)!"
+                         " OUTPUT_FORMAT: Output a ((skillName1 args1) (skillName2 args2) (skillName3 args3)) S-expression of up to 3 sexpr commands, double-check the parentheses it must me (cmd1 ... cmdn)!"
                          " each arg is an explicit string hence needs quotes, and variables are forbidden!"
                          " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback)) " HISTORY: " (getHistory) " TIME: " (get_time_as_string)))))
 
@@ -46,9 +46,10 @@
                         (change-state! &loops (- (get-state &loops) 1)))
           (let $prompt (getContext)
                (progn (println! (---------iteration $k))
-                      (let* (($msg (string-safe (repr (receive))))
-                             ($msgnew (prog1 (!= $msg (get-state &prevmsg))
-                                             (change-state! &prevmsg $msg)))
+                      (let* (($msgrcv (string-safe (repr (receive))))
+                             ($msgnew (prog1 (and (> (string_length $msgrcv) 0) (!= $msgrcv (get-state &prevmsg)))
+                                             (if (!= $msgrcv "") (change-state! &prevmsg $msgrcv) _)))
+                             ($msg (get-state &prevmsg))
                              ($_ (if (and (> $k 1) $msgnew)
                                      (change-state! &loops (maxLoops)) _)))
                             (if (> (get-state &loops) 0)
