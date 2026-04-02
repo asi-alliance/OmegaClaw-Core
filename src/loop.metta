@@ -27,6 +27,18 @@
                                           (change-state! &error $new)))
                  ($else $sexpr))))
 
+(= (ethics-pass $sexpr)
+   (if (isTelegram)
+       (case $sexpr 
+         (((search $s) (if (is-unsafe $s) (Error search "Refused: Unsafe search query.") $sexpr))
+          ((send $s) (if (is-unsafe $s) (Error send "Refused: Unsafe response content.") $sexpr))
+          ((remember $s) (if (is-sensitive $s) (Error remember "Refused: Sensitive traits/profiling blocked.") $sexpr))
+          ($else $sexpr)))
+       $sexpr))
+
+(= (is-unsafe $s) (or (== $s "bomb") (== $s "malware") (== $s "exploit") (== $s "hack") (== $s "weapon") (== $s "illegal")))
+(= (is-sensitive $s) (or (== $s "politics") (== $s "health") (== $s "religion") (== $s "race") (== $s "gender") (== $s "identity")))
+
 (= (mettaclaw)
    (mettaclaw 1))
 (= (mettaclaw $k)
@@ -57,9 +69,10 @@
                                        ($_ (change-state! &error ()))
                                        ($_ (HandleError MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY $response $sexpr))
                                        ($_ (println! (RESPONSE: $sexpr)))
-                                       ($results (RESULTS: (collapse (let $s (superpose $sexpr) (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_FORMAT_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (eval $s)))))))))
+                                       ($results (RESULTS: (collapse (let $s (superpose $sexpr) (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_FORMAT_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (eval (ethics-pass $s))))))))))
                                        ($_ (println! $results)))
                                       (progn (if (or $msgnew  (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
                                              (change-state! &lastresults (string-safe (repr $results))))) _))
                       (sleep (sleepInterval))
-                      (mettaclaw (+ 1 $k))))))
+                      (mettaclaw (+ 1 $k)))))))
+

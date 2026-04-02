@@ -1,4 +1,5 @@
 import asyncio
+import time
 import threading
 from telegram import Update
 from telegram.ext import (
@@ -11,58 +12,97 @@ from telegram.ext import (
 
 
 class _TelegramChannel:
-    """Telegram bot channel using polling-based message retrieval."""
+    """Telegram bot channel with windowed batching and bot-tag gating."""
 
     def __init__(self):
         self.running = False
         self.thread = None
         self.loop = None
         self.application = None
-        self.last_message = ""
-        self.reply_to = None
-        self.chat_id = None
-        self.msg_lock = threading.Lock()
         self.connected = False
-
-    def set_last(self, msg, message_id=None):
-        """Store a message as the most recent received message, thread-safe."""
-        with self.msg_lock:
-            if self.last_message == "":
-                self.last_message = msg
-            else:
-                self.last_message = self.last_message + " | " + msg
-            self.reply_to = message_id
+        self.chat_id = None
+        self.bot_username = None
+        self.msg_lock = threading.Lock()
+        # Windowed batching state
+        self._message_buffer = []  # List of (timestamp, name, text, message_id)
+        self._should_reply = False
+        self._last_processed_window = ""
+        self._reply_to = None
 
     def get_last_message(self):
-        """Retrieve and consume the most recent received message, thread-safe."""
+        """Retrieve and consume the most recent processed window, thread-safe."""
         with self.msg_lock:
-            tmp = self.last_message
-            self.last_message = ""
+            tmp = self._last_processed_window
+            self._last_processed_window = ""
             return tmp
 
     async def _start_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command."""
+        if update.effective_chat is not None:
+            self.chat_id = update.effective_chat.id
         if update.message is not None:
-            await update.message.reply_text("Telegram channel ready.")
+            await update.message.reply_text(
+                "Telegram channel ready. Observation mode active. Tag me to get a reply."
+            )
 
     async def _on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Capture group messages and store them for the agent loop."""
+        """Capture group messages into the buffer; flag reply if bot is tagged."""
         if update.message is None or update.message.text is None:
             return
+        # Filter out messages from other bots
         if update.message.from_user and update.message.from_user.is_bot:
             return
         if update.effective_chat is not None:
             self.chat_id = update.effective_chat.id
+
         user = update.effective_user
         if user is None:
             name = "unknown user"
         else:
             name = user.full_name or user.username or str(user.id)
-        self.set_last(f"{name}: {update.message.text}", update.message.message_id)
+        text = update.message.text
+
+        with self.msg_lock:
+            self._message_buffer.append(
+                (time.time(), name, text, update.message.message_id)
+            )
+            # Check if bot is @-tagged
+            if self.bot_username and f"@{self.bot_username}" in text:
+                self._should_reply = True
+            # Check if it's a direct reply to the bot
+            if (
+                update.message.reply_to_message
+                and update.message.reply_to_message.from_user
+                and update.message.reply_to_message.from_user.id == context.bot.id
+            ):
+                self._should_reply = True
+
+    async def _window_manager(self):
+        """Every 60s, batch buffered messages and surface them if bot was tagged."""
+        while self.running:
+            await asyncio.sleep(60)
+            with self.msg_lock:
+                if not self._message_buffer:
+                    continue
+                if self._should_reply:
+                    batched = "\n".join(
+                        [f"{m[1]}: {m[2]}" for m in self._message_buffer]
+                    )
+                    self._last_processed_window = batched
+                    # Use the last message's id for reply threading
+                    self._reply_to = self._message_buffer[-1][3]
+                    self._should_reply = False
+                # Clear buffer each window
+                self._message_buffer = []
 
     async def _runner(self, token):
         """Build the Telegram application, start polling, and run until stopped."""
         self.application = Application.builder().token(token).build()
+
+        # Get bot username for tag detection
+        bot_info = await self.application.bot.get_me()
+        self.bot_username = bot_info.username
+
         self.application.add_handler(CommandHandler("start", self._start_cmd))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message)
@@ -74,6 +114,10 @@ class _TelegramChannel:
                 allowed_updates=Update.ALL_TYPES
             )
         self.connected = True
+
+        # Start window manager
+        asyncio.create_task(self._window_manager())
+
         try:
             while self.running:
                 await asyncio.sleep(0.5)
@@ -125,7 +169,7 @@ class _TelegramChannel:
             self.application.bot.send_message(
                 chat_id=self.chat_id,
                 text=text,
-                reply_to_message_id=self.reply_to,
+                reply_to_message_id=self._reply_to,
             ),
             self.loop,
         )

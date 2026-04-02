@@ -31,7 +31,11 @@
    (append-file (library mettaclaw ./memory/history.metta) (swrite $addition)))
 
 (= (remember $str)
-   (py-call (lib_chromadb.remember $str (useGPTEmbedding (string-safe $str)) (get_time_as_string))))
+   (if (isTelegram)
+       (if (is-sensitive $str)
+           (Error remember "Refused: Sensitive traits/profiling blocked in Telegram mode.")
+           (py-call (lib_chromadb.remember $str (useGPTEmbedding (string-safe $str)) (get_time_as_string))))
+       (py-call (lib_chromadb.remember $str (useGPTEmbedding (string-safe $str)) (get_time_as_string)))))
 
 (= (query $str)
    (py-call (lib_chromadb.query (useGPTEmbedding (string-safe $str)) (maxRecallItems))))

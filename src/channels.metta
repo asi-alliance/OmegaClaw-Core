@@ -1,4 +1,5 @@
 ;configured at runtime:
+(= (isTelegram) (== (commchannel) telegram))
 (= (IRC_channel) (empty))
 (= (IRC_server) (empty))
 (= (IRC_port) (empty))
