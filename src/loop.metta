@@ -70,5 +70,5 @@
                                       (progn (if (or $msgnew  (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
                                              (change-state! &lastresults (string-safe (repr $results))))) _))
                       (sleep (sleepInterval))
-                      (mettaclaw (+ 1 $k)))))))
+                      (mettaclaw (+ 1 $k))))))
 

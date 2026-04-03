@@ -43,12 +43,12 @@
               (translatePredicate (close $Out))
               True)))
 
-!(import_prolog_functions_from_file (library mettaclaw ./src/skills.pl) (shell first_char))
+!(import_prolog_functions_from_file (library mettaclaw ./src/skills.pl) (run_cmd first_char))
 
 (= (shell $cmd)
    (if (isTelegram)
         (Error shell "DENIED: Shell access is disabled in Telegram mode.")
-       (let $temp (cut) (translatePredicate (shell $cmd $out)) $out)))
+       (let $temp (cut) (translatePredicate (run_cmd $cmd $out)) $out)))
 
 (= (metta $str)
    (if (isTelegram)

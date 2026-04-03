@@ -32,7 +32,7 @@
 
 (= (configure $name $default)
    (let $value (progn (println! (Input value for $name or press enter for default $default))
-                      (if (!= (argv 1) default)
+                      (if (!= (collapse (argv 1)) default)
                           (read_line_to_string user_input) ""))
         (if (== $value "")
             (add-atom &self (= ($name) $default))
