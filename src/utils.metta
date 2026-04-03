@@ -31,16 +31,9 @@
         (sub_string $String (max 0 (- $Len $N)) $_ 0)))
 
 (= (configure $name $default)
-   (let $value (progn (println! (Input value for $name or press enter for default $default))
-                      (if (!= (argv 1) default)
-                          (read_line_to_string user_input) ""))
-        (if (== $value "")
-            (add-atom &self (= ($name) $default))
-            (let $k (collapse (translatePredicate (number_string $v1 $value)))
-                 (if (== $k ())
-                     (add-atom &self (= ($name) $value))
-                     (progn (translatePredicate (number_string $v2 $value))
-                            (add-atom &self (= ($name) $v2))))))))
+   (let $value (argk $name $default)
+        (add-atom &self (= ($name) $value))))
+   
 
 (= (take $k ()) ())
 (= (take $k (cons $h $t))
@@ -51,3 +44,25 @@
 (= (newline)
    (progn (translatePredicate (atom_codes $NL (10)))
           $NL))
+
+(= (atom_to_number $str)
+   (let $res (collapse (progn (translatePredicate (atom_number $str $num)) $num))
+        (if (== () $res)
+            $str
+            (car-atom $res))))
+
+(= (argk $Prefix)
+   (let $Atom (argv $1)
+         (let $KeyEq (string_concat $Prefix "=")
+            (progn
+               (translatePredicate (atom_string $Atom $Str))
+               (translatePredicate (sub_string $Str 0 $KeyLen $After $KeyEq))
+               (translatePredicate (sub_string $Str $KeyLen $After 0 $Value))
+               (translatePredicate (atom_string $Res $Value))
+               (atom_to_number $Res)))))
+
+(= (argk $Prefix $default)
+   (let $res (collapse (argk $Prefix))
+        (if (== $res ())
+            $default
+            (car-atom $res))))
