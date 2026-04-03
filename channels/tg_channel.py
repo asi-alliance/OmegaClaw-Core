@@ -1,6 +1,9 @@
 import asyncio
+import os
 import threading
+from dotenv import load_dotenv
 from telegram import Update
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -40,12 +43,16 @@ class _TelegramChannel:
             self.last_message = ""
             return tmp
 
-    async def _start_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _start_cmd(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Handle the /start command."""
         if update.message is not None:
             await update.message.reply_text("Telegram channel ready.")
 
-    async def _on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _on_message(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         """Capture group messages and store them for the agent loop."""
         if update.message is None or update.message.text is None:
             return
@@ -58,7 +65,9 @@ class _TelegramChannel:
             name = "unknown user"
         else:
             name = user.full_name or user.username or str(user.id)
-        self.set_last(f"{name}: {update.message.text}", update.message.message_id)
+        self.set_last(
+            f"{name}: {update.message.text}", update.message.message_id
+        )
 
     async def _runner(self, token):
         """Build the Telegram application, start polling, and run until stopped."""
@@ -143,8 +152,12 @@ def getLastMessage():
     return _channel.get_last_message()
 
 
-def start_telegram(bot_token, chat_id):
+def start_telegram():
     """Initialize and start the Telegram bot with the given token."""
+    load_dotenv("../.env")
+    bot_token = os.environ.get("BOT_TOKEN", "")
+    chat_id = os.environ.get("CHAT_ID", "")
+
     return _channel.start(bot_token, chat_id)
 
 
