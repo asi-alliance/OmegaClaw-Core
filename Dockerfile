@@ -75,9 +75,9 @@ COPY --from=builder /PeTTa /PeTTa
 COPY . /PeTTa/repos/mettaclaw
 
 RUN cp /PeTTa/repos/mettaclaw/run.metta /PeTTa/run.metta \
- && cp /PeTTa/repos/mettaclaw/config.py /PeTTa/config.py \
  && chown -R 65534:65534 /PeTTa/repos/mettaclaw/memory \
- && find /PeTTa/repos/mettaclaw/memory -type f -exec chmod 0644 {} \;
+ && find /PeTTa/repos/mettaclaw/memory -type f -exec chmod 0644 {} \; \
+ && chmod 0444 /PeTTa/repos/mettaclaw/memory/prompt.txt
 
 USER 65534:65534
 
