@@ -23,6 +23,7 @@ class _TelegramChannel:
         self.last_message = ""
         self.reply_to = None
         self.chat_id = None
+        self.bot_username = None
         self.msg_lock = threading.Lock()
         self.connected = False
 
@@ -59,13 +60,29 @@ class _TelegramChannel:
             return
         if update.effective_chat is not None:
             self.chat_id = update.effective_chat.id
+
+        mentioned = False
+        if self.bot_username and f"@{self.bot_username}" in update.message.text:
+            mentioned = True
+        if (
+            update.message.reply_to_message
+            and update.message.reply_to_message.from_user
+            and update.message.reply_to_message.from_user.id == context.bot.id
+        ):
+            mentioned = True
+        if not mentioned:
+            return
+
         user = update.effective_user
         if user is None:
             name = "unknown user"
         else:
             name = user.full_name or user.username or str(user.id)
+        text = update.message.text
+        if self.bot_username:
+            text = text.replace(f"@{self.bot_username}", "").strip()
         self.set_last(
-            f"{name}: {update.message.text}", update.message.message_id
+            f"{name}: {text}", update.message.message_id
         )
 
     async def _runner(self, token):
@@ -105,10 +122,11 @@ class _TelegramChannel:
         loop.close()
         self.loop = None
 
-    def start(self, bot_token, chat_id=None):
+    def start(self, bot_token, chat_id=None, bot_username=None):
         """Launch the Telegram bot on a daemon thread and begin polling for messages."""
         self.running = True
         self.chat_id = chat_id or None
+        self.bot_username = bot_username or None
         self.thread = threading.Thread(
             target=self._thread_main, args=(bot_token,), daemon=True
         )
@@ -152,11 +170,12 @@ def getLastMessage():
 
 
 def start_telegram():
-    """Initialize and start the Telegram bot with the given token."""
+    """Initialize and start the Telegram bot with credentials from env."""
     bot_token = os.environ.get("BOT_TOKEN", "")
     chat_id = os.environ.get("CHAT_ID", "")
+    bot_username = os.environ.get("BOT_USERNAME", "")
 
-    return _channel.start(bot_token, chat_id)
+    return _channel.start(bot_token, chat_id, bot_username)
 
 
 def stop_telegram():
