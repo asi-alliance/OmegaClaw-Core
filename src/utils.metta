@@ -58,36 +58,3 @@
             $str
             (car-atom $res))))
 
-(= (argk $Prefix)
-   (let $Atom (argv $1)
-         (let $KeyEq (string_concat $Prefix "=")
-            (progn
-               (translatePredicate (atom_string $Atom $Str))
-               (translatePredicate (sub_string $Str 0 $KeyLen $After $KeyEq))
-               (translatePredicate (sub_string $Str $KeyLen $After 0 $Value))
-               (translatePredicate (atom_string $Res $Value))
-               (atom_to_number $Res)))))
-
-(= (argk $Prefix $default)
-   (let $res (collapse (argk $Prefix))
-        (if (== $res ())
-            $default
-            (car-atom $res))))
-
-(= (read-line)
-   (read_line_to_string user_input))
-
-(= (parse-input $input)
-   (progn (translatePredicate (atom_string $Atom $input))
-          (atom_to_number $Atom)))
-
-(= (prompt-configure $name $default)
-   (let $cli (collapse (argk $name))
-        (if (!= $cli ())
-            (add-atom &self (= ($name) (car-atom $cli)))
-            (let* (($_ (println! ($name (default: $default))))
-                   ($input (read-line))
-                   ($value (if (== $input "")
-                               $default
-                               (parse-input $input))))
-                  (add-atom &self (= ($name) $value))))))

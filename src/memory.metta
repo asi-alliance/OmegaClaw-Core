@@ -6,10 +6,10 @@
 
 (= (initMemory)
    (progn (println! "Initializing memory")
-          (prompt-configure maxFeedback 50000)
-          (prompt-configure maxRecallItems 20)
-          (prompt-configure maxEpisodeRecallLines 20)
-          (prompt-configure maxHistory 30000)))
+          (configure maxFeedback 50000)
+          (configure maxRecallItems 20)
+          (configure maxEpisodeRecallLines 20)
+          (configure maxHistory 30000)))
 
 (= (getPrompt)
    (read-file (library mettaclaw ./memory/prompt.txt)))
