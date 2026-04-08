@@ -4,7 +4,7 @@ import logging
 
 _config_cache = None
 _config_mtime = 0
-CONFIG_PATH = "../memory/telegram_profile.yaml"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "memory", "telegram_profile.yaml")
 
 def _load_config():
     global _config_cache, _config_mtime

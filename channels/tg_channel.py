@@ -1,7 +1,6 @@
 import asyncio
 import time
 import threading
-import time
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -389,3 +388,4 @@ def stop_telegram():
 def send_message(text):
     """Send a message to the active Telegram chat."""
     _channel.send_message(text)
+
