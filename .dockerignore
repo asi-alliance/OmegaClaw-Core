@@ -22,7 +22,6 @@ __pycache__/
 # Container metadata
 Dockerfile
 docker-compose.yml
-firewall.sh
 
 # Docs and license (not required at runtime)
 README.md
