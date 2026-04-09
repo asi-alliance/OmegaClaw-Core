@@ -8,22 +8,26 @@ from aiogram.filters import Command
 import yaml
 import os
 
-log_file_path = os.path.join(os.path.dirname(__file__), "..", "telegram_bot.log")
+log_file_path = os.path.join(
+    os.path.dirname(__file__), "..", "telegram_bot.log"
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(log_file_path),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.FileHandler(log_file_path), logging.StreamHandler()],
 )
+
 
 class _TelegramChannel:
     """Telegram bot channel with windowed batching and bot-tag gating using aiogram."""
 
     def __init__(self, config_path=None):
-        self.config_path = os.path.join(os.path.dirname(__file__),  "..", "memory", "telegram_profile.yaml")
-        self.policy_path= os.path.join(os.path.dirname(__file__), "..", "memory", "policy.md")
+        self.config_path = os.path.join(
+            os.path.dirname(__file__), "..", "memory", "telegram_profile.yaml"
+        )
+        self.policy_path = os.path.join(
+            os.path.dirname(__file__), "..", "memory", "policy.md"
+        )
         self.running = False
         self.thread = None
         self.loop = None
@@ -34,19 +38,19 @@ class _TelegramChannel:
         self.bot_username = None
         self.bot_id = None
         self.msg_lock = threading.Lock()
-        
+
         # Default settings
         self.window_seconds = 5
         self.reply_only_on_tag = True
         self.reply_on_reply = True
         self.admin_ids = []
         self.dm_enabled = False
-        
+
         # Policy messages
         self.start_msg = "Telegram mode active."
         self.about_msg = "I am a MeTTaClaw agent."
         self.privacy_msg = "No sensitive data is stored."
-        
+
         # Load config and policies if they exist
         self.load_config(self.config_path)
         self.load_policies()
@@ -55,9 +59,11 @@ class _TelegramChannel:
         self._muted_users = {}
         self._user_msg_rates = {}
         self._user_mute_counts = {}
-        
+
         # Windowed batching state
-        self._message_buffer = []  # List of (timestamp, name, text, message_id)
+        self._message_buffer = (
+            []
+        )  # List of (timestamp, name, text, message_id)
         self._should_reply = False
         self._last_processed_window = None
         self._reply_to_id = None
@@ -67,19 +73,29 @@ class _TelegramChannel:
         """Load bot configuration from a YAML file."""
         if not os.path.exists(config_path):
             print(f"Config file {config_path} not found. Using defaults.")
-            logging.warning(f"Config file {config_path} not found. Using defaults.")
+            logging.warning(
+                f"Config file {config_path} not found. Using defaults."
+            )
             return
 
         try:
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
-            
+
             tg_cfg = config.get("telegram", {})
-            self.window_seconds = tg_cfg.get("batching", {}).get("window_seconds", 10)
-            self.reply_only_on_tag = tg_cfg.get("reply_only_when_directly_tagged", True)
+            self.window_seconds = tg_cfg.get("batching", {}).get(
+                "window_seconds", 10
+            )
+            self.reply_only_on_tag = tg_cfg.get(
+                "reply_only_when_directly_tagged", True
+            )
             self.reply_on_reply = tg_cfg.get("reply_on_reply_to_bot", True)
-            self.dm_enabled = tg_cfg.get("dm_support", {}).get("enabled", False)
-            self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
+            self.dm_enabled = tg_cfg.get("dm_support", {}).get(
+                "enabled", False
+            )
+            self.admin_ids = config.get("admin_controls", {}).get(
+                "admin_ids", []
+            )
 
             logging.info(f"Loaded config from {config_path}: window={self.window_seconds}s, tag_only={self.reply_only_on_tag}")
         except Exception as e:
@@ -87,35 +103,39 @@ class _TelegramChannel:
 
     def load_policies(self):
         """Load and parse policy sections from a markdown file."""
-        
+
         if not os.path.exists(self.policy_path):
-            logging.warning(f"Policy file {self.policy_path} not found. Using defaults.")
+            logging.warning(
+                f"Policy file {self.policy_path} not found. Using defaults."
+            )
             return
 
         try:
             with open(self.policy_path, "r") as f:
                 content = f.read()
-            
+
             sections = {}
             current_section = None
             current_text = []
-            
+
             for line in content.split("\n"):
                 if line.startswith("# "):
                     if current_section:
-                        sections[current_section] = "\n".join(current_text).strip()
+                        sections[current_section] = "\n".join(
+                            current_text
+                        ).strip()
                     current_section = line[2:].strip().upper()
                     current_text = []
                 elif current_section:
                     current_text.append(line)
-            
+
             if current_section:
                 sections[current_section] = "\n".join(current_text).strip()
-            
+
             self.start_msg = sections.get("START", self.start_msg)
             self.about_msg = sections.get("ABOUT", self.about_msg)
             self.privacy_msg = sections.get("PRIVACY", self.privacy_msg)
-            
+
             logging.info(f"Loaded policies from {self.policy_path}: sections={list(sections.keys())}")
         except Exception as e:
             logging.error(f"Error loading policies {self.policy_path}: {e}")
@@ -131,13 +151,14 @@ class _TelegramChannel:
         """Handle the /start command with interactive buttons."""
         if message.chat is not None:
             self.chat_id = message.chat.id
-        
+
         # Create buttons
         from aiogram.utils.keyboard import InlineKeyboardBuilder
+
         builder = InlineKeyboardBuilder()
         builder.button(text="ℹ️ About", callback_data="show_about")
         builder.button(text="🛡️ Privacy", callback_data="show_privacy")
-        
+
         await message.answer(self.start_msg, reply_markup=builder.as_markup())
 
     async def _about_cmd(self, message: types.Message):
@@ -152,7 +173,9 @@ class _TelegramChannel:
         """Handle global kill switch (admin only)."""
         user_id = message.from_user.id if message.from_user else None
         if user_id in self.admin_ids:
-            await message.answer("⚠️ Global Kill Switch activated. Shutting down...")
+            await message.answer(
+                "⚠️ Global Kill Switch activated. Shutting down..."
+            )
             logging.critical(f"KILLED by admin {user_id}")
             self.stop()
             os._exit(0)
@@ -171,38 +194,46 @@ class _TelegramChannel:
         """Capture group messages into the buffer; flag reply if bot is tagged."""
         if message.text is None:
             return
-        
+
         # Check DM support
         if message.chat.type == "private" and not self.dm_enabled:
             return
-        
+
         # Filter out messages from other bots
         if message.from_user:
             if message.from_user.is_bot:
                 return
             if await self.is_user_muted(message.from_user):
+                # TODO: reply with a "temporary mute" message
                 return
 
         if message.chat is not None:
             self.chat_id = message.chat.id
-            
+
         user = message.from_user
-        name = "unknown user" if user is None else (user.full_name or user.username or str(user.id))
+        name = (
+            "unknown user"
+            if user is None
+            else (user.full_name or user.username or str(user.id))
+        )
         text = message.text
-        
+
         with self.msg_lock:
-            self._message_buffer.append((time.time(), name, text, message.message_id))
-            
+            self._message_buffer.append(
+                (time.time(), name, text, message.message_id)
+            )
+
             # Use rules from config
             is_tagged = self.bot_username and f"@{self.bot_username}" in text
-            is_reply = (self.reply_on_reply and 
-                        message.reply_to_message and 
-                        message.reply_to_message.from_user and 
-                        message.reply_to_message.from_user.id == self.bot_id)
-            
+            is_reply = (
+                self.reply_on_reply
+                and message.reply_to_message
+                and message.reply_to_message.from_user
+                and message.reply_to_message.from_user.id == self.bot_id
+            )
+
             if not self.reply_only_on_tag or is_tagged or is_reply:
                 self._should_reply = True
-            
 
     async def _window_manager(self):
         """Every window_seconds, batch buffered messages and surface them if bot was tagged."""
@@ -211,17 +242,19 @@ class _TelegramChannel:
             with self.msg_lock:
                 if not self._message_buffer:
                     continue
-                
+
                 if self._should_reply:
                     # Batch messages
-                    batched = "\n".join([f"{m[1]}: {m[2]}" for m in self._message_buffer])
+                    batched = "\n".join(
+                        [f"{m[1]}: {m[2]}" for m in self._message_buffer]
+                    )
                     self._last_processed_window = batched
                     # Use the last message's id for reply threading
                     self._reply_to_id = self._message_buffer[-1][3]
                     self._should_reply = False
                 else:
                     self._last_processed_window = ""
-                
+
                 # Clear buffer (Retention rules apply: only keep for the window)
                 self._message_buffer = []
 
@@ -233,38 +266,48 @@ class _TelegramChannel:
                 return True
             else:
                 del self._muted_users[user_id]
-                
+
         now = time.time()
         history = self._user_msg_rates.get(user_id, [])
-        history = [ts for ts in history if now - ts < 10] # 10 second window for rate limiting
+        history = [
+            ts for ts in history if now - ts < 10
+        ]  # 10 second window for rate limiting
         history.append(now)
         self._user_msg_rates[user_id] = history
-        
+
         if len(history) > 5:
             mute_count = self._user_mute_counts.get(user_id, 0) + 1
             self._user_mute_counts[user_id] = mute_count
 
             username = user.username or user.full_name or str(user_id)
             logging.warning(f"User with id: {user_id} | username: {username} muted for spamming.")
-            self._muted_users[user_id] = now + 120 # 2 minute cool-down
-            
+            self._muted_users[user_id] = now + 120  # 2 minute cool-down
+
             if mute_count >= 3:
                 for admin_id in self.admin_ids:
                     try:
-                        alert_msg = (f"🚨 **Spam Alert** 🚨\n"
-                                        f"User @{username} (ID: {user_id}) has been temporarily muted for spamming.\n"
-                                        f"Total times muted: {mute_count}")
-                        await self.bot.send_message(chat_id=admin_id, text=alert_msg)
+                        alert_msg = (
+                            f"🚨 **Spam Alert** 🚨\n"
+                            f"User @{username} (ID: {user_id}) has been temporarily muted for spamming.\n"
+                            f"Total times muted: {mute_count}"
+                        )
+                        await self.bot.send_message(
+                            chat_id=admin_id, text=alert_msg
+                        )
                     except Exception as e:
-                        logging.error(f"Failed to notify admin {admin_id}: {e}")
-                        
+                        logging.error(
+                            f"Failed to notify admin {admin_id}: {e}"
+                        )
+
             return True
-            
+
         return False
 
     async def _on_media_rejected(self, message: types.Message):
         """Feature: Block files, images, audio, voice notes."""
-        logging.info("Denied capability invoked: Media/File uploaded. Discarding.")
+        logging.info(
+            "Denied capability invoked: Media/File uploaded. Discarding."
+        )
         # Silently discard to prevent abuse surface / leakage
         pass
 
@@ -272,13 +315,13 @@ class _TelegramChannel:
         """Build the aiogram bot, start polling, and run until stopped."""
         self.bot = Bot(token=token)
         self.dp = Dispatcher()
-        
+
         try:
             # Get bot info for tag detection
             bot_info = await self.bot.get_me()
             self.bot_username = bot_info.username
             self.bot_id = bot_info.id
-            
+
             self.dp.message.register(self._start_cmd, Command("start"))
             self.dp.message.register(self._about_cmd, Command("about"))
             self.dp.message.register(self._privacy_cmd, Command("privacy"))
@@ -287,14 +330,17 @@ class _TelegramChannel:
             self.dp.message.register(self._on_message, F.text)
             self.dp.message.register(self._on_media_rejected, ~F.text)
 
-            
             self.connected = True
-            
+
             # Start window manager
             asyncio.create_task(self._window_manager())
-            
+
             # Start polling as a task so we can cancel it
-            self._polling_task = asyncio.create_task(self.dp.start_polling(self.bot, skip_updates=True, handle_signals=False))
+            self._polling_task = asyncio.create_task(
+                self.dp.start_polling(
+                    self.bot, skip_updates=True, handle_signals=False
+                )
+            )
             await self._polling_task
         except asyncio.CancelledError:
             pass
@@ -324,8 +370,10 @@ class _TelegramChannel:
         # Reload config if path provided
         if config_path is None:
             self.load_config(self.config_path)
-            
-        self.thread = threading.Thread(target=self._thread_main, args=(token,), daemon=True)
+
+        self.thread = threading.Thread(
+            target=self._thread_main, args=(token,), daemon=True
+        )
         self.thread.start()
         return self.thread
         # return "OK"
@@ -339,11 +387,20 @@ class _TelegramChannel:
     def send_message(self, text):
         """Send a text message to the active chat, dispatched to the bot's event loop."""
         text = text.replace("\\n", "\n")
-        if not self.connected or self.bot is None or self.loop is None or self.chat_id is None:
+        if (
+            not self.connected
+            or self.bot is None
+            or self.loop is None
+            or self.chat_id is None
+        ):
             return
-        
+
         fut = asyncio.run_coroutine_threadsafe(
-            self.bot.send_message(chat_id=self.chat_id, text=text, reply_to_message_id=self._reply_to_id),
+            self.bot.send_message(
+                chat_id=self.chat_id,
+                text=text,
+                reply_to_message_id=self._reply_to_id,
+            ),
             self.loop,
         )
         try:
@@ -351,7 +408,9 @@ class _TelegramChannel:
         except Exception:
             pass
 
+
 _channel = _TelegramChannel()
+
 
 def getLastMessage():
     """Return the last processed batch window."""
@@ -361,31 +420,33 @@ def getLastMessage():
         last_msg = _channel.get_last_message()
         if last_msg is not None:
             return str(last_msg)
-        
+
         time.sleep(1)
-        
+
     return ""
+
 
 def start_telegram(token, chat_id=None):
     """Initialize and start the Telegram bot."""
     if isinstance(token, list) and len(token) > 0:
         token = str(token[0])
-    
+
     token = str(token).strip("\"' ")
-    
+
     if isinstance(chat_id, list) and len(chat_id) > 0:
         chat_id = str(chat_id[0])
 
     if chat_id is not None:
         chat_id = str(chat_id).strip("\"' ")
-            
+
     return _channel.start(token, chat_id)
+
 
 def stop_telegram():
     """Stop the Telegram bot."""
     _channel.stop()
 
+
 def send_message(text):
     """Send a message to the active Telegram chat."""
     _channel.send_message(text)
-
