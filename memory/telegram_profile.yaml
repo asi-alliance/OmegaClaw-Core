@@ -13,7 +13,7 @@ telegram:
     if_enabled_treat_as_direct_tag: true
   batching:
     enabled: true
-    window_seconds: 5
+    window_seconds: 30
     max_model_calls_per_chat_per_window: 1
     max_replies_per_chat_per_window: 1
   reply_constraints:
@@ -149,7 +149,7 @@ logging:
   minimize_sensitive_content_logging: true
 
 admin_controls:
-  admin_ids: []  # Add authorized admin Telegram IDs here
+  admin_ids: [] # Add authorized admin Telegram IDs here
   global_kill_switch: true
   per_chat_pause: true
   per_user_cooldown_or_mute: true
