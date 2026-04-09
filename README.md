@@ -18,8 +18,13 @@ Long-term memory is deliberately maintained by the agent through:
 
 - `(remember string)` for adding memory items
 - `(query string)` for querying related memories
+- `(episodes time)` for retrieving episodes around a point in time
 
-The agent can learn and apply **new skills** and **declarative knowledge** through the use of memory items.
+Additionally the agent has an episodic trace for observations, tool usage record, and self-created working working memory items:
+
+- `(pin string)` for adding a message to itself to its episodic trace
+
+The agent can follow multistep operations effectively by pinning, and learn and apply **new skills** and **knowledge** through the use of memory items.
 
 In addition, an initial set of **OpenClaw-like tools** is implemented, including:
 
