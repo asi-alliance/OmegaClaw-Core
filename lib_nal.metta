@@ -157,6 +157,10 @@
 (= (|-nal ((--> $R (× $A $B)) $T1) ((--> $C $B) $T2)) ((--> $R (× $A $C)) (Truth_Abduction $T1 $T2)))
 
 ;;NAL-5
+;;Syllogisms:
+(= (|-nal ((==> $a $b) $T1) ((==> $b $c) $T2)) ((==> $a $c) (Truth_Deduction $T1 $T2)))
+(= (|-nal ((==> $a $b) $T1) ((==> $a $c) $T2)) ((==> $c $b) (Truth_Induction $T1 $T2)))
+(= (|-nal ((==> $a $c) $T1) ((==> $b $c) $T2)) ((==> $b $a) (Truth_Abduction $T1 $T2)))
 ;;!Negation ∧ and ∨ decomposition:
 (= (|-nal ((¬ $A) $T)) ($A (Truth_Negation $T)))
 (= (|-nal ((∧ $A $B) $T)) ($A (Truth_StructuralDeduction $T)))
