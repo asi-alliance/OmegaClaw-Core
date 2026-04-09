@@ -7,11 +7,16 @@ set -euo pipefail
 #######################################################
 image="${1:?usage: $0 <container-image>}"
 
-
+# Create temporary files
 tmp_channel_file="$(mktemp)"
 tmp_token_file="$(mktemp)"
 tmp_py_file="$(mktemp --suffix=.py)"
 trap 'rm -f "$tmp_channel_file" "$tmp_token_file" "$tmp_py_file"' EXIT
+
+# Lock down permissions immediately after creation
+chmod 0600 "$tmp_channel_file"
+chmod 0600 "$tmp_token_file"
+chmod 0600 "$tmp_py_file"
 
 cat >"$tmp_py_file" <<'PY'
 import sys
