@@ -1,5 +1,9 @@
 ;configured at runtime:
 (= (isTelegram) (== (commchannel) telegram))
+(= (isRequired $file) (or (== $file (library mettaclaw ./memory/prompt.txt)) (== $file (library mettaclaw ./memory/history.metta))))
+(= (isTelegramButNotRequired $file) (and (isTelegram) (not (isRequired $file))))
+(= (BOT_TOKEN) (empty))
+(= (CHAT_ID) (empty))
 (= (IRC_channel) (empty))
 (= (IRC_server) (empty))
 (= (IRC_port) (empty))
@@ -8,8 +12,6 @@
 (= (MM_URL) (empty))
 (= (MM_CHANNEL_ID) (empty))
 (= (MM_BOT_TOKEN) (empty))
-(= (BOT_TOKEN) (empty))
-(= (CHAT_ID) (empty))
 
 ;Connect all the channels:
 (= (initChannels)
@@ -21,8 +23,8 @@
                                   (configure IRC_port 6667)
                                   (configure IRC_user maxbotnick)
                                   (py-call (irc.start_irc (IRC_channel) (IRC_server) (IRC_port) (IRC_user)))))
-                 (telegram  (progn (configure BOT_TOKEN "")
-                                   (configure CHAT_ID "5011454213")
+                 (telegram  (progn (configure BOT_TOKEN "") ;; remove after test
+                                    (configure CHAT_ID "")
                                    (py-call (tg_channel.start_telegram (BOT_TOKEN) (CHAT_ID)))))
                  ($_ (progn (configure MM_URL "https://chat.singularitynet.io")
                             (configure MM_CHANNEL_ID "8fjrmabjx7gupy7e5kjznpt5qh")
@@ -31,10 +33,11 @@
 
 ;Receive the latest user message considering all communication channels:
 (= (receive)
-   (case (commchannel)
-         ((irc      (py-call (irc.getLastMessage)))
-          (telegram  (py-call (tg_channel.getLastMessage)))
-          ($_ (py-call (mattermost.getLastMessage))))))
+   (if (== (commchannel) irc)
+       (py-call (irc.getLastMessage))
+       (if (== (commchannel) telegram)
+           (py-call (tg_channel.getLastMessage))
+           (py-call (mattermost.getLastMessage)))))
 
 ;Send a message to all communication channels:
 !(change-state! &lastsend "")
@@ -42,10 +45,11 @@
    (if (!= $msg (get-state &lastsend))
        (progn (change-state! &lastsend $msg)
               (let $safemsg (string-replace $msg  "\n" "\\n")
-                   (case (commchannel)
-                         ((irc      (let $temp (cut) (py-call (irc.send_message $safemsg))))
-                          (telegram  (let $temp (cut) (py-call (tg_channel.send_message $safemsg))))
-                          ($_ (let $temp (cut) (py-call (mattermost.send_message $safemsg)))))))) _))
+                   (if (== (commchannel) irc)
+                       (let $temp (cut) (py-call (irc.send_message $safemsg)))
+                       (if (== (commchannel) telegram)
+                           (let $temp (cut) (py-call (tg_channel.send_message $safemsg)))
+                           (let $temp (cut) (py-call (mattermost.send_message $safemsg))))))) _))
 
 ;Search the internet for some information:
 (= (search $msg)

@@ -11,6 +11,7 @@
 !(import! &self (library mettaclaw ./channels/tg_channel.py))
 !(import! &self (library mettaclaw ./src/utils))
 !(import! &self (library mettaclaw ./src/channels))
+!(import! &self (library mettaclaw ./src/config_helper.py))
 !(import! &self (library mettaclaw ./src/skills))
 !(import! &self (library mettaclaw ./src/memory))
 !(import! &self (library mettaclaw ./src/context))

@@ -6,10 +6,11 @@
 (= (provider) (empty))
 
 (= (initLoop)
-   (progn (configure maxLoops 50) ;20
-          (configure sleepInterval 1) ;10
-          (configure LLM minimax/minimax-m2.5)
-          (configure provider OpenAI) ; OpenAI or ASICloud
+   (progn (println! "=== MettaClaw Configuration ===")
+          (configure maxLoops 50)
+          (configure sleepInterval 1)
+          (configure LLM gpt-5.4)
+          (configure provider OpenAI)
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
           (change-state! &prevmsg "")
@@ -30,14 +31,22 @@
 (= (ethics-pass $sexpr)
    (if (isTelegram)
        (case $sexpr 
-         (((search $s) (if (is-unsafe $s) (Error search "Refused: Unsafe search query.") $sexpr))
-          ((send $s) (if (is-unsafe $s) (Error send "Refused: Unsafe response content.") $sexpr))
-          ((remember $s) (if (is-sensitive $s) (Error remember "Refused: Sensitive traits/profiling blocked.") $sexpr))
+         (((search $s) (if (== (py-call (tg_channel.is_search_disabled)) True) 
+                           (Error search "Refused: Search is disabled by admin.")
+                           (if (py-call (config_helper.is_category_blocked $s)) 
+                               (progn (py-call (tg_channel.alert_ethics_violation "search")) (Error search "Refused: Unsafe search query.")) 
+                               $sexpr)))
+          ((send $s) (if (py-call (config_helper.is_category_blocked $s)) 
+                         (progn (py-call (tg_channel.alert_ethics_violation "send")) (Error send "Refused: Unsafe response content.")) 
+                         $sexpr))
+          ((remember $s) (if (py-call (config_helper.is_memory_forbidden $s)) 
+                             (progn (py-call (tg_channel.alert_ethics_violation "remember")) (Error remember "Refused: Sensitive traits/profiling blocked.")) 
+                             $sexpr))
           ($else $sexpr)))
        $sexpr))
 
-(= (is-unsafe $s) (or (== $s "bomb") (== $s "malware") (== $s "exploit") (== $s "hack") (== $s "weapon") (== $s "illegal")))
-(= (is-sensitive $s) (or (== $s "politics") (== $s "health") (== $s "religion") (== $s "race") (== $s "gender") (== $s "identity")))
+(= (is-unsafe $s) (py-call (config_helper.is_category_blocked $s)))
+(= (is-sensitive $s) (py-call (config_helper.is_memory_forbidden $s)))
 
 (= (mettaclaw)
    (mettaclaw 1))
@@ -74,5 +83,5 @@
                                       (progn (if (or $msgnew  (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
                                              (change-state! &lastresults (string-safe (repr $results))))) _))
                       (sleep (sleepInterval))
-                      (mettaclaw (+ 1 $k)))))))
+                      (mettaclaw (+ 1 $k))))))
 

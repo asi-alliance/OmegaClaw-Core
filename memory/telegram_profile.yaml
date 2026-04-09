@@ -1,0 +1,157 @@
+profile_name: telegram_mode_v1
+description: >
+  Telegram-only MeTTaClaw profile. Callable capabilities are restricted to
+  Telegram reply generation and safe search lookup. Learning is allowed only
+  through an internal gated store and may not expand external powers.
+
+telegram:
+  observe_messages: true
+  reply_only_when_directly_tagged: true
+  reply_on_reply_to_bot: true
+  dm_support:
+    enabled: false
+    if_enabled_treat_as_direct_tag: true
+  batching:
+    enabled: true
+    window_seconds: 30
+    max_model_calls_per_chat_per_window: 1
+    max_replies_per_chat_per_window: 1
+  reply_constraints:
+    same_chat_only: true
+    text_only: true
+    allow_files: false
+    allow_media: false
+    allow_admin_actions: false
+    allow_new_outbound_chats: false
+
+callable_capabilities:
+  telegram_reply:
+    enabled: true
+    constraints:
+      - same_chat_only
+      - text_only
+      - no_files
+      - no_admin_actions
+  safe_search_lookup:
+    enabled: true
+    result_mode: snippets_only
+    constraints:
+      - no_clickthrough
+      - no_forms
+      - no_login
+      - no_arbitrary_url_fetch
+      - no_authenticated_sites
+      - no_file_downloads
+
+disabled_tools:
+  shell: true
+  sudo: true
+  file_read: true
+  file_write: true
+  file_append: true
+  send_file: true
+  send_message_outside_current_chat: true
+  browser_automation: true
+  arbitrary_http: true
+  arbitrary_eval: true
+  plugin_install: true
+  connector_access: true
+  memory_write_tool: true
+  skill_creation_tool: true
+
+internal_learning:
+  enabled: true
+  note: >
+    Memory and skill learning are internal gated subsystems, not callable tools.
+  durable_memory:
+    enabled: true
+    scope: telegram_local
+    categories_allowed:
+      - channel_norm
+      - explicit_user_preference
+      - explicit_user_identifier
+      - safe_operational_heuristic
+      - safe_search_heuristic
+      - safe_reply_heuristic
+    categories_forbidden:
+      - secret
+      - credential
+      - sensitive_personal_data
+      - inferred_demographic_trait
+      - political_or_religious_profile
+      - health_or_mental_state_profile
+      - vulnerability_profile
+      - reputation_score
+      - cross_service_identity_link
+      - indefinite_raw_message_archive
+    require_user_visible_or_explainable: true
+    require_delete_support: true
+    require_source_attribution: true
+  learned_skills:
+    enabled: true
+    classes_allowed:
+      - response_structure
+      - summarization_pattern
+      - search_query_rewrite
+      - citation_pattern
+      - channel_etiquette
+    classes_forbidden:
+      - external_action
+      - filesystem_operation
+      - browser_action
+      - arbitrary_network_action
+      - code_execution
+      - jailbreak_or_evasion
+      - persuasion_optimization
+    lifecycle:
+      create_candidate: true
+      rewrite_existing: true
+      canary_evaluation_required: true
+      rollback_supported: true
+      activation_requires_safety_check: true
+
+ethics_pass:
+  enabled: true
+  run_before_search: true
+  run_before_reply: true
+  run_before_durable_memory_write: true
+  run_before_skill_activation: true
+  outcomes:
+    - ALLOW
+    - ALLOW_NO_SEARCH
+    - SAFE_ANSWER
+    - REFUSE_WARN
+    - ADMIN_FLAG
+  blocked_categories:
+    - child_sexual_content
+    - nonconsensual_sexual_content
+    - fraud_or_scam_enablement
+    - credential_theft_or_phishing
+    - malware_or_hacking_enablement
+    - doxxing_or_private_data_lookup
+    - stalking_or_invasive_surveillance
+    - violent_wrongdoing_or_terror_enablement
+    - hateful_targeted_abuse
+    - self_harm_or_harm_instructions
+    - safeguard_bypass_requests
+
+logging:
+  metadata_events:
+    - batch_created
+    - tag_detected
+    - ethics_outcome
+    - search_attempted
+    - reply_emitted
+    - memory_write_attempted
+    - memory_write_blocked
+    - skill_candidate_created
+    - skill_activation_result
+  minimize_sensitive_content_logging: true
+
+admin_controls:
+  admin_ids: [] # Add authorized admin Telegram IDs here
+  global_kill_switch: true
+  per_chat_pause: true
+  per_user_cooldown_or_mute: true
+  disable_search_only: true
+  purge_memory: true
