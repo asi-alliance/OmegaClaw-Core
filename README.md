@@ -87,6 +87,7 @@ mkdir -p repos && git clone https://github.com/asi-alliance/OmegaClaw-Core.git r
 
 **Usage**
 
+Please install the Python 'openai' library. Typically this is done using `python3 -m pip install openai`.
 Run the system via the following command which ensures the system is started from the root folder of PeTTa:
 
 ```
