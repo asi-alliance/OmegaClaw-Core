@@ -52,6 +52,8 @@ Each memory item is stored as a triplet:
 
 ## Quick Start - IRC Channel
 
+Create a Docker container to run your own OmegaClaw on an IRC channel you specify.
+
 Requirement: Docker
 
 OmegaClaw can be installed and started with:
@@ -72,5 +74,6 @@ Your OmegaClaw will retain its memory for subsequent restarts.
 
 ---
 
-## Installation
+## Full Installation
+
 
