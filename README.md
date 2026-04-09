@@ -82,7 +82,7 @@ First, get [SWI-Prolog](https://www.swi-prolog.org/Download.html). Then:
 ```
 git clone https://github.com/trueagi-io/PeTTa
 cd PeTTa
-mkdir -p repos && git clone https://github.com/asi-alliance/OmegaClaw-Core.git repos/mettaclaw
+mkdir -p repos && git clone https://github.com/asi-alliance/OmegaClaw-Core.git repos/omegaclaw
 ```
 
 **Usage**
@@ -90,6 +90,6 @@ mkdir -p repos && git clone https://github.com/asi-alliance/OmegaClaw-Core.git r
 Run the system via the following command which ensures the system is started from the root folder of PeTTa:
 
 ```
-cp repos/mettaclaw/run.metta ./
+cp repos/omegaclaw/run.metta ./
 OPENAI_API_KEY=... sh run.sh run.metta
 ```
