@@ -77,7 +77,7 @@ Your OmegaClaw will retain its memory for subsequent restarts.
 ## Full Installation
 
 
-First, get [SWI-Prolog](https://www.swi-prolog.org/). Then:
+First, get [SWI-Prolog](https://www.swi-prolog.org/Download.html). Then:
 
 ```
 git clone https://github.com/trueagi-io/PeTTa
