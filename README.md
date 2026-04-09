@@ -69,3 +69,8 @@ When done interacting with your OmegaClaw, please use these commands as needed:
 | View logs | `docker logs -f omegaclaw` |
 
 Your OmegaClaw will retain its memory for subsequent restarts.
+
+---
+
+## Installation
+
