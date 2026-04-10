@@ -80,7 +80,7 @@ class _TelegramChannel:
             self.reply_only_on_tag = tg_cfg.get("reply_only_when_directly_tagged", True)
             self.reply_on_reply = tg_cfg.get("reply_on_reply_to_bot", True)
             self.dm_enabled = tg_cfg.get("dm_support", {}).get("enabled", False)
-            self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
+            # self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
 
             logging.info(f"Loaded config from {config_path}: window={self.window_seconds}s, tag_only={self.reply_only_on_tag}")
         except Exception as e:
@@ -339,6 +339,19 @@ class _TelegramChannel:
             bot_info = await self.bot.get_me()
             self.bot_username = bot_info.username
             self.bot_id = bot_info.id
+
+            if self.chat_id:
+                try:
+                    eval_chat_id = str(self.chat_id)
+                    if not eval_chat_id.startswith('-'):
+                        eval_chat_id = f"-{eval_chat_id}"
+                    admins = await self.bot.get_chat_administrators(eval_chat_id)
+                    for admin in admins:
+                        if admin.user.id not in self.admin_ids:
+                            self.admin_ids.append(admin.user.id)
+                    logging.info(f"Loaded admins from group {self.chat_id}. Total admins: {len(self.admin_ids)}")
+                except Exception as e:
+                    logging.error(f"Failed to fetch administrators for chat {self.chat_id}: {e}")
             
             self.dp.message.register(self._start_cmd, Command("start"))
             self.dp.message.register(self._about_cmd, Command("about"))
