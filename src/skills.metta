@@ -50,7 +50,7 @@
 (= (technical-analysis $ticker)
    (py-call (agentverse.technical_analysis $ticker)))
 
-!(import_prolog_functions_from_file (library mettaclaw ./src/skills.pl) (shell first_char))
+!(import_prolog_functions_from_file (library omegaclaw ./src/skills.pl) (shell first_char))
 
 (= (metta $str)
    (let $code (sread $str)

@@ -11,7 +11,7 @@ _connected = False
 
 # ---- Mattermost config (dummy token ok) ----
 MM_URL = "https://chat.singularitynet.io"
-CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "mettaclaw"x
+CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "omegaclaw"x
 BOT_TOKEN = ""
 
 def _get_bot_user_id():

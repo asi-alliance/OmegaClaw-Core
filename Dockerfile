@@ -72,13 +72,13 @@ WORKDIR /PeTTa
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /PeTTa /PeTTa
 
-# Bring in only local MeTTaClaw source (filtered by .dockerignore).
-COPY . /PeTTa/repos/mettaclaw
+# Bring in only local OmegaClaw source (filtered by .dockerignore).
+COPY . /PeTTa/repos/omegaclaw
 
-RUN cp /PeTTa/repos/mettaclaw/run.metta /PeTTa/run.metta \
- && chown -R 65534:65534 /PeTTa/repos/mettaclaw/memory \
- && find /PeTTa/repos/mettaclaw/memory -type f -exec chmod 0644 {} \; \
- && chmod 0444 /PeTTa/repos/mettaclaw/memory/prompt.txt
+RUN cp /PeTTa/repos/omegaclaw/run.metta /PeTTa/run.metta \
+ && chown -R 65534:65534 /PeTTa/repos/omegaclaw/memory \
+ && find /PeTTa/repos/omegaclaw/memory -type f -exec chmod 0644 {} \; \
+ && chmod 0444 /PeTTa/repos/omegaclaw/memory/prompt.txt
 
 USER 65534:65534
 

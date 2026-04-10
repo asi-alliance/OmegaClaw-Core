@@ -12,10 +12,10 @@
           (configure maxHistory 30000)))
 
 (= (getPrompt)
-   (read-file (library mettaclaw ./memory/prompt.txt)))
+   (read-file (library omegaclaw ./memory/prompt.txt)))
 
 (= (getHistory)
-   (let $ret (read-file (library mettaclaw ./memory/history.metta))
+   (let $ret (read-file (library omegaclaw ./memory/history.metta))
         (last_chars $ret (maxHistory))))
 
 (= (addToHistory $lastmessage $response $sexpr $msgnew)
@@ -28,7 +28,7 @@
            (appendToHistory ((get_time_as_string) (newline) $response (newline) ERROR_FEEDBACK: (get-state &error))))))
 
 (= (appendToHistory $addition)
-   (append-file (library mettaclaw ./memory/history.metta) (swrite $addition)))
+   (append-file (library omegaclaw ./memory/history.metta) (swrite $addition)))
 
 (= (remember $str)
    (py-call (lib_chromadb.remember $str (useGPTEmbedding (string-safe $str)) (get_time_as_string))))

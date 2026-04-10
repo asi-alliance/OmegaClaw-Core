@@ -31,9 +31,9 @@
                                           (change-state! &error $new)))
                  ($else $sexpr))))
 
-(= (mettaclaw)
-   (mettaclaw 1))
-(= (mettaclaw $k)
+(= (omegaclaw)
+   (omegaclaw 1))
+(= (omegaclaw $k)
    (progn (if (== $k 1) (progn (initLoop)
                                (initMemory)
                                (initChannels))
@@ -71,4 +71,4 @@
                                 (if (> (get_time) (get-state &nextWakeAt))
                                     (change-state! &loops (+ 1 (maxWakeLoops))) _)))
                       (sleep (sleepInterval))
-                      (mettaclaw (+ 1 $k))))))
+                      (omegaclaw (+ 1 $k))))))

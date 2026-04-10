@@ -64,7 +64,7 @@ def _irc_loop(channel, server, port, nick):
         _sock = None
     sock.close()
 
-def start_irc(channel, server="irc.libera.chat", port=6667, nick="mettaclaw"):
+def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw"):
     global _running, _channel
     nick = f"{nick}{random.randint(1000, 9999)}"
     _running = True
