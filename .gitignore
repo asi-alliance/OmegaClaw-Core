@@ -1,0 +1,11 @@
+# embedded vector store
+memory/chroma_db/
+
+# pulled in repos
+repos/
+
+# secrets
+.env
+
+# editor backup files
+*~
