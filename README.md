@@ -65,6 +65,19 @@ curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/he
 ```
 When prompted, enter your OpenAI API key and a unique IRC channel name, then interact with your OmegaClaw at [webchat.quakenet.org](https://webchat.quakenet.org) or any IRC portal. 
 
+### Channel authentication
+
+At startup, the setup script prints a **one-time secret**.
+
+To activate message handling, send this command in your channel exactly once:
+
+```text
+auth <one-time-secret>
+```
+
+The first user who sends the correct secret becomes the authenticated user.
+All messages from other users are silently ignored.
+
 When done interacting with your OmegaClaw, please use these commands as needed:
 
 | Action | Command |

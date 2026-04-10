@@ -1,6 +1,10 @@
-import threading, json
-import requests, websocket
+import json
+import os
+import threading
 import time
+
+import requests
+import websocket
 
 _running = False
 _ws = None
@@ -8,6 +12,9 @@ _ws_lock = threading.Lock()
 _last_message = ""
 _msg_lock = threading.Lock()
 _connected = False
+_auth_lock = threading.Lock()
+_auth_secret = ""
+_authenticated_user_id = None
 
 # ---- Mattermost config (dummy token ok) ----
 MM_URL = "https://chat.singularitynet.io"
@@ -36,6 +43,40 @@ def getLastMessage():
         tmp = _last_message
         _last_message = ""
         return tmp
+
+
+def _set_auth_secret(secret=None):
+    global _auth_secret, _authenticated_user_id
+    if secret is None:
+        secret = os.environ.get("OMEGACLAW_AUTH_SECRET", "")
+    with _auth_lock:
+        _auth_secret = (secret or "").strip()
+        _authenticated_user_id = None
+
+
+def _parse_auth_candidate(msg):
+    text = msg.strip()
+    lower = text.lower()
+    if lower.startswith("auth "):
+        return text[5:].strip()
+    if lower.startswith("/auth "):
+        return text[6:].strip()
+    return text
+
+
+def _is_allowed_message(user_id, msg):
+    global _authenticated_user_id
+    candidate = _parse_auth_candidate(msg)
+    with _auth_lock:
+        if not _auth_secret:
+            return True
+        if candidate == _auth_secret:
+            if _authenticated_user_id is None:
+                _authenticated_user_id = user_id
+            return False
+        if _authenticated_user_id is None:
+            return False
+        return user_id == _authenticated_user_id
 
 def _get_display_name(user_id):
     r = requests.get(
@@ -76,8 +117,11 @@ def _ws_loop():
             if event.get("event") == "posted":
                 post = json.loads(event["data"]["post"])
                 if post["channel_id"] == CHANNEL_ID and post["user_id"] != BOT_USER_ID:
-                    name = _get_display_name(post["user_id"])
-                    _set_last(f"{name}: {post['message']}")
+                    user_id = post["user_id"]
+                    message = post.get("message", "")
+                    if _is_allowed_message(user_id, message):
+                        name = _get_display_name(user_id)
+                        _set_last(f"{name}: {message}")
 
         except websocket.WebSocketTimeoutException:
             continue
@@ -87,13 +131,15 @@ def _ws_loop():
     ws.close()
     _connected = False
 
-def start_mattermost(MM_URL_, CHANNEL_ID_, BOT_TOKEN_):
-    global _running, MM_URL, CHANNEL_ID, BOT_TOKEN, _headers
+def start_mattermost(MM_URL_, CHANNEL_ID_, BOT_TOKEN_, auth_secret=None):
+    global _running, MM_URL, CHANNEL_ID, BOT_TOKEN, _headers, _connected
     MM_URL = MM_URL_
     CHANNEL_ID = CHANNEL_ID_
     BOT_TOKEN = BOT_TOKEN_
     _headers = {"Authorization": f"Bearer {BOT_TOKEN}"}
     _running = True
+    _connected = False
+    _set_auth_secret(auth_secret)
     t = threading.Thread(target=_ws_loop, daemon=True)
     t.start()
     return t

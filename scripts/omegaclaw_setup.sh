@@ -95,26 +95,35 @@ python3 "$tmp_py_file" "$tmp_channel_file" "$tmp_token_file" </dev/tty
 
 channel="$(cat "$tmp_channel_file")"
 token="$(cat "$tmp_token_file")"
+auth_secret="$(python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(24))
+PY
+)"
 
-printf '%s\n' \
-  '============================================' \
-  ' QuakeNet / OmegaClaw Instructions' \
-  '============================================' \
-  'Please go to https://webchat.quakenet.org/' \
-  'and enter your name and channel.' \
-   '' \
-  'Stop OmegaClaw:' \
-  '  docker stop omegaclaw' \
-  '' \
-  'Stop OmegaClaw:' \
-  '  docker stop omegaclaw' \
-  '' \
-  'Restart OmegaClaw:' \
-  '  docker start omegaclaw' \
-  '' \
-  'Examine log file in case of problem:' \
-  '  docker logs -f omegaclaw' \
-  '' \
+cat <<EOF
+============================================
+ QuakeNet / OmegaClaw Instructions
+============================================
+Please go to https://webchat.quakenet.org/
+and enter your name and channel.
+
+Authentication step (required):
+  In your channel, send this one-time secret exactly once:
+  auth ${auth_secret}
+  The first nickname that sends it becomes the only accepted user.
+  Messages from all other users will be silently ignored.
+
+Stop OmegaClaw:
+  docker stop omegaclaw
+
+Restart OmegaClaw:
+  docker start omegaclaw
+
+Examine log file in case of problem:
+  docker logs -f omegaclaw
+
+EOF
 
 docker rm -f omegaclaw 2>/dev/null || true
 
@@ -127,5 +136,6 @@ docker run -d -it \
   --tmpfs /run:size=16m,mode=755 \
   --tmpfs /var/tmp:size=64m,mode=1777 \
   -e ANTHROPIC_API_KEY="$token" \
+  -e OMEGACLAW_AUTH_SECRET="$auth_secret" \
   "$image" \
   "$channel"

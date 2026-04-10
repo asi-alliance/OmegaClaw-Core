@@ -1,4 +1,7 @@
-import socket, threading, random
+import os
+import random
+import socket
+import threading
 
 _running = False
 _sock = None
@@ -7,6 +10,9 @@ _last_message = ""
 _msg_lock = threading.Lock()
 _channel = None
 _connected = False
+_auth_lock = threading.Lock()
+_auth_secret = ""
+_authenticated_nick = None
 
 def _send(cmd):
     with _sock_lock:
@@ -27,6 +33,45 @@ def getLastMessage():
         tmp = _last_message
         _last_message = ""
         return tmp
+
+
+def _set_auth_secret(secret=None):
+    global _auth_secret, _authenticated_nick
+    if secret is None:
+        secret = os.environ.get("OMEGACLAW_AUTH_SECRET", "")
+    with _auth_lock:
+        _auth_secret = (secret or "").strip()
+        _authenticated_nick = None
+
+
+def _normalize_nick(nick):
+    return nick.strip().lower()
+
+
+def _parse_auth_candidate(msg):
+    text = msg.strip()
+    lower = text.lower()
+    if lower.startswith("auth "):
+        return text[5:].strip()
+    if lower.startswith("/auth "):
+        return text[6:].strip()
+    return text
+
+
+def _is_allowed_message(nick, msg):
+    global _authenticated_nick
+    candidate = _parse_auth_candidate(msg)
+    norm_nick = _normalize_nick(nick)
+    with _auth_lock:
+        if not _auth_secret:
+            return True
+        if candidate == _auth_secret:
+            if _authenticated_nick is None:
+                _authenticated_nick = norm_nick
+            return False
+        if _authenticated_nick is None:
+            return False
+        return norm_nick == _authenticated_nick
 
 def _irc_loop(channel, server, port, nick):
     global _running, _sock, _connected
@@ -57,18 +102,21 @@ def _irc_loop(channel, server, port, nick):
                         return  # malformed, ignore safely
 
                     msg = trailing.split(" :", 1)[1]
-                    _set_last(f"{nick}: {msg}")
+                    if _is_allowed_message(nick, msg):
+                        _set_last(f"{nick}: {msg}")
                 except Exception:
                     pass  # never let IRC parsing kill the thread
     with _sock_lock:
         _sock = None
     sock.close()
 
-def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw"):
-    global _running, _channel
+def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw", auth_secret=None):
+    global _running, _channel, _connected
     nick = f"{nick}{random.randint(1000, 9999)}"
     _running = True
+    _connected = False
     _channel = channel
+    _set_auth_secret(auth_secret)
     t = threading.Thread(target=_irc_loop, args=(channel, server, port, nick), daemon=True)
     t.start()
     return t
