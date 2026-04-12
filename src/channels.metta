@@ -16,7 +16,7 @@
               (progn (let $chan (argv 2) (configure IRC_channel $chan))
                      (configure IRC_server "irc.quakenet.org")
                      (configure IRC_port 6667)
-                     (configure IRC_user maxbotnick)
+                     (configure IRC_user omegaclaw)
                      (py-call (irc.start_irc (IRC_channel) (IRC_server) (IRC_port) (IRC_user))))
               (progn (configure MM_URL "https://chat.singularitynet.io")
                      (configure MM_CHANNEL_ID "8fjrmabjx7gupy7e5kjznpt5qh")
