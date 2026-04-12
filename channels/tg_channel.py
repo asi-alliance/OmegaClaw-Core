@@ -5,6 +5,8 @@ import time
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
+from src.config_helper import is_category_blocked
+
 
 import yaml
 import os
@@ -254,6 +256,12 @@ class _TelegramChannel:
         name = "unknown user" if user is None else (user.full_name or user.username or str(user.id))
         text = message.text
 
+        if is_category_blocked(text):
+            logging.warning(f"Ethics pass rejected incoming message from {name}: {text}")
+            message = "From: " + user.username + ": " + text if user and user.username else text
+            alert_ethics_violation("incoming_message", message)
+            return
+
         is_tagged = self.bot_username and f"@{self.bot_username}" in text
         is_reply = (self.reply_on_reply and 
                     message.reply_to_message and 
@@ -448,19 +456,23 @@ def stop_telegram():
 
 def send_message(text):
     """Send a message to the active Telegram chat."""
+    if is_category_blocked(text):
+        alert_ethics_violation("send", text)
+        return "Error: Refused: Unsafe response content."
+        
     _channel.send_message(text)
 
 def is_search_disabled():
     """Check if admin disabled searching."""
     return _channel.search_disabled
 
-def alert_ethics_violation(tool_name):
+def alert_ethics_violation(tool_name, text=None):
     """Allow MeTTa to trigger an ethics alert DM to admins."""
     if _channel.loop and _channel.bot:
         for admin_id in _channel.admin_ids:
             try:
                 fut = asyncio.run_coroutine_threadsafe(
-                    _channel.bot.send_message(chat_id=admin_id, text=f"🚨 Ethics Pass Triggered!\nAction Blocked: {tool_name}"),
+                    _channel.bot.send_message(chat_id=admin_id, text=f"🚨 Ethics Pass Triggered!\nAction Blocked: {tool_name} | With message: {text}"),
                     _channel.loop
                 )
             except Exception:
