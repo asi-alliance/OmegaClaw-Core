@@ -92,6 +92,12 @@ RUN mkdir -p /app/data \
  && touch /app/mettaclaw/telegram_bot.log \
  && chown mettauser:mettagroup /app/mettaclaw/telegram_bot.log
 
+# Declare persistent volumes
+# - memory: conversation history + config (prompt, policy, telegram profile)
+# - chroma_db: ChromaDB vector store for long-term embeddings
+# - data: general writable space for logs/future use
+VOLUME ["/app/mettaclaw/memory", "/app/PeTTa/chroma_db", "/app/data"]
+
 # Environment variables for PeTTa/Janus
 ENV PYTHONPATH=/app/mettaclaw:/app/mettaclaw/src:/app/mettaclaw/channels
 
