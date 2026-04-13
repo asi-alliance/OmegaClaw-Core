@@ -12,6 +12,8 @@
     ;COMMUNICATION CHANNELS:
     "- Send message to user: (send string_in_quotes)"
     "- Search the web: (search string_in_quotes)"
+    "- Search the web using the Tavily Search Agent: (tavily-search string_in_quotes)"
+    "- Get technical analysis for a stock ticker using the Technical Analysis Agent: (technical-analysis ticker_in_quotes)"
     ;CODE EXECUTION:
     "- Execute MeTTa expression: (metta sexpression)"
     "Example to invoke Non-Axiomatic Logic via MeTTa: "
