@@ -91,6 +91,7 @@ RUN apt-get update \
       gfortran \
       libgflags-dev \
       nano \
+      git \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /PeTTa
@@ -101,18 +102,17 @@ COPY --from=builder /opt/huggingface /opt/huggingface
 COPY --from=builder /opt/sentence_transformers /opt/sentence_transformers
 
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
-COPY . /PeTTa/repos/omegaclaw
+COPY . /PeTTa/repos/OmegaClaw-Core
 
-RUN cp /PeTTa/repos/omegaclaw/run.metta /PeTTa/run.metta \
- && ln -s /PeTTa/repos/omegaclaw /PeTTa/repos/omegaClaw-Core \
+RUN cp /PeTTa/repos/OmegaClaw-Core/run.metta /PeTTa/run.metta \
  && mkdir ./chroma_db \
  && chown -R 65534:65534 ./chroma_db \
- && chown -R 65534:65534 /PeTTa/repos/omegaclaw/memory \
- && find /PeTTa/repos/omegaclaw/memory -type f -exec chmod 0644 {} \; \
- && chmod 0444 /PeTTa/repos/omegaclaw/memory/prompt.txt \
+ && chown -R 65534:65534 /PeTTa/repos/OmegaClaw-Core/memory \
+ && find /PeTTa/repos/OmegaClaw-Core/memory -type f -exec chmod 0644 {} \; \
+ && chmod 0444 /PeTTa/repos/OmegaClaw-Core/memory/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
 USER 65534:65534
 
-ENTRYPOINT ["sh", "run.sh", "run.metta", "default"]
+ENTRYPOINT ["sh", "run.sh", "run.metta"]
 CMD []

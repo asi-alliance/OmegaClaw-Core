@@ -138,4 +138,4 @@ docker run -d -it \
   -e ANTHROPIC_API_KEY="$token" \
   -e OMEGACLAW_AUTH_SECRET="$auth_secret" \
   "$image" \
-  "$channel"
+  IRC_channel="$channel"
