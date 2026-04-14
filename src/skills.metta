@@ -6,6 +6,7 @@
            "- Pin a short-term working memory item: (pin string)"
            "- Send message to user: (send string)"
            "- Search the web: (search string)"
+           "- Save a newly acquired MeTTa skill snippet: (save-skill string)"
            "- Execute MeTTa expression: (metta sexpression)"
                "- Example to invoke Non-Axiomatic Logic via MeTTa: "
                "- (metta (|- ((--> (× sam garfield) friend) (stv 1.0 0.9))"
@@ -52,6 +53,13 @@
               (translatePredicate (nl $Out)),
               (translatePredicate (close $Out))
               True)))
+
+(= (save-skill $str)
+   (progn (translatePredicate (open (library mettaclaw ./memory/new-metta-skills.txt) append $Out))
+          (translatePredicate (write $Out $str))
+          (translatePredicate (nl $Out))
+          (translatePredicate (close $Out))
+          True))
 
 !(import_prolog_functions_from_file (library mettaclaw ./src/skills.pl) (run_cmd first_char))
 
