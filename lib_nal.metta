@@ -57,7 +57,7 @@
 
 (= (Truth_Union (stv $f1 $c1)
                 (stv $f2 $c2))
-   ((Truth_or $f1 $f2) (* $c1 $c2)))
+   (stv (Truth_or $f1 $f2) (* $c1 $c2)))
 
 (= (Truth_Difference (stv $f1 $c1)
                      (stv $f2 $c2))
@@ -84,7 +84,7 @@
 (= (Truth_DecomposeNNN (stv $f1 $c1)
                        (stv $f2 $c2))
    (let $fn (* (- 1 $f1) (- 1 $f2))
-        ((- 1 $fn) (* $fn (* $c1 $c2)))))
+        (stv (- 1 $fn) (* $fn (* $c1 $c2)))))
 
 (= (Truth_Eternalize (stv $f $c))
    (stv $f (Truth_w2c $c)))
@@ -157,6 +157,10 @@
 (= (|-nal ((--> $R (× $A $B)) $T1) ((--> $C $B) $T2)) ((--> $R (× $A $C)) (Truth_Abduction $T1 $T2)))
 
 ;;NAL-5
+;;Syllogisms:
+(= (|-nal ((==> $a $b) $T1) ((==> $b $c) $T2)) ((==> $a $c) (Truth_Deduction $T1 $T2)))
+(= (|-nal ((==> $a $b) $T1) ((==> $a $c) $T2)) ((==> $c $b) (Truth_Induction $T1 $T2)))
+(= (|-nal ((==> $a $c) $T1) ((==> $b $c) $T2)) ((==> $b $a) (Truth_Abduction $T1 $T2)))
 ;;!Negation ∧ and ∨ decomposition:
 (= (|-nal ((¬ $A) $T)) ($A (Truth_Negation $T)))
 (= (|-nal ((∧ $A $B) $T)) ($A (Truth_StructuralDeduction $T)))

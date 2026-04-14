@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Chroma db
+knowledge_db/
+
 # Distribution / packaging
 .Python
 build/
