@@ -1,6 +1,12 @@
 name: build
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -8,3 +14,4 @@ jobs:
     uses: ./.github/workflows/common.yml
     with:
       publish_docker: false
+      platforms: 'linux/amd64'

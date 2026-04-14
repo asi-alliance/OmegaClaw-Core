@@ -16,6 +16,11 @@ on:
         required: false
         default: 'latest'
         type: string
+      platforms:
+        description: 'Comma separated list of platforms to be built'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+        type: string
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -43,7 +48,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |
             singularitynet/omegaclaw:${{ inputs.tag_name }}
