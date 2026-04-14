@@ -152,6 +152,7 @@ docker run -d -it \
   --user 65534:65534 \
   --security-opt no-new-privileges:true \
   --init \
+  --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory \
   --tmpfs /tmp:size=64m,mode=1777 \
   --tmpfs /run:size=16m,mode=755 \
   --tmpfs /var/tmp:size=64m,mode=1777 \
