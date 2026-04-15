@@ -12,7 +12,7 @@
           (configure maxWakeLoops 1)
           (configure sleepInterval 1) ;10
           (configure LLM gpt-5.4)
-          (configure provider Anthropic) ;Anthropic or OpenAI or ASICloud
+          (configure provider Anthropic) ;Anthropic or OpenAI or ASICloud or OpenRouter
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
@@ -57,7 +57,9 @@
                                                    (useGPT (LLM) (maxOutputToken) (reasoningMode) $send)
                                                    (if (== (provider) Anthropic)
                                                        (py-call (lib_llm_ext.useClaude $send))
-                                                       (py-call (lib_llm_ext.useMiniMax $send)))))
+                                                       (if (== (provider) OpenRouter)
+                                                           (py-call (lib_llm_ext.useOpenRouter $send))
+                                                           (py-call (lib_llm_ext.useMiniMax $send))))))
                                        ($resp (py-call (helper.balance_parentheses $respi)))
                                        ($response (if (== "(" (first_char $resp)) $resp (progn (println! $resp) (repr (REMEMBER:OUTPUT_NOTHING_ELSE_THAN: ((skill arg) ...))))))
                                        ($sexpr (catch (sread $response)))
