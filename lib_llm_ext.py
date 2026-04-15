@@ -23,14 +23,18 @@ def _chat(client, model, content, max_tokens=6000):
     resp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": content}],
-        max_tokens=max_tokens
+        max_tokens=max_tokens,
+        extra_body={
+            "enable_thinking": True,
+            "thinking_budget": 6000 
+        }
     )
     return _clean(resp.choices[0].message.content)
 
 def useMiniMax(content):
     return _chat(
         client=ASI_CLIENT,
-        model="minimax/minimax-m2.5",
+        model="minimax/minimax-m2.7", #"asi1-mini"
         content=content
     )
 

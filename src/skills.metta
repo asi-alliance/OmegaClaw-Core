@@ -37,7 +37,7 @@
    (progn (translatePredicate (open $file write $Out))
           (translatePredicate (write $Out $str))
           (translatePredicate (close $Out))
-          True))
+          WRITE-FILE-SUCCESS))
 
 (= (append-file $file $str)
    (progn (translatePredicate (exists_file $file))
@@ -45,7 +45,7 @@
           (translatePredicate (write $Out $str))
           (translatePredicate (nl $Out)),
           (translatePredicate (close $Out))
-          True))
+          APPEND-FILE-SUCCESS))
 
 (= (tavily-search $query)
    (py-call (agentverse.tavily_search $query)))
@@ -57,4 +57,7 @@
 
 (= (metta $str)
    (let $code (sread $str)
-        (eval $code)))
+        (repr (swrite (eval $code)))))
+
+(= (pin $x)
+   PIN-SUCCESS)
