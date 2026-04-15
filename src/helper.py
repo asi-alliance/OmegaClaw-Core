@@ -49,7 +49,6 @@ def balance_parentheses(s):
         line = line.strip()
         if not line:
             continue
-        # case 1: already s-expression
         if line.startswith("(") and line.endswith(")"):
             inner = line[1:-1].strip()
             parts = inner.split(maxsplit=1)
@@ -57,29 +56,28 @@ def balance_parentheses(s):
             arg = parts[1] if len(parts) > 1 else ""
             if arg:
                 arg = arg.strip()
-                # if not quoted → fix it
                 if not (arg.startswith('"') and arg.endswith('"')):
                     arg = arg.replace('"', '\\"')
                     line = f'({cmd} "{arg}")'
+                else:
+                    line = f'({cmd} {arg})'
             else:
                 line = f'({cmd})'
-
             sexprs.append(line)
             continue
-        # case 2: plain line
         parts = line.split(maxsplit=1)
         cmd = parts[0]
         arg = parts[1] if len(parts) > 1 else ""
         if arg:
-            arg = arg.replace('"', '\\"')
-            sexprs.append(f'({cmd} "{arg}")')
+            arg = arg.strip()
+            if arg.startswith('"') and arg.endswith('"'):
+                sexprs.append(f'({cmd} {arg})')
+            else:
+                arg = arg.replace('"', '\\"')
+                sexprs.append(f'({cmd} "{arg}")')
         else:
             sexprs.append(f'({cmd})')
     ret = " ".join(sexprs)
-    #print("vvvv")
-    #print(s)
-    #print("-----")
-    #print(ret);
     return "(" + ret + ")"
 
 def normalize_string(x):
