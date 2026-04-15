@@ -43,19 +43,42 @@ def around_time(needle_time_str, k):
     return ret
 
 def balance_parentheses(s):
-    s = s.replace("_quote_", '"').strip()
-    first_paren = s.find('(')
-    if first_paren > 0:
-        garbage = s[:first_paren].strip()
-        s = s[first_paren:]
-        if garbage:
-            garbage = garbage.replace('"', '\\"')
-            s = s[:1] + f'(pin "{garbage}") ' + s[1:]
-    if s.startswith("((") and s.endswith("))"):
-        return s
-    if s.startswith("(") and s.endswith(")"):
-        return f"({s})"
-    return f"(({s}))"
+    s = s.replace("_quote_", '"')
+    sexprs = []
+    for line in s.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("(") and line.endswith(")"):
+            inner = line[1:-1].strip()
+            parts = inner.split(maxsplit=1)
+            cmd = parts[0]
+            arg = parts[1] if len(parts) > 1 else ""
+            if arg:
+                arg = arg.strip()
+                if not (arg.startswith('"') and arg.endswith('"')): 
+                    arg = arg.replace('"', '\\"')
+                    line = f'({cmd} "{arg}")'
+                else:
+                    line = f'({cmd} {arg})'
+            else:
+                line = f'({cmd})'
+            sexprs.append(line)
+            continue
+        parts = line.split(maxsplit=1)
+        cmd = parts[0]
+        arg = parts[1] if len(parts) > 1 else ""
+        if arg:
+            arg = arg.strip()
+            if arg.startswith('"') and arg.endswith('"'):
+                sexprs.append(f'({cmd} {arg})')
+            else:
+                arg = arg.replace('"', '\\"')
+                sexprs.append(f'({cmd} "{arg}")')
+        else:
+            sexprs.append(f'({cmd})')
+    ret = " ".join(sexprs)
+    return "(" + ret + ")"
 
 def normalize_string(x):
     try:

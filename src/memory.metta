@@ -40,7 +40,8 @@
    (append-file (library OmegaClaw-Core ./memory/history.metta) (swrite $addition)))
 
 (= (remember $str)
-   (py-call (lib_chromadb.remember $str (embed $str) (get_time_as_string))))
+   (progn (py-call (lib_chromadb.remember $str (embed $str) (get_time_as_string)))
+          REMEMBER-SUCCESS))
 
 (= (query $str)
    (py-call (lib_chromadb.query (embed $str) (maxRecallItems))))
