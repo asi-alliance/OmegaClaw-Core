@@ -10,4 +10,5 @@ jobs:
     with:
       publish_docker: true
       tag_name: ${{ github.event.release.tag_name }}
+      move_latest: true
     secrets: inherit
