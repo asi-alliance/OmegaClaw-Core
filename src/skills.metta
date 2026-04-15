@@ -46,4 +46,4 @@
 
 (= (metta $str)
    (let $code (sread $str)
-        (eval $code)))
+        (repr (swrite (eval $code)))))
