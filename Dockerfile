@@ -26,8 +26,6 @@ RUN apt-get update \
       gfortran \
       libgflags-dev \
       nano \
-      aiogram \
-      PyYAML      \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies from source. Pin refs at build time for reproducibility.
@@ -62,6 +60,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     janus-swi \
     openai \
     uagents \
+    aiogram \
+    PyYAML \
     sentence-transformers
 
 # Pre-download the sentence-transformers model so runtime does not need network access.
