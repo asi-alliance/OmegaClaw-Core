@@ -15,6 +15,10 @@ log_file_path = os.path.join(os.path.dirname(__file__), "..", "logs","telegram_b
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(log_file_path),
+        logging.StreamHandler()
+    ]
 )
 
 class _TelegramChannel:
@@ -35,7 +39,6 @@ class _TelegramChannel:
         self.msg_lock = threading.Lock()
         
         # Default settings
-        self.window_seconds = 5
         self.reply_only_on_tag = True
         self.reply_on_reply = True
         self.admin_ids = []
@@ -78,7 +81,7 @@ class _TelegramChannel:
             self.reply_only_on_tag = tg_cfg.get("reply_only_when_directly_tagged", True)
             self.reply_on_reply = tg_cfg.get("reply_on_reply_to_bot", True)
             self.dm_enabled = tg_cfg.get("dm_support", {}).get("enabled", False)
-            # self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
+            self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
 
             logging.info(f"Loaded config from {config_path}: window={self.window_seconds}s, tag_only={self.reply_only_on_tag}")
         except Exception as e:
@@ -270,25 +273,6 @@ class _TelegramChannel:
         with self.msg_lock:
             self._message_queue.append((chat_id, f"{name}: {text}", message.message_id))
             
-
-    async def _window_manager(self):
-        """Every window_seconds, batch buffered messages and surface them if bot was tagged."""
-        while self.running:
-            await asyncio.sleep(self.window_seconds)
-            with self.msg_lock:
-                for chat_id in list(self._message_buffers.keys()):
-                    buffer = self._message_buffers[chat_id]
-                    if not buffer:
-                        continue
-                    
-                    if self._should_reply.get(chat_id, False):
-                        batched = "\n".join([f"{m[1]}: {m[2]}" for m in buffer])
-                        reply_id = buffer[-1][3]
-                        self._ready_windows.append((chat_id, batched, reply_id))
-                        
-                    self._message_buffers[chat_id] = []
-                    self._should_reply[chat_id] = False
-                
 
     async def is_user_muted(self, user: types.User):
         """Feature: User mute / cool-down after repeated abuse."""

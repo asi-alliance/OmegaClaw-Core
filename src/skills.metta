@@ -43,7 +43,7 @@
    (progn (translatePredicate (open $file write $Out))
               (translatePredicate (write $Out $str))
               (translatePredicate (close $Out))
-              WRITE-FILE-SUCCESS)))
+              WRITE-FILE-SUCCESS))
 
 (= (append-file-raw $file $str)
    (progn (translatePredicate (open $file append $Out))
@@ -69,10 +69,8 @@
    (let $temp (cut) (translatePredicate (run_cmd $cmd $out)) $out))
 
 (= (metta $str)
-   (if (isTelegram)
-        (Error metta "DENIED: MeTTa evaluation is disabled in Telegram mode.")
        (let $code (sread $str)
-            (repr (swrite (eval $code))))))
+            (repr (swrite (eval $code)))))
 
 (= (pin $x)
    PIN-SUCCESS)
