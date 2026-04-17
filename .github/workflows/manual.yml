@@ -1,0 +1,25 @@
+name: manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_docker:
+        description: 'Publish Docker images to Docker Hub'
+        required: false
+        default: false
+        type: boolean
+      platforms:
+        description: 'Comma separated list of platforms to be built'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+        type: string
+
+jobs:
+  manual:
+    uses: ./.github/workflows/common.yml
+    with:
+      publish_docker: ${{ inputs.publish_docker }}
+      tag_name: ${{ github.sha }}
+      move_latest: false
+      platforms: ${{ inputs.platforms }}
+    secrets: inherit

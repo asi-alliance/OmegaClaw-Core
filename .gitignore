@@ -1,3 +1,12 @@
+# embedded vector store
+memory/chroma_db/
+
+# pulled in repos
+repos/
+
+# editor backup files
+*~
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
