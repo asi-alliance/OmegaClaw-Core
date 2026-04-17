@@ -1,18 +1,25 @@
-# ==========================================
-# Stage 1: Build Environment (Heavy tools stay here)
-# ==========================================
-FROM docker.io/library/swipl:latest as build
+# syntax=docker/dockerfile:1.7
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# For maximum integrity, set this to an immutable digest in CI/CD.
+ARG SWIPL_IMAGE=docker.io/library/swipl:9.2.4
+
+FROM ${SWIPL_IMAGE} AS builder
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive \
+    HF_HOME=/opt/huggingface \
+    SENTENCE_TRANSFORMERS_HOME=/opt/sentence_transformers
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
       git \
       build-essential \
-      python3 \
-      python3-pip \
-      python3-dev \
-      ca-certificates \
-      pkg-config \
       cmake \
+      pkg-config \
+      python3 \
+      python3-dev \
+      python3-pip \
       libopenblas-dev \
       libblas-dev \
       liblapack-dev \
@@ -20,91 +27,110 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libgflags-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Install FAISS (Static Library)
-RUN git clone --depth 1 https://github.com/facebookresearch/faiss.git /faiss
+# Build dependencies from source. Pin refs at build time for reproducibility.
+ARG PETTA_REPO=https://github.com/patham9/PeTTa.git
+ARG PETTA_REF=main
+ARG FAISS_REPO=https://github.com/facebookresearch/faiss.git
+ARG FAISS_REF=v1.8.0
+ARG CHROMADB_REPO=https://github.com/patham9/petta_lib_chromadb.git
+ARG CHROMADB_REF=master
+
+# Embedding model to pre-download at build time.
+ARG EMBEDDING_MODEL=intfloat/e5-large-v2
+
+RUN git clone --depth 1 --branch "${PETTA_REF}" "${PETTA_REPO}" /PeTTa
+RUN git clone --depth 1 --branch "${FAISS_REF}" "${FAISS_REPO}" /faiss
+
 WORKDIR /faiss
-# --parallel N should match available CPU cores (too high causes OOM on low-memory VPS)
 RUN cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=OFF -DBUILD_SHARED_LIBS=OFF \
- && cmake --build build --config Release --parallel 2 \
+ && cmake --build build --config Release --parallel \
  && cmake --install build
 
-# Install PeTTa (MeTTa-to-Prolog transpiler)
-RUN git clone --depth 1 https://github.com/trueagi-io/PeTTa.git /PeTTa
 WORKDIR /PeTTa
 RUN sh build.sh
+RUN mkdir -p /PeTTa/repos \
+ && git clone --depth 1 --branch "${CHROMADB_REF}" "${CHROMADB_REPO}" /PeTTa/repos/petta_lib_chromadb
 
-# ==========================================
-# Stage 2: Production Environment (Lean & Secure)
-# ==========================================
-FROM docker.io/library/swipl:latest as final
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch \
+ && python3 -m pip install --no-cache-dir --break-system-packages \
+    chromadb \
+    janus-swi \
+    openai \
+    uagents \
+    sentence-transformers \
+    aiogram \
+    requests \
+    websocket-client \
+    PyYAML
 
-# Install runtime necessities (gosu for non-root, iptables for firewall)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Pre-download the sentence-transformers model so runtime does not need network access.
+RUN mkdir -p "${HF_HOME}" "${SENTENCE_TRANSFORMERS_HOME}" \
+ && python3 - <<PY
+from sentence_transformers import SentenceTransformer
+model_name = "${EMBEDDING_MODEL}"
+print(f"Downloading embedding model: {model_name}")
+SentenceTransformer(model_name)
+print("Model download complete.")
+PY
+
+# ===========================================================================
+# Runtime stage
+# ===========================================================================
+FROM ${SWIPL_IMAGE} AS runtime
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/opt/huggingface \
+    SENTENCE_TRANSFORMERS_HOME=/opt/sentence_transformers
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
       python3 \
-      python3-pip \
-      python3-dev \
-      build-essential \
-      iptables \
+      libopenblas-dev \
+      libblas-dev \
+      liblapack-dev \
+      gfortran \
+      libgflags-dev \
+      git \
       gosu \
+      iptables \
  && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group
-RUN groupadd -r mettagroup && useradd -r -g mettagroup mettauser
+RUN groupadd -r omegagroup && useradd -r -g omegagroup omegauser
 
-# Install Python dependencies required by MeTTaClaw
-RUN pip3 install --no-cache-dir --break-system-packages \
-      janus-swi \
-      openai \
-      # python-telegram-bot \
-      aiogram \
-      requests \
-      websocket-client \
-      PyYAML \
-      chromadb
+WORKDIR /PeTTa
 
-# Set up the working directory
-WORKDIR /app
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /PeTTa /PeTTa
+COPY --from=builder /opt/huggingface /opt/huggingface
+COPY --from=builder /opt/sentence_transformers /opt/sentence_transformers
 
-# Copy compiled artifacts from the build stage
-COPY --from=build /PeTTa /app/PeTTa
-COPY --from=build /usr/local/lib/libfaiss.a /usr/local/lib/
+# Bring in only local OmegaClaw source (filtered by .dockerignore).
+COPY . /PeTTa/repos/OmegaClaw-Core
 
-# Setup the project structure
-# We copy the local mettaclaw code into a stable location
-COPY . /app/mettaclaw
-
-# Link MeTTaClaw into PeTTa/repos so it can be imported as a library
-RUN mkdir -p /app/PeTTa/repos \
- && ln -s /app/mettaclaw /app/PeTTa/repos/mettaclaw \
- && cp /app/mettaclaw/run.metta /app/PeTTa/run.metta \
- && cp /app/mettaclaw/firewall.sh /firewall.sh \
- && chmod +x /firewall.sh
-
-# Lock down filesystem permissions
-# Root ownership for safety, non-root user cannot modify the codebase
-RUN chown -R root:root /app \
- && chmod -R 755 /app
-
-# Create a specific isolated data directory for MeTTaClaw's writes (logs, DBs)
-RUN mkdir -p /app/data \
- && chown -R mettauser:mettagroup /app/data \
- && chown -R mettauser:mettagroup /app/mettaclaw/memory \
- && touch /app/mettaclaw/telegram_bot.log \
- && chown mettauser:mettagroup /app/mettaclaw/telegram_bot.log
+RUN cp /PeTTa/repos/OmegaClaw-Core/run.metta /PeTTa/run.metta \
+ && cp /PeTTa/repos/OmegaClaw-Core/firewall.sh /firewall.sh \
+ && chmod +x /firewall.sh \
+ && mkdir -p ./chroma_db \
+ && mkdir -p /app/data \
+ && chown -R omegauser:omegagroup ./chroma_db \
+ && chown -R omegauser:omegagroup /PeTTa/repos/OmegaClaw-Core/memory \
+ && chown -R omegauser:omegagroup /app/data \
+ && chown -R omegauser:omegagroup /opt/huggingface /opt/sentence_transformers
 
 # Declare persistent volumes
-# - memory: conversation history + config (prompt, policy, telegram profile)
-# - chroma_db: ChromaDB vector store for long-term embeddings
-# - data: general writable space for logs/future use
-VOLUME ["/app/mettaclaw/memory", "/app/PeTTa/chroma_db", "/app/data"]
+VOLUME ["/PeTTa/repos/OmegaClaw-Core/memory", "/PeTTa/chroma_db", "/app/data"]
 
-# Environment variables for PeTTa/Janus
-ENV PYTHONPATH=/app/mettaclaw:/app/mettaclaw/src:/app/mettaclaw/channels
-
-# Change working directory to PeTTa root to run run.sh
-WORKDIR /app/PeTTa
+# Python module search path
+ENV PYTHONPATH=/PeTTa/repos/OmegaClaw-Core:/PeTTa/repos/OmegaClaw-Core/src:/PeTTa/repos/OmegaClaw-Core/channels
 
 ENTRYPOINT ["/firewall.sh"]
 
 # Use gosu to step down to non-root user
-CMD ["gosu", "mettauser", "sh", "run.sh", "run.metta", "default"]
+CMD ["gosu", "omegauser", "sh", "run.sh", "run.metta", "default"]

@@ -1,7 +1,5 @@
 ;configured at runtime:
 (= (isTelegram) (== (commchannel) telegram))
-(= (isRequired $file) (or (== $file (library mettaclaw ./memory/prompt.txt)) (== $file (library mettaclaw ./memory/history.metta))))
-(= (isTelegramButNotRequired $file) (and (isTelegram) (not (isRequired $file))))
 (= (BOT_TOKEN) (empty))
 (= (CHAT_ID) (empty))
 (= (IRC_channel) (empty))
@@ -16,19 +14,21 @@
 ;Connect all the channels:
 (= (initChannels)
    (progn (println! "Initializing channels")
-          (configure commchannel telegram)
+          (configure commchannel irc)
           (case (commchannel)
-                ((irc      (progn (configure IRC_channel ##metta)
+                ((irc      (progn (configure IRC_channel ##omegaclaw)
                                   (configure IRC_server "irc.quakenet.org")
                                   (configure IRC_port 6667)
-                                  (configure IRC_user maxbotnick)
+                                  (configure IRC_user omegaclaw)
                                   (py-call (irc.start_irc (IRC_channel) (IRC_server) (IRC_port) (IRC_user)))))
-                 (telegram  (progn (configure BOT_TOKEN "") ;; remove after test
-                                    (configure CHAT_ID "")
-                                   (py-call (tg_channel.start_telegram (BOT_TOKEN) (CHAT_ID)))))
+                 (telegram  (progn 
+                                (println! "Initializing telegram")
+                                (configure BOT_TOKEN "")
+                                (configure CHAT_ID "")
+                                (py-call (tg_channel.start_telegram (BOT_TOKEN) (CHAT_ID)))))
                  ($_ (progn (configure MM_URL "https://chat.singularitynet.io")
                             (configure MM_CHANNEL_ID "8fjrmabjx7gupy7e5kjznpt5qh")
-                            (configure MM_BOT_TOKEN "acympttqpjyjfnm9j65gz7mzbw")
+                            (configure MM_BOT_TOKEN "")
                             (py-call (mattermost.start_mattermost (MM_URL) (MM_CHANNEL_ID) (MM_BOT_TOKEN)))))))))
 
 ;Receive the latest user message considering all communication channels:

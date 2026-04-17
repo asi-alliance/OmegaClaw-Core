@@ -1,0 +1,14 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    uses: ./.github/workflows/common.yml
+    with:
+      publish_docker: true
+      tag_name: ${{ github.event.release.tag_name }}
+      move_latest: true
+    secrets: inherit

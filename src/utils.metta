@@ -38,7 +38,8 @@
             (add-atom &self (= ($name) $default))
             (let $k (collapse (translatePredicate (number_string $v1 $value)))
                  (if (== $k ())
-                     (add-atom &self (= ($name) $value))
+                     (progn (translatePredicate (atom_string $atom $value))
+                            (add-atom &self (= ($name) $atom)))
                      (progn (translatePredicate (number_string $v2 $value))
                             (add-atom &self (= ($name) $v2))))))))
 

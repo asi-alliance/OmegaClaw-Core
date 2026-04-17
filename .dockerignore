@@ -1,0 +1,28 @@
+# VCS
+.git
+.gitignore
+
+# Local secrets/config
+.env
+.env.*
+*.pem
+*.key
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Build/dev artifacts
+*.log
+*.tmp
+*.swp
+
+# Container metadata
+Dockerfile
+docker-compose.yml
+
+# Docs and license (not required at runtime)
+README.md
+LICENSE

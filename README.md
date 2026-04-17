@@ -1,80 +1,89 @@
-## MeTTaClaw
+# OmegaClaw
 
-<img width="362" alt="image" src="https://github.com/user-attachments/assets/197d745f-1562-4d31-88c2-b813a56ccbf1" />
+<p align="center">
+  <img src="./omegaclaw-logo-SoD_g_nX.png" alt="OmegaClaw logo" width="220" />
+</p>
 
-An agentic AI system implemented in MeTTa, guided by the MeTTaClaw proposal and an agent core inspired by Nanobot.
-Beyond basic tool use, it features embedding-based long-term memory represented entirely in MeTTa AtomSpace format.
 
-Long-term memory is deliberately maintained by the agent via `(remember string)` for adding memory items and `(query string)` for querying related memories.
-The agent can learn and apply new skills and declarative knowledge through the use of memory items.
 
-In addition, an initial set of OpenClaw-like tools is implemented, including web search, file modification, communication channels, and access to the operating system shell and its associated tools.
+---
+
+## Overview
+
+OmegaClaw is an agentic AI system implemented in **MeTTa**.
+
+Beyond basic tool use, it features **embedding-based long-term memory** represented entirely in **MeTTa AtomSpace** format.
+
+Long-term memory is deliberately maintained by the agent through:
+
+- `(remember string)` for adding memory items
+- `(query string)` for querying related memories
+- `(episodes time)` for retrieving episodes around a point in time
+
+Additionally the agent has an episodic trace for observations, tool usage record, and self-created working working memory items:
+
+- `(pin string)` for adding a message to itself to its episodic trace
+
+The agent can follow multistep operations effectively by pinning, and learn and apply **new skills** and **knowledge** through the use of memory items.
+
+In addition, an initial set of **OpenClaw-like tools** is implemented, including:
+
+- web search
+- file modification
+- communication channels
+- access to the operating system shell and its associated tools
 
 Simplicity of design, ease of prototyping, ease of extension, and transparent implementation in MeTTa were the primary design criteria.
-The agent core comprises approximately 200 lines of code.
 
-**Special Features**
+The lean agent core comprises approximately **200 lines of code**.
 
-- MeTTaClaw uses a token-efficient agentic loop, enabling low-cost long-term operation and embodiment in domains that require real-time learning and decision-making.
+---
 
-- The agent can learn to represent its memories in different ways, including such that allow other Hyperon components to operate on the same memories within the same Atomspace. Each memory item is stored as a triplet `(timestamp, atom, embedding)`, while the agent remains flexible in choosing the representation for the atom itself. Consequently, the agent is not hardcoded to any particular memory representation, and different formats can co-exist in the same atom space.
+## Special Features
 
-The following example demonstrates learning and decision-making in a textually represented grid-world environment adapted from [NACE](https://github.com/patham9/NACE):
+### Token-efficient agentic loop
 
-![mettaclaw_in_nace_world](https://github.com/user-attachments/assets/c6c01839-234d-4505-baf6-4f2f3787c7b9)
+OmegaClaw uses a **token-efficient agentic loop**, enabling low-cost long-term operation and embodiment in domains that require real-time learning and decision-making.
 
+### Flexible memory representation
 
-This project also aims to explore the potential of Agentic Physical AI, a ROS2 package for mobile robots with manipulators is underway.
+The agent can learn to represent its memories in different ways, including forms that allow other Hyperon components to operate on the same memories within the same AtomSpace. Each memory item is stored as a triplet (timestamp, atom, embedding) yet the agent remains flexible in choosing the specific representation. Consequently, the agent is not hardcoded to any particular memory representation, and different formats can co-exist in the same atom space.
 
-**Installation**
+Each memory item is stored as a triplet:
 
-First, get [SWI-Prolog](https://www.swi-prolog.org/). Then:
+`(timestamp, atom, embedding)`
 
+---
+
+## Quick Start - IRC Channel
+
+Requirement: Docker
+
+OmegaClaw can be installed and started with:
+```bash
+curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw_setup.sh | bash -s -- singularitynet/omegaclaw:latest
 ```
-git clone https://github.com/trueagi-io/PeTTa
-cd PeTTa
-mkdir -p repos && git clone https://github.com/patham9/mettaclaw repos/mettaclaw
-```
+When prompted, enter your OpenAI API key and a unique IRC channel name, then interact with your OmegaClaw at [webchat.quakenet.org](https://webchat.quakenet.org) or any IRC portal. 
 
-**Usage**
+### Channel authentication
 
-Run the system via the following command which ensures the system is started from the root folder of PeTTa:
+At startup, the setup script prints a **one-time secret**.
 
-```
-cp repos/mettaclaw/run.metta ./
-OPENAI_API_KEY=... sh run.sh run.metta
-```
+To activate message handling, send this command in your channel exactly once:
 
-**Auto-install/run**
-
-Alternatively, if PeTTa is already installed and the latest version pulled (v1.0.2 or latest commit), then, running the following MeTTa file from the root folder, installs and runs MeTTaClaw (assuming OPENAI_API_KEY is set):
-
-```
-!(import! &self (library lib_import))
-!(git-import! "https://github.com/patham9/mettaclaw.git")
-!(import! &self (library mettaclaw lib_mettaclaw))
-
-!(mettaclaw)
+```text
+auth <one-time-secret>
 ```
 
-**Illustrations**
+The first user who sends the correct secret becomes the authenticated user.
+All messages from other users are silently ignored.
 
-Long-Term Memory Recall:
+When done interacting with your OmegaClaw, please use these commands as needed:
 
-<img width="638" height="125" alt="image" src="https://github.com/user-attachments/assets/0d4817ed-e743-4e44-8bd4-a10e27ea6380" />
+| Action | Command |
+|--------|---------|
+| Stop OmegaClaw | `docker stop omegaclaw` |
+| Restart OmegaClaw | `docker start omegaclaw` |
+| View logs | `docker logs -f omegaclaw` |
 
-Tool use:
-
-<img width="1323" height="188" alt="image" src="https://github.com/user-attachments/assets/18ef19c4-010a-4c94-84ce-bb49277dccfc" />
-
-Shell output of the actual invocation of the generated MeTTa code:
-
-<img width="416" height="486" alt="image" src="https://github.com/user-attachments/assets/f5b27205-cdb2-47e7-821a-ffd93b3dd7c6" />
-
-System also added it into its Atom Space storage (embedding vector omitted):
-
-<img width="379" height="69" alt="image" src="https://github.com/user-attachments/assets/6aa59deb-33b4-42b9-a535-ae153b4b7a18" />
-
-
-
-
+Your OmegaClaw will retain its memory for subsequent restarts.
