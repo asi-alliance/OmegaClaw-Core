@@ -155,3 +155,14 @@ admin_controls:
   per_user_cooldown_or_mute: true
   disable_search_only: true
   purge_memory: true
+
+classification_model:
+  name: "gpt-4o-mini"
+  max_tokens: 10
+  temperature: 0.0
+
+spam_protection:
+  time_window: 10
+  message_limit: 5
+  cooldown_duration: 120
+  admin_alert_threshold: 3

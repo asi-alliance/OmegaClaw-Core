@@ -5,7 +5,7 @@ import time
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from src.config_helper import is_category_blocked, flagged_by_moderator
+from src.config_helper import is_category_blocked, get_spam_protection_config
 
 
 import yaml
@@ -256,8 +256,8 @@ class _TelegramChannel:
         name = "unknown user" if user is None else (user.full_name or user.username or str(user.id))
         text = message.text
 
-        if is_category_blocked(text) or await flagged_by_moderator(text):
-            logging.warning(f"Ethics pass rejected incoming message from {name}: {text}")
+        if is_category_blocked(text):
+            logging.warning(f"Ethics/Security pass rejected incoming message from {name}: {text}")
             message = "From: " + user.username + ": " + text if user and user.username else text
             alert_ethics_violation("incoming_message", message)
             return
@@ -296,7 +296,13 @@ class _TelegramChannel:
 
     async def is_user_muted(self, user: types.User):
         """Feature: User mute / cool-down after repeated abuse."""
+        spam_config = get_spam_protection_config()
+        time_window = spam_config["time_window"]
+        message_limit = spam_config["message_limit"]
+        cooldown_duration = spam_config["cooldown_duration"]
+        admin_alert_threshold = spam_config["admin_alert_threshold"]
         user_id = user.id
+
         if user_id in self._muted_users:
             if time.time() < self._muted_users[user_id]:
                 return True
@@ -305,19 +311,19 @@ class _TelegramChannel:
                 
         now = time.time()
         history = self._user_msg_rates.get(user_id, [])
-        history = [ts for ts in history if now - ts < 10] # 10 second window for rate limiting
+        history = [ts for ts in history if now - ts < time_window]
         history.append(now)
         self._user_msg_rates[user_id] = history
         
-        if len(history) > 5:
+        if len(history) > message_limit:
             mute_count = self._user_mute_counts.get(user_id, 0) + 1
             self._user_mute_counts[user_id] = mute_count
 
             username = user.username or user.full_name or str(user_id)
             logging.warning(f"User with id: {user_id} | username: {username} muted for spamming.")
-            self._muted_users[user_id] = now + 120 # 2 minute cool-down
+            self._muted_users[user_id] = now + cooldown_duration
             
-            if mute_count >= 3:
+            if mute_count >= admin_alert_threshold:
                 for admin_id in self.admin_ids:
                     try:
                         alert_msg = (f"🚨 **Spam Alert** 🚨\n"

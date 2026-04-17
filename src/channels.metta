@@ -23,7 +23,7 @@
                                   (configure IRC_port 6667)
                                   (configure IRC_user maxbotnick)
                                   (py-call (irc.start_irc (IRC_channel) (IRC_server) (IRC_port) (IRC_user)))))
-                 (telegram  (progn (configure BOT_TOKEN "") ;; remove after test
+                 (telegram  (progn (configure BOT_TOKEN "")
                                     (configure CHAT_ID "")
                                    (py-call (tg_channel.start_telegram (BOT_TOKEN) (CHAT_ID)))))
                  ($_ (progn (configure MM_URL "https://chat.singularitynet.io")
