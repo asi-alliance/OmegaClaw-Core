@@ -3,6 +3,7 @@
 (= (maxRecallItems) (empty))
 (= (maxEpisodeRecallLines) (empty))
 (= (maxHistory) (empty))
+(= (embeddingprovider) (empty))
 
 (= (initMemory)
    (progn (println! "Initializing memory")
@@ -20,7 +21,7 @@
        (read-file-raw (library OmegaClaw-Core ./memory/prompt.txt))))
 
 (= (getHistory)
-   (let $ret (read-file-raw (library OmegaClaw-Core ./memory/history.metta))
+   (let $ret (read-file (library OmegaClaw-Core ./memory/history.metta))
         (last_chars $ret (maxHistory))))
 
 (= (addToHistory $lastmessage $response $sexpr $msgnew)
@@ -32,17 +33,20 @@
            (appendToHistory ((get_time_as_string) (newline) $response (newline)))
            (appendToHistory ((get_time_as_string) (newline) $response (newline) ERROR_FEEDBACK: (get-state &error))))))
 
+(= (embed $str)
+   (if (== (embeddingprovider) Local)
+       (py-call (lib_llm_ext.useLocalEmbedding (string-safe $str)))
+       (useGPTEmbedding (string-safe $str))))
+
 (= (appendToHistory $addition)
-   (append-file-raw (library OmegaClaw-Core ./memory/history.metta) (swrite $addition)))
+   (append-file (library OmegaClaw-Core ./memory/history.metta) (swrite $addition)))
 
 (= (remember $str)
-       (if (py-call (config_helper.is_memory_forbidden $str))
-           (Error remember "Refused: Sensitive traits/profiling blocked.")
-           (progn (py-call (lib_chromadb.remember $str (embed $str) (get_time_as_string)))
-                  REMEMBER-SUCCESS)))
+   (progn (py-call (lib_chromadb.remember $str (embed $str) (get_time_as_string)))
+          REMEMBER-SUCCESS))
 
 (= (query $str)
-   (py-call (lib_chromadb.query (embed (string-safe $str)) (maxRecallItems))))
+   (py-call (lib_chromadb.query (embed $str) (maxRecallItems))))
 
 (= (episodes $time)
    (py-call (helper.around_time $time (maxEpisodeRecallLines))))

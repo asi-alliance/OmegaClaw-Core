@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # --- Constants -----------------------------------------------------------
 
 EMBEDDING_MODEL = "text-embedding-3-large"
-COLLECTION_NAME = "knowledge_priors"
+COLLECTION_NAME = "memories"
 TOP_K = 5
 MIN_CHUNK_CHARS = 100
 MAX_CHUNK_CHARS = 6000
@@ -21,9 +21,9 @@ MAX_CHUNK_CHARS = 6000
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DB_PATH = os.environ.get(
-    "KNOWLEDGE_DB_PATH",
-    "/app/data/knowledge_db" if os.path.isdir("/app/data") else
-    os.path.join(_PROJECT_ROOT, "knowledge_db")
+    "CHROMA_DB_PATH",
+    "/PeTTa/chroma_db" if os.path.isdir("/PeTTa/chroma_db") else
+    os.path.join(_PROJECT_ROOT, "chroma_db")
 )
 
 # --- Lazy ChromaDB client ------------------------------------------------
@@ -234,7 +234,12 @@ def init_knowledge():
             # Store chunks
             ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
             metadatas = [
-                {"source": filename, "breadcrumb": c["breadcrumb"], "type": "chunk"}
+                {
+                    "source": filename,
+                    "breadcrumb": c["breadcrumb"],
+                    "type": "chunk",
+                    "time": "knowledge_prior"
+                }
                 for c in chunks
             ]
             collection.upsert(
