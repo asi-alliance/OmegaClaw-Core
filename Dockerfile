@@ -27,7 +27,7 @@ RUN apt-get update \
       libgflags-dev \
       nano \
       aiogram \
-      PyYAML      
+      PyYAML      \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies from source. Pin refs at build time for reproducibility.
