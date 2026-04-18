@@ -16,48 +16,43 @@ Full documentation lives in [`docs/`](./docs/README.md): introduction, tutorials
 
 ## Overview
 
-OmegaClaw is an agentic AI system implemented in **MeTTa**.
+OmegaClaw is a **hybrid agentic AI framework** implemented in MeTTa on OpenCog Hyperon. A large language model (LLM) works together with formal logic engines — **NAL** and **PLN** — to reason about the world, track uncertainty, combine evidence, and produce conclusions that are mathematically grounded rather than just plausible-sounding.
 
-Beyond basic tool use, it features **embedding-based long-term memory** represented entirely in **MeTTa AtomSpace** format.
+The core agent loop is approximately **200 lines of MeTTa**.
 
-Long-term memory is deliberately maintained by the agent through:
-
-- `(remember string)` for adding memory items
-- `(query string)` for querying related memories
-- `(episodes time)` for retrieving episodes around a point in time
-
-Additionally the agent has an episodic trace for observations, tool usage record, and self-created working working memory items:
-
-- `(pin string)` for adding a message to itself to its episodic trace
-
-The agent can follow multistep operations effectively by pinning, and learn and apply **new skills** and **knowledge** through the use of memory items.
-
-In addition, an initial set of **OpenClaw-like tools** is implemented, including:
-
-- web search
-- file modification
-- communication channels
-- access to the operating system shell and its associated tools
-
-Simplicity of design, ease of prototyping, ease of extension, and transparent implementation in MeTTa were the primary design criteria.
-
-The lean agent core comprises approximately **200 lines of code**.
+> Most AI assistants generate answers that sound right. OmegaClaw-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
 
 ---
 
-## Special Features
+## What OmegaClaw does
 
-### Token-efficient agentic loop
+- Runs a token-efficient agentic loop that receives messages, selects skills, and acts.
+- Delegates reasoning to one of two formal engines, orchestrated by the LLM:
+  - **NAL** — Non-Axiomatic Logic, symbolic inference under uncertainty.
+  - **PLN** — Probabilistic Logic Networks, probabilistic higher-order reasoning.
+  - ONA (OpenNARS for Applications) is a planned third engine but is **not installed by default** — see [reference-lib-ona.md](./reference-lib-ona.md) for the current experimental status.
+- Maintains a **three-tier memory** architecture (working, long-term, AtomSpace — described below).
+- Exposes an extensible **skill system** covering memory, shell and file I/O, communication channels, web search, remote agents, and formal reasoning.
 
-OmegaClaw uses a **token-efficient agentic loop**, enabling low-cost long-term operation and embodiment in domains that require real-time learning and decision-making.
+---
 
-### Flexible memory representation
+## The hybrid thesis
 
-The agent can learn to represent its memories in different ways, including forms that allow other Hyperon components to operate on the same memories within the same AtomSpace. Each memory item is stored as a triplet (timestamp, atom, embedding) yet the agent remains flexible in choosing the specific representation. Consequently, the agent is not hardcoded to any particular memory representation, and different formats can co-exist in the same atom space.
+### Two kinds of reasoning, one pipeline
 
-Each memory item is stored as a triplet:
+| Aspect | LLM (neural) | Formal engine (symbolic) |
+|---|---|---|
+| Natural language understanding | ✅ | ❌ |
+| Premise formulation from text | ✅ | ❌ |
+| Inference orchestration (which rule when) | ✅ | ❌ |
+| Truth-value propagation | ❌ | ✅ |
+| Confidence decay through chains | ❌ | ✅ |
+| Formal contradiction detection | ❌ | ✅ |
+| Auditable conclusion path | ❌ | ✅ |
 
-`(timestamp, atom, embedding)`
+The LLM turns ambiguous natural language into structured atoms with explicit truth values. The formal engine takes those atoms and applies rules whose truth-value arithmetic is deterministic and auditable.
+
+When the agent outputs a conclusion, you can trace it back through every step: which premises fed into which rule, what truth value each premise carried, and what the math produced.
 
 ---
 
@@ -69,7 +64,7 @@ OmegaClaw can be installed, started, and subsequently restarted with this single
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:latest
 ```
-When prompted, please select from a list of supported models, enter an API key and a unique IRC channel name, then interact with your OmegaClaw at [webchat.quakenet.org](https://webchat.quakenet.org) or any IRC portal. 
+OmegaClaw requires an LLM model to run. When prompted, please select from a list of supported models, enter an API key and a unique IRC channel name, then interact with your OmegaClaw at [webchat.quakenet.org](https://webchat.quakenet.org). 
 
 ### Channel authentication
 
@@ -81,10 +76,10 @@ To activate message handling, send this command in your channel exactly once:
 auth <one-time-secret>
 ```
 
-### Stopping, Restarting, Clearing Memory, Viewing Logs
-
 The first user who sends the correct secret becomes the authenticated user.
 All messages from other users are silently ignored.
+
+### Stopping, Restarting, Clearing Memory, Viewing Logs
 
 When done interacting with your OmegaClaw, please use these commands as needed:
 
@@ -94,7 +89,7 @@ When done interacting with your OmegaClaw, please use these commands as needed:
 | View Logs | `docker logs -f omegaclaw` |
 | Clear Memory | `docker volume rm omegaclaw-memory` |
 
-To restart Omegaclaw simply rerun the single curl command show above. When you restart OmegaClaw, you will receive a new authentication token secret to paste into your IRC channel chat for re-verification.
+To restart Omegaclaw simply rerun the single curl command show above. If there is an updated version of OmegaClaw, it will automatically be installed. When you restart OmegaClaw, you will receive a new authentication token secret to paste into your IRC channel chat for re-verification.
 
 Your OmegaClaw will retain its memory for subsequent restarts unless you clear memory. To clear OmegaClaw memory and return to its initialized state, please run the command to stop OmegaClaw, then the command to clear memory (both shown above), and then the single curl script command shown above.
 
