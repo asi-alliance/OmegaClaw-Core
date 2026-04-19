@@ -16,22 +16,26 @@ Full documentation lives in [`docs/`](./docs/README.md): introduction, tutorials
 
 ## Overview
 
-OmegaClaw is a **hybrid agentic AI framework** implemented in MeTTa on OpenCog Hyperon. A large language model (LLM) works together with formal logic engines — **NAL** and **PLN** — to reason about the world, track uncertainty, combine evidence, and produce conclusions that are mathematically grounded rather than just plausible-sounding.
+OmegaClaw is a **hybrid agentic AI framework** implemented in MeTTa on OpenCog Hyperon. A large language model (LLM) works together with persistant memory in queryable format and formal logic engines — **NAL** and **PLN** — to remember its experiences, reason about the world, track uncertainty, combine evidence, and produce conclusions that are mathematically grounded rather than just plausible-sounding.
 
 The core agent loop is approximately **200 lines of MeTTa**.
 
-> Most AI assistants generate answers that sound right. OmegaClaw-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
+>Most AI assistants generate answers that sound right. OmegaClaw-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
+
+- OmegaClaw operates via a **continuous, stateful execution loop**, rather than a rigid stateless request-response model. By utilizing active memory "pins", the architecture allows the system to maintain a stable internal state and drive long-horizon, interleaved workflows without requiring a human prompt to trigger every step.
+- Memory is stored as **knowledge graph that can reason**, not just retrieve. Rather than storing facts as flat text, AtomSpace structures knowledge as typed, relational atoms — meaning OmegaClaw can query its own memory symbolically, not just semantically. This is the difference between operating on a history of compressed context window, and reasoning over a web of meaning.
+- Through direct access to its own execution traces and stored memories, OmegaClaw can observe and reflect on its own reasoning processes. This early-stage **metacognition** provides a level of structural transparency and self-auditing rarely found in standard agentic systems.
 
 ---
 
 ## What OmegaClaw does
 
 - Runs a token-efficient agentic loop that receives messages, selects skills, and acts.
+- Maintains a **three-tier memory** architecture (working, long-term, AtomSpace).
 - Delegates reasoning to one of two formal engines, orchestrated by the LLM:
   - **NAL** — Non-Axiomatic Logic, symbolic inference under uncertainty.
   - **PLN** — Probabilistic Logic Networks, probabilistic higher-order reasoning.
   - ONA (OpenNARS for Applications) is a planned third engine but is **not installed by default** — see [reference-lib-ona.md](./reference-lib-ona.md) for the current experimental status.
-- Maintains a **three-tier memory** architecture (working, long-term, AtomSpace).
 - Exposes an extensible **skill system** covering memory, shell and file I/O, communication channels, web search, remote agents, and formal reasoning.
 
 ---
@@ -77,7 +81,7 @@ auth <one-time-secret>
 ```
 
 The first user who sends the correct secret becomes the authenticated user.
-All messages from other users are silently ignored.
+All messages from other users are silently ignored. Your agent cannot be manipulated or controlled by other users, even if they enter your channel.
 
 ### Stopping, Restarting, Clearing Memory, Viewing Logs
 
