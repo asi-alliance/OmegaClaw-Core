@@ -23,7 +23,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.environ.get(
     "CHROMA_DB_PATH",
     "/PeTTa/chroma_db" if os.path.isdir("/PeTTa/chroma_db") else
-    os.path.join(_PROJECT_ROOT, "chroma_db")
+    os.path.join(_PROJECT_ROOT, "..", "..","chroma_db")
 )
 
 # --- Lazy ChromaDB client ------------------------------------------------
