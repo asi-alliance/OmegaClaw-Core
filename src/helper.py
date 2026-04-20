@@ -110,26 +110,19 @@ def normalize_string(x):
     except Exception:
         return str(x)
 
+def test_balance_parenthesis():
+	assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('(append-file test.txt hello world)') == '((append-file "test.txt" "hello world"))'
+	assert balance_parentheses('(write-file "test.txt" hello world)') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('(write-file "test.txt" "hello world")') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('(write-file test.txt "hello world")') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('(send test.xt hello world)') == '((send "test.xt hello world"))'
+	assert balance_parentheses('write-file test.txt hello world') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('append-file test.txt hello world') == '((append-file "test.txt" "hello world"))'
+	assert balance_parentheses('write-file "test.txt" hello world') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('write-file "test.txt" "hello world"') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('write-file test.txt "hello world"') == '((write-file "test.txt" "hello world"))'
+	assert balance_parentheses('send test.xt hello world') == '((send "test.xt hello world"))'
+
 if __name__ == "__main__":
-	test_cases = [
-		('(write-file test.txt hello world)', '((write-file "test.txt" "hello world"))'),
-		('(append-file test.txt hello world)', '((append-file "test.txt" "hello world"))'),
-		('(write-file "test.txt" hello world)', '((write-file "test.txt" "hello world"))'),
-		('(write-file "test.txt" "hello world")', '((write-file "test.txt" "hello world"))'),
-		('(write-file test.txt "hello world")', '((write-file "test.txt" "hello world"))'),
-		('(send test.xt hello world)', '((send "test.xt hello world"))'),
-		('write-file test.txt hello world', '((write-file "test.txt" "hello world"))'),
-		('append-file test.txt hello world', '((append-file "test.txt" "hello world"))'),
-		('write-file "test.txt" hello world', '((write-file "test.txt" "hello world"))'),
-		('write-file "test.txt" "hello world"', '((write-file "test.txt" "hello world"))'),
-		('write-file test.txt "hello world"', '((write-file "test.txt" "hello world"))'),
-		('send test.xt hello world', '((send "test.xt hello world"))'),
-	]
-	for i, (inp, expected) in enumerate(test_cases, 1):
-		got = balance_parentheses(inp)
-		ok = got == expected
-		print(f"Test {i}: {'PASS' if ok else 'FAIL'}")
-		print(f"  input:    {inp}")
-		print(f"  got:      {got}")
-		print(f"  expected: {expected}")
-		print()
+    test_balance_parenthesis()
