@@ -2,6 +2,7 @@ import os
 import random
 import socket
 import threading
+import time
 
 _running = False
 _sock = None
@@ -18,6 +19,7 @@ def _send(cmd):
     with _sock_lock:
         if _sock:
             _sock.sendall((cmd + "\r\n").encode())
+    time.sleep(1)
 
 def _set_last(msg):
     global _last_message
@@ -154,12 +156,13 @@ def stop_irc():
     _running = False
 
 def send_message(text):
-    text = text.replace("\r", "").replace("\n", "\\n")
-    try:
-        if _connected and _channel:
-            max_len = 400
-            for i in range(0, len(text), max_len):
-                chunk = text[i:i + max_len]
-                _send(f"PRIVMSG {_channel} :{chunk}")
-    except Exception:
-        pass
+    max_len = 400
+    lines = text.replace("\r", "").split("\\n")
+    for text in lines:
+        try:
+            if _connected and _channel:
+                for i in range(0, len(text), max_len):
+                    chunk = text[i:i + max_len]
+                    _send(f"PRIVMSG {_channel} :{chunk}")
+        except Exception:
+            pass
