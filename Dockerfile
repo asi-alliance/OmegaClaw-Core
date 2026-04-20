@@ -25,6 +25,7 @@ RUN apt-get update \
       liblapack-dev \
       gfortran \
       libgflags-dev \
+      nano \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies from source. Pin refs at build time for reproducibility.
@@ -59,11 +60,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     janus-swi \
     openai \
     uagents \
-    sentence-transformers \
-    aiogram \
-    requests \
-    websocket-client \
-    PyYAML
+    sentence-transformers
 
 # Pre-download the sentence-transformers model so runtime does not need network access.
 RUN mkdir -p "${HF_HOME}" "${SENTENCE_TRANSFORMERS_HOME}" \
@@ -75,9 +72,6 @@ SentenceTransformer(model_name)
 print("Model download complete.")
 PY
 
-# ===========================================================================
-# Runtime stage
-# ===========================================================================
 FROM ${SWIPL_IMAGE} AS runtime
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -96,13 +90,9 @@ RUN apt-get update \
       liblapack-dev \
       gfortran \
       libgflags-dev \
+      nano \
       git \
-      gosu \
-      iptables \
  && rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user and group
-RUN groupadd -r omegagroup && useradd -r -g omegagroup omegauser
 
 WORKDIR /PeTTa
 
@@ -111,31 +101,21 @@ COPY --from=builder /PeTTa /PeTTa
 COPY --from=builder /opt/huggingface /opt/huggingface
 COPY --from=builder /opt/sentence_transformers /opt/sentence_transformers
 
+ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
+ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
+
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
-COPY . /PeTTa/repos/OmegaClaw-Core
+COPY . ${OMEGACLAW_DIR}
 
-RUN cp /PeTTa/repos/OmegaClaw-Core/run.metta /PeTTa/run.metta \
- && cp /PeTTa/repos/OmegaClaw-Core/firewall.sh /firewall.sh \
- && chmod +x /firewall.sh \
- && mkdir -p ./chroma_db \
- && mkdir -p /app/data \
- && chown -R omegauser:omegagroup ./chroma_db \
- && chown -R omegauser:omegagroup /PeTTa/repos/OmegaClaw-Core/memory \
- && chown -R omegauser:omegagroup /app/data \
- && chown -R omegauser:omegagroup /opt/huggingface /opt/sentence_transformers
+RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
+ && mkdir ${MEMORY_DIR}/chroma_db \
+ && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
+ && chown -R 65534:65534 ${MEMORY_DIR} \
+ && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
+ && chmod 0444 ${MEMORY_DIR}/prompt.txt \
+ && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
-# Declare persistent volumes
-VOLUME ["/PeTTa/repos/OmegaClaw-Core/memory", "/PeTTa/chroma_db", "/app/data"]
+USER 65534:65534
 
-# Python module search path
-ENV PYTHONPATH=/PeTTa/repos/OmegaClaw-Core:/PeTTa/repos/OmegaClaw-Core/src:/PeTTa/repos/OmegaClaw-Core/channels
-
-# Optional healthcheck placeholder
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python3 -c "import os; assert os.path.isdir('/app/mettaclaw')" || exit 1
-
-# Minimal init process
-ENTRYPOINT ["/usr/bin/tini", "--"]
-
-# Use gosu to step down to non-root user
-CMD ["gosu", "omegauser", "sh", "run.sh", "run.metta", "default"]
+ENTRYPOINT ["sh", "run.sh", "run.metta"]
+CMD []
