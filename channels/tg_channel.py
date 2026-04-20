@@ -11,15 +11,10 @@ import asyncio
 import yaml
 import os
 
-log_file_path = os.path.join(os.path.dirname(__file__), "..", "logs","telegram_bot.log")
-os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(log_file_path),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 
 class _TelegramChannel:

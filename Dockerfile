@@ -56,6 +56,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     --index-url https://download.pytorch.org/whl/cpu \
     torch \
  && python3 -m pip install --no-cache-dir --break-system-packages \
+    aiogram \
     chromadb \
     janus-swi \
     openai \
