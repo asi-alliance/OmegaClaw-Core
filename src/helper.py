@@ -43,13 +43,17 @@ def around_time(needle_time_str, k):
     return ret
 
 def balance_parentheses(s):
-    s = s.replace("_quote_", '"')
+    s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
     special_two_arg_cmds = {"write-file", "append-file"}
     for line in s.splitlines():
         line = line.strip()
         if not line:
             continue
+        if line.startswith("(-"):
+            line = "(pin -" + line[2:]
+        elif line.startswith("-"):
+            line = "pin " + line
         # remove one outer (...) if present
         if line.startswith("(") and line.endswith(")"):
             line = line[1:-1].strip()
