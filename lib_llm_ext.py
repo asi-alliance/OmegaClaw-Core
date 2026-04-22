@@ -16,9 +16,14 @@ ANTHROPIC_CLIENT = _init_openai_client(
     base_url="https://api.anthropic.com/v1/"
 )
 
+def _get_response(resp):
+    try:
+        return _clean(resp.choices[0].message.content)
+    except Exception as e:
+        print(f"[lib_llm_ext] Exception while processing the response {resp}: {e}")
+        return ""
+
 def _clean(text):
-    if not text:
-        text = ""
     return text.replace("_quote_", '"').replace("_apostrophe_", "'")
 
 def _chat(client, model, content, max_tokens=6000):
@@ -31,7 +36,7 @@ def _chat(client, model, content, max_tokens=6000):
             "thinking_budget": 6000 
         }
     )
-    return _clean(resp.choices[0].message.content)
+    return _get_response(resp)
 
 def useMiniMax(content):
     return _chat(
@@ -65,3 +70,7 @@ def useLocalEmbedding(atom):
         atom,
         normalize_embeddings=True
     ).tolist()
+
+def test_get_response():
+    assert _get_response(type('', (object,), {'choices': [
+        type('', (object,), { 'message': None }) ] })) == ""
