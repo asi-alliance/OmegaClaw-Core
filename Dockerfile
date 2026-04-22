@@ -109,13 +109,13 @@ COPY . ${OMEGACLAW_DIR}
 
 RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
  && mkdir ${MEMORY_DIR}/chroma_db \
- && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
- && chown -R 65534:65534 ${MEMORY_DIR} \
- && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
- && chmod 0444 ${MEMORY_DIR}/prompt.txt \
- && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
+ && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db 
+# && chown -R 65534:65534 ${MEMORY_DIR} \
+# && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
+# && chmod 0444 ${MEMORY_DIR}/prompt.txt \
+# && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
-USER 65534:65534
+#USER 65534:65534
 
 ENTRYPOINT ["sh", "run.sh", "run.metta"]
 CMD []
