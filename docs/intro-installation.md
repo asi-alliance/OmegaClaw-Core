@@ -59,6 +59,7 @@ Set one key, matching the `provider` you configure:
 | `Anthropic` (default) | `ANTHROPIC_API_KEY` | Claude models via the Anthropic API. |
 | `OpenAI` | `OPENAI_API_KEY` | GPT models. Also reused by the OpenAI embedding provider below. |
 | `ASICloud` | `ASI_API_KEY` | ASI Alliance inference endpoint (`inference.asicloud.cudos.org`), currently routes to MiniMax models. The variable name is deliberately `ASI_API_KEY` — not `ASI_KEY` or `ASICLOUD_API_KEY`. |
+| `ASIOne` | `ASIONE_API_KEY` | Fetch.ai inference endpoint (`https://api.asi1.ai/v1`), currently routes to ASI1 model. The variable name is `ASIONE_API_KEY`. |
 
 Only the variable for your selected `provider` is required; the others can be unset.
 
@@ -80,6 +81,6 @@ Set via `embeddingprovider` in `src/memory.metta`:
 
 ### Docker setup script
 
-`scripts/omegaclaw_setup.sh` (invoked by the Docker one-liner above) asks which provider you want, writes the chosen key into the container's runtime config, and auto-pairs the embedding provider: `Anthropic → Local`, `OpenAI → OpenAI`, `ASICloud → Local`. You don't need to set anything manually when using Docker.
+`scripts/omegaclaw_setup.sh` (invoked by the Docker one-liner above) asks which provider you want, writes the chosen key into the container's runtime config, and auto-pairs the embedding provider: `Anthropic → Local`, `OpenAI → OpenAI`, `ASICloud → Local`, `ASIOne → Local`. You don't need to set anything manually when using Docker.
 
 All runtime parameters are listed in [reference-configuration.md](./reference-configuration.md).

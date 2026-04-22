@@ -41,7 +41,9 @@ In `src/loop.metta`, the main dispatch is:
     (useGPT ...)
     (if (== (provider) Anthropic)
         (py-call (lib_llm_ext.useClaude $send))
-        (py-call (lib_llm_ext.useMiniMax $send))))
+        (if (== (provider) ASICloud)
+            (py-call (lib_llm_ext.useMiniMax $send))
+            (py-call (lib_llm_ext.useAsi1 $send)))))
 ```
 
 To add a provider:

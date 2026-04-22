@@ -138,19 +138,19 @@ memory/history.metta      episodic trace (written at runtime)
 Each iteration of `(omegaclaw $k)` in `src/loop.metta` performs:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ 1. receive()        pull latest message from channel    │
-│ 2. getContext()     PROMPT + SKILLS +                   │
-│                     LAST_SKILL_USE_RESULTS +            │
-│                     HISTORY + TIME                      │
-│ 3. LLM call         Anthropic / OpenAI / ASICloud       │
-│ 4. sread / balance  parse response into skill s-exprs   │
-│ 5. eval each skill  (remember ...), (metta ...), ...    │
-│ 6. addToHistory     append human msg + response +       │
-│                     any errors                          │
-│ 7. sleep            sleepInterval seconds               │
-│ 8. recurse          (omegaclaw (+ 1 $k))                │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ 1. receive()        pull latest message from channel        │
+│ 2. getContext()     PROMPT + SKILLS +                       │
+│                     LAST_SKILL_USE_RESULTS +                │
+│                     HISTORY + TIME                          │
+│ 3. LLM call         Anthropic / OpenAI / ASICloud / ASI:One │
+│ 4. sread / balance  parse response into skill s-exprs       │
+│ 5. eval each skill  (remember ...), (metta ...), ...        │
+│ 6. addToHistory     append human msg + response +           │
+│                     any errors                              │
+│ 7. sleep            sleepInterval seconds                   │
+│ 8. recurse          (omegaclaw (+ 1 $k))                    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 If no new message arrives and the `loops` counter hits zero, the agent idles until `nextWakeAt`, then runs one wake loop for background work.

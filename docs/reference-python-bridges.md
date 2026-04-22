@@ -10,6 +10,7 @@ LLM and embedding bridges.
 |---|---|
 | `useClaude(prompt)` | Call an Anthropic Claude model. Used when `provider = Anthropic`. |
 | `useMiniMax(prompt)` | Call MiniMax. Used when `provider = ASICloud` (or similar routing). |
+| `useAsi1(prompt)` | Call ASI1. Used when `provider = ASIOne`. |
 | `useLocalEmbedding(str)` | Compute an embedding with a locally loaded model. Used when `embeddingprovider = Local`. |
 | `initLocalEmbedding()` | Load the local embedding model once at startup. |
 

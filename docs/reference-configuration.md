@@ -18,7 +18,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `maxWakeLoops` | 1 | Extra turns granted on each scheduled wake-up. |
 | `sleepInterval` | 1 (seconds) | Delay between loop iterations. |
 | `LLM` | `gpt-5.4` | Model identifier passed to the provider. |
-| `provider` | `Anthropic` | LLM provider — `Anthropic`, `OpenAI`, or `ASICloud`. |
+| `provider` | `Anthropic` | LLM provider — `Anthropic`, `OpenAI`, `ASICloud`, or `ASIOne`. |
 | `maxOutputToken` | 6000 | Output cap passed to the provider. |
 | `reasoningMode` | `medium` | Reasoning-effort hint passed to the provider. |
 | `wakeupInterval` | 600 (seconds) | How long idle before the next scheduled wake-up. |

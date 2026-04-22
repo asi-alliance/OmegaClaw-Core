@@ -16,6 +16,11 @@ ANTHROPIC_CLIENT = _init_openai_client(
     base_url="https://api.anthropic.com/v1/"
 )
 
+ASIONE_CLIENT = _init_openai_client(
+    var_name="ASIONE_API_KEY",
+    base_url="https://api.asi1.ai/v1"
+)
+
 def _clean(text):
     return text.replace("_quote_", '"').replace("_apostrophe_", "'")
 
@@ -42,6 +47,13 @@ def useClaude(content):
     return _chat(
         client=ANTHROPIC_CLIENT,
         model="claude-opus-4-6",
+        content=content
+    )
+
+def useAsi1(content):
+    return _chat(
+        client=ASIONE_CLIENT,
+        model="asi1",
         content=content
     )
 

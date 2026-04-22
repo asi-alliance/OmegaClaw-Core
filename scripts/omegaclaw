@@ -70,23 +70,24 @@ def config_run_omegaclaw(config_output_path):
 
     while True:
         print("Please select your LLM provider.")
-        print("1) Anthropic/Claude 2) OpenAI/ChatGPT 3) ASI Cloud Minimax")
-        c = input("Enter 1-3 or 'q' to exit (default: 1): ").strip()
+        print("1) Anthropic/Claude 2) OpenAI/ChatGPT 3) ASI Cloud Minimax 4) ASI:One")
+        c = input("Enter 1-4 or 'q' to exit (default: 1): ").strip()
 
         if c.lower() == "q":
             sys.exit(1)
 
         if not c:
             provider_id = 0
-        elif c in ["1", "2", "3"]:
+        elif c in ["1", "2", "3", "4"]:
             provider_id = int(c) - 1
         else:
-            print("Please enter 1-3 or 'q'", file=sys.stderr)
+            print("Please enter 1-4 or 'q'", file=sys.stderr)
             continue
 
         providers = [("Anthropic", "Local", "ANTHROPIC_API_KEY"),
             ("OpenAI", "OpenAI", "OPENAI_API_KEY"),
-            ("ASICloud", "Local", "ASI_API_KEY")]
+            ("ASICloud", "Local", "ASI_API_KEY"),
+            ("ASIOne", "Local", "ASIONE_API_KEY")]
         provider = providers[provider_id][0]
         embeddingprovider = providers[provider_id][1]
         api_token_var = providers[provider_id][2]

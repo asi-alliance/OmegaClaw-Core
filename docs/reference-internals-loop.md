@@ -34,7 +34,8 @@ Also creates shared state slots:
 6. **Call the LLM** — dispatches on `provider`:
    - `OpenAI` → `useGPT`
    - `Anthropic` → `lib_llm_ext.useClaude`
-   - else → `lib_llm_ext.useMiniMax`
+   - `ASICloud` → `lib_llm_ext.useMiniMax`
+   - else → `lib_llm_ext.useAsi1`
 7. **Repair parentheses** — `helper.balance_parentheses` fixes common mismatches before parsing.
 8. **Parse** — `sread` on the repaired string; if it does not start with `(`, the loop feeds back a reminder prompt.
 9. **Dispatch skills** — `(superpose $sexpr)` runs each skill, capturing errors via `HandleError`.
