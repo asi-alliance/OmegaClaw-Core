@@ -53,7 +53,7 @@ def useClaude(content):
 def useAsi1(content):
     return _chat(
         client=ASIONE_CLIENT,
-        model="asi1",
+        model="asi1-ultra",
         content=content
     )
 
