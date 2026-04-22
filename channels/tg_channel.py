@@ -36,6 +36,8 @@ class _TelegramChannel:
         self.dp = None
         self.connected = False
         self.chat_id = None
+        self.allowed_chat_id = None
+        
         self.bot_username = None
         self.bot_id = None
         self.msg_lock = threading.Lock()
@@ -142,8 +144,6 @@ class _TelegramChannel:
     
     async def _start_cmd(self, message: types.Message):
         """Handle the /start command with interactive buttons."""
-        if message.chat is not None:
-            self.chat_id = message.chat.id
         
         from aiogram.utils.keyboard import InlineKeyboardBuilder
         builder = InlineKeyboardBuilder()
@@ -251,8 +251,9 @@ class _TelegramChannel:
         # Check for multiple chat support and config restriction
         else:
             if self.restrict_to_config_chat:
-                if self.chat_id and str(message.chat.id) != str(self.chat_id):
-                    return
+                if hasattr(self, 'allowed_chat_id') and self.allowed_chat_id:
+                    if str(message.chat.id) != str(self.allowed_chat_id):
+                        return
         
         # Filter out messages from other bots and muted users
         if message.from_user:
@@ -407,6 +408,7 @@ class _TelegramChannel:
         """Launch the Telegram bot on a daemon thread and begin polling."""
         self.running = True
         self.chat_id = chat_id
+        self.allowed_chat_id = chat_id
         # Reload config if path provided
         if config_path is None:
             self.load_config(self.config_path)
