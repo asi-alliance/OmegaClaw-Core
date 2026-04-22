@@ -1,6 +1,6 @@
 # START
 
-This bot may read channel messages to build 1-minute context windows, but it replies only when directly tagged. It uses limited safe web lookups and keeps safety/privacy guardrails in place. Do not share secrets or sensitive personal data.
+This bot may read channel messages but it responds only when directly tagged or replied to. It uses limited safe web lookups and keeps safety/privacy guardrails in place. Do not share secrets or sensitive personal data.
 
 **About this bot**
 
@@ -15,25 +15,23 @@ This bot may read channel messages to build 1-minute context windows, but it rep
 **Use notes**
 
 - Tag the bot directly if you want a response.
-- Replies are batched, so the bot may answer once per minute per chat.
-- Some categories of requests will be refused for safety reasons.
+- Some categories of requests will be refused for safety/security reasons.
 
 # ABOUT
 
-I’m a Telegram-only MeTTaClaw profile.
+I’m a Telegram-only OmegaClaw profile.
 
 What I can do:
 
 - observe channel context quietly
 - answer when directly tagged
 - perform limited safe web lookups
-- provide one batched reply per chat per minute
 
 What I cannot do:
 
 - browse interactively
-- open, read, write, or send files
-- run shell commands or use sudo
+- send files/media
+- use sudo
 - call arbitrary websites or APIs
 - act outside Telegram
 
