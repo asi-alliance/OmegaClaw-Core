@@ -83,34 +83,42 @@ This project also aims to explore the potential of Agentic Physical AI, a ROS2 p
 
 **Installation**
 
-First, get [SWI-Prolog](https://www.swi-prolog.org/). Then:
+Prerequisites: Git, Python3, Pip and [venv](https://docs.python.org/3/library/venv.html) library
 
+First, get [SWI-Prolog](https://www.swi-prolog.org/). Then:
 ```
 git clone https://github.com/trueagi-io/PeTTa
 cd PeTTa
-mkdir -p repos && git clone https://github.com/patham9/mettaclaw repos/mettaclaw
+mkdir -p repos
+git clone https://github.com/asi-alliance/OmegaClaw-Core.git repos/OmegaClaw-Core
+git clone https://github.com/patham9/petta_lib_chromadb.git repos/petta_lib_chromadb
+python3 -m venv ./.venv
+source ./.venv/bin/activate
+python3 -m pip install -r
+cp repos/OmegaClaw-Core/run.metta ./
 ```
 
 **Usage**
 
+Before running the system you need to choose your LLM API provider and export the API key as the environment variable.
+| Provider | Env var name | Notes |
+|---|---|---|
+| `Anthropic` (default) | `ANTHROPIC_API_KEY` | Claude models via the Anthropic API. |
+| `OpenAI` | `OPENAI_API_KEY` | GPT models. Also reused by the OpenAI embedding provider below. |
+| `ASICloud` | `ASI_API_KEY` |  MiniMax models via ASI Alliance inference endpoint (`inference.asicloud.cudos.org`). |
+
 Run the system via the following command which ensures the system is started from the root folder of PeTTa:
-
 ```
-cp repos/mettaclaw/run.metta ./
-OPENAI_API_KEY=... sh run.sh run.metta
+OMEGACLAW_AUTH_SECRET=<channel-secret> sh run.sh run.metta IRC_channel="<irc-channel>"
 ```
+After start go to https://webchat.quakenet.org/ to communicate with the agent. Join `<irc-channel>` and after agent is joined send `auth <channel-secret>` message to authenticate yourself as an agent owner. Please replace `<irc-channel>` and `<channel-secret>` by your own values.
 
-**Auto-install/run**
-
-Alternatively, if PeTTa is already installed and the latest version pulled (v1.0.2 or latest commit), then, running the following MeTTa file from the root folder, installs and runs MeTTaClaw (assuming OPENAI_API_KEY is set):
-
-```
-!(import! &self (library lib_import))
-!(git-import! "https://github.com/patham9/mettaclaw.git")
-!(import! &self (library mettaclaw lib_mettaclaw))
-
-!(mettaclaw)
-```
+The full list of the `run.metta` optinos
+| Option | Value | Description |
+|---|---|---|
+| `provider` | `Anthropic`, `OpenAI` or `ASICloud` | The name of the LLM API provider. The corresponding API token should be exported as an environment variable (see the table above). Default value is `Anthropic` |
+| `IRC_channel` | `"#some_channel_name"` | Name of the channel on [QuakeNet IRC server](https://webchat.quakenet.org/) which agent will connect to. In order to make agent talk only to the owner the `OMEGACLAW_AUTH_SECRET` environment variable is used. After agent is joined to the channel send `auth <secret>` message for the authentication. For example if `OMEGACLAW_AUTH_SECRET=12345` then one need sending `auth 12345`. |
+| `embeddingprovider` | `Local` or `OpenAI` | The embedding provider to use for the memory. `Local` uses [sentence-transformers](https://pypi.org/project/sentence-transformers/) library locally. `OpenAI` requires `OPENAI_API_KEY` and uses OpenAI embedding API. |
 
 **Illustrations**
 
