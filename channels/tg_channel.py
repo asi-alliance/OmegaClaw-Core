@@ -37,6 +37,7 @@ class _TelegramChannel:
         self.connected = False
         self.chat_id = None
         self.allowed_chat_id = None
+        self.allowed_chat_ids = set()
         
         self.bot_username = None
         self.bot_id = None
@@ -72,6 +73,44 @@ class _TelegramChannel:
         self._ready_windows = []
         self._polling_task = None
 
+    def _normalize_chat_id(self, chat_id):
+        if chat_id is None:
+            return None
+
+        chat_id = str(chat_id).strip("\"' ")
+        if not chat_id:
+            return None
+
+        if not chat_id.startswith("-") and chat_id.isdigit() and len(chat_id) > 10:
+            chat_id = f"-{chat_id}"
+
+        return chat_id
+
+    def _normalize_chat_ids(self, chat_ids):
+        if chat_ids is None:
+            return set()
+
+        if isinstance(chat_ids, (list, tuple, set)):
+            values = chat_ids
+        else:
+            values = str(chat_ids).split(",")
+
+        normalized = set()
+        for chat_id in values:
+            value = self._normalize_chat_id(chat_id)
+            if value:
+                normalized.add(value)
+        return normalized
+
+    def _is_allowed_chat(self, chat_id):
+        if not self.restrict_to_config_chat:
+            return True
+
+        if not self.allowed_chat_ids:
+            return True
+
+        return self._normalize_chat_id(chat_id) in self.allowed_chat_ids
+
     def load_config(self, config_path):
         """Load bot configuration from a YAML file."""
         if not os.path.exists(config_path):
@@ -90,6 +129,8 @@ class _TelegramChannel:
             self.dm_enabled = tg_cfg.get("dm_support", {}).get("enabled", False)
             self.restrict_to_config_chat = tg_cfg.get("restrict_to_config_chat", True)
             self.allow_group_bots = tg_cfg.get("allow_group_bots", False)
+            self.allowed_chat_ids = self._normalize_chat_ids(tg_cfg.get("allowed_chats", []))
+            self.allowed_chat_id = next(iter(self.allowed_chat_ids), None)
             self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
             self.reply_constraints = tg_cfg.get("reply_constraints", {})
 
@@ -138,8 +179,7 @@ class _TelegramChannel:
             if self._message_queue:
                 ready_chat_id, text, reply_id = self._message_queue.pop(0)
 
-                if self.restrict_to_config_chat and getattr(self, 'allowed_chat_id', None):
-                    if str(ready_chat_id) != str(self.allowed_chat_id) and ready_chat_id not in self.admin_ids:
+                if not self._is_allowed_chat(ready_chat_id) and ready_chat_id not in self.admin_ids:
                         return None
                 
                 self.chat_id = ready_chat_id
@@ -166,9 +206,8 @@ class _TelegramChannel:
             return True
         
         # Handle Groups
-        if self.restrict_to_config_chat and getattr(self, 'allowed_chat_id', None):
-            if str(message.chat.id) != str(self.allowed_chat_id):
-                return False
+        if not self._is_allowed_chat(message.chat.id):
+            return False
                 
         return True
     
@@ -220,7 +259,7 @@ class _TelegramChannel:
         if not self._is_admin_dm(message):
              return await message.answer("❌ Admin commands only work in direct messages.")
         
-        target_chat = message.allowed_chat_id
+        target_chat = self.allowed_chat_id or getattr(message.chat, "id", None)
         args = message.text.split()
         if len(args) > 1:
             target_chat = args[1]
@@ -401,18 +440,21 @@ class _TelegramChannel:
             self.bot_username = bot_info.username
             self.bot_id = bot_info.id
 
+            chat_ids_for_admin_scan = list(self.allowed_chat_ids)
             if self.chat_id:
+                normalized_chat_id = self._normalize_chat_id(self.chat_id)
+                if normalized_chat_id:
+                    chat_ids_for_admin_scan.append(normalized_chat_id)
+
+            for eval_chat_id in dict.fromkeys(chat_ids_for_admin_scan):
                 try:
-                    eval_chat_id = str(self.chat_id)
-                    if not eval_chat_id.startswith('-') and len(eval_chat_id) > 10:
-                        eval_chat_id = f"-{eval_chat_id}"
                     admins = await self.bot.get_chat_administrators(eval_chat_id)
                     for admin in admins:
                         if admin.user.id not in self.admin_ids:
                             self.admin_ids.append(int(admin.user.id))
-                    logging.info(f"Loaded admins from group {self.chat_id}. Total admins: {len(self.admin_ids)}")
+                    logging.info(f"Loaded admins from group {eval_chat_id}. Total admins: {len(self.admin_ids)}")
                 except Exception as e:
-                    logging.error(f"Failed to fetch administrators for chat {self.chat_id}: {e}")
+                    logging.error(f"Failed to fetch administrators for chat {eval_chat_id}: {e}")
             
             self.dp.message.register(self._start_cmd, Command("start"))
             self.dp.message.register(self._about_cmd, Command("about"))
@@ -452,11 +494,17 @@ class _TelegramChannel:
     def start(self, token, chat_id=None, config_path=None):
         """Launch the Telegram bot on a daemon thread and begin polling."""
         self.running = True
-        self.chat_id = chat_id
-        self.allowed_chat_id = chat_id
         # Reload config if path provided
         if config_path is None:
             self.load_config(self.config_path)
+
+        runtime_chat_ids = self._normalize_chat_ids(chat_id)
+        if runtime_chat_ids:
+            self.allowed_chat_ids.update(runtime_chat_ids)
+            self.allowed_chat_id = next(iter(self.allowed_chat_ids), None)
+            self.chat_id = next(iter(runtime_chat_ids))
+        else:
+            self.chat_id = self.allowed_chat_id
             
         self.thread = threading.Thread(target=self._thread_main, args=(token,), daemon=True)
         self.thread.start()
@@ -511,10 +559,9 @@ def start_telegram(token, chat_id=None):
     
     token = str(token).strip("\"' ")
     
-    if isinstance(chat_id, list) and len(chat_id) > 0:
-        chat_id = str(chat_id[0])
-
-    if chat_id is not None:
+    if isinstance(chat_id, list):
+        chat_id = [str(item).strip("\"' ") for item in chat_id if str(item).strip("\"' ")]
+    elif chat_id is not None:
         chat_id = str(chat_id).strip("\"' ")
             
     return _channel.start(token, chat_id)

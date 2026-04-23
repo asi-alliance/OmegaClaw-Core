@@ -9,6 +9,9 @@ telegram:
   reply_only_when_directly_tagged: true
   reply_on_reply_to_bot: true
   restrict_to_config_chat: true
+  allowed_chats:
+    - "-1001234xxxxx" 
+    - "-1009876xxxxx"
   allow_group_bots: true
   dm_support:
     enabled: false

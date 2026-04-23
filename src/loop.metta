@@ -47,6 +47,10 @@
                                           (change-state! &error $new)))
                  ($else $sexpr))))
 
+(= (metta $str)
+   (let $code (sread $str)
+        (repr (swrite (eval $code)))))
+
 (= (omegaclaw)
    (omegaclaw 1))
 (= (omegaclaw $k)
