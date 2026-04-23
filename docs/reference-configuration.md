@@ -37,11 +37,14 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `commchannel` | `irc` | Active channel — `irc` or `mattermost`. |
+| `commchannel` | `irc` | Active channel — `irc`, `telegram`, or `mattermost`. |
 | `IRC_channel` | `##omegaclaw` | IRC channel to join. |
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname. |
 | `IRC_port` | 6667 | IRC port. |
 | `IRC_user` | `omegaclaw` | IRC nickname. |
+| `TG_BOT_TOKEN` | *(empty — set at runtime)* | Telegram bot token (from BotFather). |
+| `TG_CHAT_ID` | *(empty — auto-bind supported)* | Optional fixed Telegram chat ID. Leave empty to auto-bind on first valid inbound auth/message. |
+| `TG_POLL_TIMEOUT` | 20 | Telegram long-poll timeout in seconds. |
 | `MM_URL` | `https://chat.singularitynet.io` | Mattermost base URL. |
 | `MM_CHANNEL_ID` | `8fjrmabjx7gupy7e5kjznpt5qh` | Target channel ID. |
 | `MM_BOT_TOKEN` | *(empty — set at runtime)* | Bot auth token. |

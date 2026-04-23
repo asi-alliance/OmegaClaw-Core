@@ -126,6 +126,7 @@ lib_omegaclaw.metta       loads all submodules
 └── lib_llm_ext.py        Claude / GPT / MiniMax / local embeddings
 
 channels/irc.py           IRC adapter
+channels/telegram.py      Telegram adapter
 channels/mattermost.py    Mattermost adapter
 channels/websearch.py     web search
 
@@ -282,7 +283,7 @@ The set of callable operations available to the agent at each turn — plain MeT
 
 ### Channels
 
-Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC or Mattermost by default). See [reference-channels.md](./reference-channels.md).
+Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC, Telegram, or Mattermost by default). See [reference-channels.md](./reference-channels.md).
 
 ### Orchestration
 
@@ -343,7 +344,7 @@ A skill whose implementation is a remote agent reached through the Agentverse br
 - a small, auditable agent that can explain **why** it reached a conclusion;
 - reasoning with explicit uncertainty (`stv frequency confidence`) rather than opaque probabilities;
 - a platform for experimenting with NAL and PLN inside an agent loop;
-- a chat-facing agent over IRC, Mattermost, or a channel you add yourself.
+- a chat-facing agent over IRC, Telegram, Mattermost, or a channel you add yourself.
 
 ### Honest limits
 

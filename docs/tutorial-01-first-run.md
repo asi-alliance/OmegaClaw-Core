@@ -11,7 +11,7 @@
 ## 1. Start the container
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw_setup.sh \
+curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw \
   | bash -s -- singularitynet/omegaclaw:latest
 ```
 

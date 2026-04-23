@@ -60,7 +60,7 @@ When the agent outputs a conclusion, you can trace it back through every step: w
 
 ---
 
-## Quick Start - IRC Channel
+## Quick Start - Channel Setup
 
 Requirement: Docker
 
@@ -68,7 +68,10 @@ OmegaClaw can be installed, started, and subsequently restarted with this single
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:latest
 ```
-OmegaClaw requires an LLM model to run. When prompted, please select from a list of supported models, enter an API key and a unique IRC channel name, then interact with your OmegaClaw at [webchat.quakenet.org](https://webchat.quakenet.org). 
+OmegaClaw requires an LLM model to run. When prompted, select a communication channel (`IRC` or `Telegram`), pick an LLM provider, and enter your API key.
+
+- **IRC:** enter a unique channel name and interact at [webchat.quakenet.org](https://webchat.quakenet.org).
+- **Telegram:** enter only your bot token. You do **not** need to provide a chat ID; OmegaClaw auto-binds after the first valid auth message.
 
 ### Channel authentication
 
@@ -94,8 +97,7 @@ When done interacting with your OmegaClaw, please use these commands as needed:
 | Remove Containers | `docker rm -f omegaclaw` |
 | Clear Memory | `docker volume rm omegaclaw-memory` |
 
-To restart Omegaclaw simply rerun the single curl command show above. If there is an updated version of OmegaClaw, it will automatically be installed. When you restart OmegaClaw, you will receive a new authentication token secret to paste into your IRC channel chat for re-verification.
+To restart Omegaclaw simply rerun the single curl command show above. If there is an updated version of OmegaClaw, it will automatically be installed. When you restart OmegaClaw, you will receive a new authentication token secret to paste into your channel chat for re-verification.
 
 Your OmegaClaw will retain its memory for subsequent restarts unless you clear memory. To clear OmegaClaw memory and return to its initialized state, please run the command to stop OmegaClaw, the command to remove containers, the command to clear memory (all shown above), and then the single curl script command shown above.
-
 

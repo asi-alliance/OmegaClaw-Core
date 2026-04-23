@@ -7,14 +7,15 @@ OmegaClaw supports two setups: the recommended Docker one-liner and a manual MeT
 Requirements: Docker.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw_setup.sh \
+curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw \
   | bash -s -- singularitynet/omegaclaw:latest
 ```
 
 The script prompts for:
 
 - an LLM API key (OpenAI by default)
-- a unique IRC channel name
+- a communication channel selection (`IRC` or `Telegram`)
+- channel details (IRC name, or Telegram bot token)
 
 and prints a one-time secret used to authenticate the first IRC user. See [tutorial-01-first-run.md](./tutorial-01-first-run.md) for the full first-run walkthrough.
 
@@ -76,10 +77,11 @@ Set via `embeddingprovider` in `src/memory.metta`:
 | Channel | Env var | Notes |
 |---|---|---|
 | IRC | *(none required)* | Connects anonymously to QuakeNet. Optional `OMEGACLAW_AUTH_SECRET` gates who the agent treats as its owner. |
+| Telegram | *(none required if passed as args)* | Provide `commchannel=telegram` and `TG_BOT_TOKEN=<token>` at startup. `TG_CHAT_ID` is optional; if omitted, the adapter can auto-bind on first valid inbound auth/message. |
 | Mattermost | `MM_BOT_TOKEN` | Set via `configure` or directly in `src/channels.metta`. |
 
 ### Docker setup script
 
-`scripts/omegaclaw_setup.sh` (invoked by the Docker one-liner above) asks which provider you want, writes the chosen key into the container's runtime config, and auto-pairs the embedding provider: `Anthropic → Local`, `OpenAI → OpenAI`, `ASICloud → Local`. You don't need to set anything manually when using Docker.
+`scripts/omegaclaw` (invoked by the Docker one-liner above) asks which channel/provider you want, writes the chosen keys into the container's runtime config, and auto-pairs the embedding provider: `Anthropic → Local`, `OpenAI → OpenAI`, `ASICloud → Local`. You don't need to set anything manually when using Docker.
 
 All runtime parameters are listed in [reference-configuration.md](./reference-configuration.md).

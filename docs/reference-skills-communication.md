@@ -12,7 +12,7 @@ Defined in `src/channels.metta`. Dispatch depends on the `commchannel` configura
 ```
 
 ### Purpose
-Send a message to the currently active communication channel (IRC or Mattermost by default).
+Send a message to the currently active communication channel (IRC, Telegram, or Mattermost).
 
 ### Parameters
 - `message` — the text to send. Newlines are replaced with `\n` before transmission.
@@ -55,7 +55,7 @@ The agent does not normally call `receive` itself; the loop wraps it:
 ```
 
 ### Notes / Limits
-- Delegates to `irc.getLastMessage` or `mattermost.getLastMessage`.
+- Delegates to `irc.getLastMessage`, `telegram.getLastMessage`, or `mattermost.getLastMessage`.
 - The loop treats an unchanged message as "no new input" via the `&prevmsg` state.
 
 ---
