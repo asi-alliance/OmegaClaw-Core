@@ -32,7 +32,7 @@ def _chat(client, model, content, max_tokens=6000):
         )
         return _clean(resp.choices[0].message.content)
     except Exception as e:
-        print(f"[lib_llm_ext] Exception while processing the response {resp}: {e}")
+        print(f"[lib_llm_ext._chat] Exception while communicating with LLM: {e}")
         return ""
 
 def useMiniMax(content):
