@@ -1,0 +1,5 @@
+sentence-transformers
+chromadb
+janus-swi
+openai
+uagents
