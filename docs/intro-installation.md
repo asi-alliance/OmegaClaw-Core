@@ -2,34 +2,6 @@
 
 OmegaClaw supports two setups: the recommended Docker one-liner and a manual MeTTa install.
 
-## Option A — Docker (recommended)
-
-Requirements: Docker.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw_setup.sh \
-  | bash -s -- singularitynet/omegaclaw:latest
-```
-
-The script prompts for:
-
-- an LLM API key (OpenAI by default)
-- a unique IRC channel name
-
-and prints a one-time secret used to authenticate the first IRC user. See [tutorial-01-first-run.md](./tutorial-01-first-run.md) for the full first-run walkthrough.
-
-Container management:
-
-| Action | Command |
-|---|---|
-| Stop | `docker stop omegaclaw` |
-| Restart | `docker start omegaclaw` |
-| View logs | `docker logs -f omegaclaw` |
-
-Memory persists across restarts because `memory/history.metta` and the ChromaDB store are kept in the container volume.
-
-## Option B — Manual
-
 Requirements: a working MeTTa / Hyperon install, Python 3, and the Python dependencies pulled in by `lib_llm_ext.py`, `src/agentverse.py`, `channels/*.py`, and the ChromaDB bridge.
 
 1. Clone the repository.
@@ -77,9 +49,5 @@ Set via `embeddingprovider` in `src/memory.metta`:
 |---|---|---|
 | IRC | *(none required)* | Connects anonymously to QuakeNet. Optional `OMEGACLAW_AUTH_SECRET` gates who the agent treats as its owner. |
 | Mattermost | `MM_BOT_TOKEN` | Set via `configure` or directly in `src/channels.metta`. |
-
-### Docker setup script
-
-`scripts/omegaclaw_setup.sh` (invoked by the Docker one-liner above) asks which provider you want, writes the chosen key into the container's runtime config, and auto-pairs the embedding provider: `Anthropic → Local`, `OpenAI → OpenAI`, `ASICloud → Local`. You don't need to set anything manually when using Docker.
 
 All runtime parameters are listed in [reference-configuration.md](./reference-configuration.md).
