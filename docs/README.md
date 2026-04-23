@@ -15,7 +15,7 @@ If you are new, read the Introduction in order, then pick tutorials that match w
 Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
 
 - [introduction.md](./introduction.md) — What OmegaClaw is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
-- [intro-installation.md](./intro-installation.md) — Docker, manual MeTTa setup, environment variables, API keys.
+- [installation instruction](/README.md#installation) — Docker, manual MeTTa setup, environment variables, API keys.
 
 ---
 

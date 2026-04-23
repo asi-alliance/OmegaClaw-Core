@@ -6,7 +6,7 @@ The core agent loop is approximately **200 lines of MeTTa**.
 
 > Most AI assistants generate answers that sound right. OmegaClaw-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
 
-This page is the conceptual introduction: what OmegaClaw is, why the hybrid architecture exists, how the pieces connect at runtime, the vocabulary used throughout the rest of the docs, and the honest limits of the current system. For getting a running instance, see [intro-installation.md](./intro-installation.md). For hands-on walkthroughs, see the tutorials listed at the end.
+This page is the conceptual introduction: what OmegaClaw is, why the hybrid architecture exists, how the pieces connect at runtime, the vocabulary used throughout the rest of the docs, and the honest limits of the current system. For getting a running instance, see [installation instruction](/README.md#installation). For hands-on walkthroughs, see the tutorials listed at the end.
 
 ---
 
@@ -361,7 +361,6 @@ The mitigations (external grounding, revision, action thresholds, the defense st
 
 ## Where to go next
 
-- [intro-installation.md](./intro-installation.md) — get a running instance.
 - [tutorial-01-first-run.md](./tutorial-01-first-run.md) — hands-on first session.
 - [reference-orchestration.md](./reference-orchestration.md) — engine selection, stopping criteria, action thresholds, defense stack.
 - [reference-internals-loop.md](./reference-internals-loop.md) — turn structure in detail.
