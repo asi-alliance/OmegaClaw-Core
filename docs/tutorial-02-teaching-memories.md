@@ -1,10 +1,10 @@
-# Tutorial 02 — Teaching Memories
+# Tutorial 01 — Teaching Memories
 
 **Goal:** understand and exercise the four memory skills: `remember`, `query`, `episodes`, and `pin`.
 
 ## Prerequisites
 
-- A running OmegaClaw (see [tutorial-01-first-run.md](./tutorial-01-first-run.md)).
+- A running OmegaClaw.
 
 ## Background
 
