@@ -24,6 +24,10 @@ Unlike reactive, session-based agents, OmegaClaw operates in a continuous
 execution loop, managing its own goals and providing auditable proof trails for
 its reasoning.
 
+The primary design criteria for OmegaClaw were simplicity, ease of extension,
+and transparent implementation. This results in a minimalist MeTTa-based core
+of approximately 200 lines of code.
+
 ---
 
 ## Installation
