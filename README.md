@@ -57,6 +57,7 @@ OmegaClaw is a persistent AI agent written in MeTTa — SingularityNET's AGI pro
 **1. Run the launch script:**
 
 ```shell
+docker pull singularitynet/omegaclaw:hackathon2604
 curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/tags/hackathon2604/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:hackathon2604
 ```
 
