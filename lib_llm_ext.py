@@ -25,12 +25,11 @@ def _clean(text):
     return text.replace("_quote_", '"').replace("_apostrophe_", "'")
 
 def _chat(client, model, content, max_tokens=6000, **kwargs):
-    spl = content.split(":-:-:-:")
+    content = content.replace(":-:-:-:", " ")
     try:
         resp = client.chat.completions.create(
             model=model,
-            messages=[{"role": "system", "content": spl[0]},
-                      {"role": "user", "content": spl[1]}],
+            messages=[{"role": "user", "content": content}],
             max_tokens=max_tokens,
             extra_body={
                 "enable_thinking": True,
@@ -57,8 +56,27 @@ def useClaude(content):
         content=content
     )
 
+def _chatAsiOne(client, model, content, max_tokens=6000, **kwargs):
+    spl = content.split(":-:-:-:")
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": spl[0]},
+                      {"role": "user", "content": spl[1]}],
+            max_tokens=max_tokens,
+            extra_body={
+                "enable_thinking": True,
+                "thinking_budget": 6000 
+            },
+            **kwargs
+        )
+        return _clean(resp.choices[0].message.content)
+    except Exception as e:
+        print(f"[lib_llm_ext._chat] Exception while communicating with LLM: {e}")
+        return ""
+
 def useAsi1(content):
-    resp = _chat(
+    resp = _chatAsiOne(
         client=ASIONE_CLIENT,
         model="asi1-ultra", # "asi1-ultra"
         content=content
