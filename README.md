@@ -46,7 +46,11 @@ OmegaClaw is a persistent AI agent written in MeTTa — SingularityNET's AGI pro
 - Python
 - Linux/Mac terminal
 - API Key
-- IRC Channel name — OmegaClaw communicates through a chat channel using IRC as a lightweight interface. You'll chat with the agent in your browser at [webchat.quakenet.org](https://webchat.quakenet.org).
+- Communication Channel - 2 options:
+  - IRC (lightweight interface on IRC protocol server); to use, create a unique  Private Channel name for webchat.quakenet.org. Private Channel names start with ## and should be unique like  ##omega12345
+  - Telegram (modern social chat application); to use, search /botfather on Telegram, enter /newbot to create a new bot token, and follow directions to name and join your bot’s private channel.
+
+> **Note:** the IRC channel name you choose should be unique, to decrease the odds other individuals will join it; if someone enters your channel, and your bot is unattended, they will have full access to the bot and whatever permissions it has on your docker/ machine - stop the omegaclaw docker when not in use, and always monitor the channel.
 
 ### Steps
 
@@ -56,20 +60,19 @@ OmegaClaw is a persistent AI agent written in MeTTa — SingularityNET's AGI pro
 curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/tags/hackathon2604/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:hackathon2604
 ```
 
-**2. Proceed through the startup script:**
+**2. Proceed through the start-up script:  
+   1) Read the disclaimer \- understand the risks of running an agent and take appropriate precautions; to proceed, type ‘accept’  
+   2) Choose 1\) IRC or 2\) Telegram  
+      1) For IRC, enter your unique private channel ID  
+      2) For Telegram enter your bot token  
+   3) Select desired LLM to use  
+   4) Enter your API key
 
-- Read the disclaimer — understand the risks of running an agent and take appropriate precautions. Type `accept` to proceed.
-- Enter an IRC channel name such as `##omega12345` (any unique value, starting with `##`).
-- Select your desired LLM.
-- Enter your API key.
+**3. Join your preferred channel:**
 
-> **Security note:** The IRC channel name you choose should be unique to decrease the odds of others joining it. If someone enters your channel while your bot is unattended, they will have full access to the bot and whatever permissions it has on your Docker/machine. Stop the OmegaClaw Docker when not in use and always monitor the channel.
-
-**3. Connect via IRC:**
-
-Go to [https://webchat.quakenet.org](https://webchat.quakenet.org), enter a username and your exact channel name (e.g. `##omega12345`). Wait for your agent to initialize and join the chat.
-
-> **IRC formatting note:** IRC has a very particular format that some models may struggle with. If you are not receiving responses or they are cut off, try: *"send in IRC format — text only, short chunks, low bandwidth, and always use the send command."* The agent will learn, though may need occasional reminders.
+   1) IRC: navigate to website [https://webchat.quakenet.org](https://webchat.quakenet.org/), enter a username for yourself and your exact channel name as during setup (e.g., \#\#omega12345).   
+   2) Telegram: navigate to your DM with your bot (e.g. https://t.me/\<botname\>  
+   3) Wait for your agent to download, initialize its processes, and join the chat.
 
 **4. Interact with OmegaClaw:**
 
