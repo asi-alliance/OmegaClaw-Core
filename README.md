@@ -134,6 +134,64 @@ You can monitor which skills the agent is using, as well as its reasoning proces
 
 ---
 
+## Implementing OmegaClaw Skills with Agentverse Agents
+
+To implement minimal skills for OmegaClaw using Agentverse agents, follow these three steps.
+
+### 1. Implement an Agentverse Module
+
+Using the [uAgents framework](https://pypi.org/project/uagents/) by FetchAI, create a Python module that handles interaction with a target Agentverse agent. At minimum, the module should expose a simple function that calls the agent with all required input parameters.
+
+Example implementation:
+
+```python
+def tavily_search(search_query: str, timeout: int = 60) -> str:
+    try:
+        request = WebSearchRequest(query=search_query)
+        response = asyncio.run(
+            _ask_agent(TAVILY_SEARCH_AGENT_ADDRESS, request, int(timeout))
+        )
+        return _format_tavily_results(response)
+    except Exception as e:
+        return f"error: {e}"
+```
+
+### 2. Implement a MeTTa Call Function
+
+To enable skill invocation, define a function in MeTTa that calls your Python module. In the `src/skills.metta` file, implement a function that accepts the required arguments and forwards them to the Python module responsible for calling the Agentverse agent.
+
+Example implementation:
+
+```metta
+(= (tavily-search $query)
+   (py-call (agentverse.tavily_search $query)))
+```
+
+### 3. Register the Skill in OmegaClaw
+
+In the same `src/skills.metta` file, update the `getSkills` function by adding a new entry that defines:
+
+- The purpose of the skill within OmegaClaw
+- The corresponding function that invokes your Agentverse agent
+
+Skills are grouped into categories — choose the most appropriate one based on the agent's functionality and intended use.
+
+Example registration:
+
+```metta
+(= (getSkills)
+   (;INTERNAL:
+    ...
+    ;SHELL AND FILE I/O:
+    ...
+    ;COMMUNICATION CHANNELS:
+    ...
+    "- Search the web using the Tavily Search Agent: (tavily-search string_in_quotes)"
+    ...
+```
+
+---
+
 ## Option 2: Intermediate Install
 
 *For more control over image creation and functions.*
