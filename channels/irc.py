@@ -3,6 +3,7 @@ import random
 import socket
 import threading
 import time
+import textwrap
 
 _running = False
 _sock = None
@@ -157,12 +158,13 @@ def stop_irc():
 
 def send_message(text):
     max_len = 400
-    lines = text.replace("\r", "").split("\\n")
-    for text in lines:
+    segments = text.replace("\r", "").split("\\n")
+    lines = []
+    for segment in segments:
+        lines.extend(textwrap.wrap(segment, width=max_len, break_long_words=True, break_on_hyphens=False))
+    for chunk in lines:
         try:
             if _connected and _channel:
-                for i in range(0, len(text), max_len):
-                    chunk = text[i:i + max_len]
-                    _send(f"PRIVMSG {_channel} :{chunk}")
-        except Exception:
-            pass
+                 _send(f"PRIVMSG {_channel} :{chunk}")
+        except Exception as e:
+            print(f"[IRC] error in send_message on channel {_channel}: {e}")
