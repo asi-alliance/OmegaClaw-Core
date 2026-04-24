@@ -166,5 +166,5 @@ def send_message(text):
         try:
             if _connected and _channel:
                  _send(f"PRIVMSG {_channel} :{chunk}")
-        except Exception:
-            print(f"[IRC] error in send_message on channel {_channel}")
+        except Exception as e:
+            print(f"[IRC] error in send_message on channel {_channel}: {e}")
