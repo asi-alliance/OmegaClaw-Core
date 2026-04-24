@@ -42,7 +42,7 @@ Not a communication channel in the `send`/`receive` sense — this is the backen
 
 ## Adding a new channel
 
-See [tutorial-05-adding-a-channel.md](./tutorial-05-adding-a-channel.md).
+See [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md).
 
 ## Related reference
 

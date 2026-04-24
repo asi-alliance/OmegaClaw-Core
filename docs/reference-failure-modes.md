@@ -22,7 +22,7 @@ The LLM converts natural language into atoms. This is where the most common — 
 
 **Mitigations:**
 
-- External grounding — see [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md).
+- External grounding — see [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md).
 - Discount LLM-originated confidence by 10–15 percentage points before feeding into the chain.
 - Systematic checks for term order, copula, and granularity at the point of formulation.
 
@@ -163,5 +163,5 @@ The numbers on this page come from operational experience with **Max Botnick**, 
 
 - [introduction.md#the-hybrid-thesis](./introduction.md#the-hybrid-thesis) — why the hybrid architecture fails this way.
 - [reference-orchestration.md](./reference-orchestration.md) — the defense stack and thresholds in detail.
-- [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md) — external grounding walkthrough.
-- [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md) — strategic advice for getting reliable outputs.
+- [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md) — external grounding walkthrough.
+- [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) — strategic advice for getting reliable outputs.

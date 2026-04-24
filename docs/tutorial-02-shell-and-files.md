@@ -1,11 +1,11 @@
-# Tutorial 03 — Shell and Files
+# Tutorial 02 — Shell and Files
 
 **Goal:** let OmegaClaw inspect and modify its environment using `shell`, `read-file`, `write-file`, and `append-file`.
 
 ## Prerequisites
 
-- A running OmegaClaw (see [tutorial-01-first-run.md](./tutorial-01-first-run.md)).
-- Awareness that these skills run with the permissions of the OmegaClaw process. In Docker this is the container user; outside Docker, it is your user.
+- A running OmegaClaw (see [Usage](/README.md#usage)).
+- Awareness that these skills run with the permissions of the OmegaClaw process.
 
 ## The four I/O skills
 
@@ -40,7 +40,7 @@ Expected: `(write-file "/tmp/haiku.txt" "...")`, then on the next turn `(read-fi
 start a log at /tmp/session.log and append a line summarizing every turn
 ```
 
-The agent should `(append-file "/tmp/session.log" "...")` on each subsequent turn. Inspect with `docker exec omegaclaw cat /tmp/session.log`.
+The agent should `(append-file "/tmp/session.log" "...")` on each subsequent turn. Inspect cat `/tmp/session.log`.
 
 ## Safety notes
 
@@ -55,5 +55,5 @@ The agent should `(append-file "/tmp/session.log" "...")` on each subsequent tur
 
 ## Next steps
 
-- [tutorial-04-writing-a-custom-skill.md](./tutorial-04-writing-a-custom-skill.md) — extend the surface with your own skill.
+- [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md) — extend the surface with your own skill.
 - [reference-skills-io.md](./reference-skills-io.md) — full details and edge cases.

@@ -1,11 +1,11 @@
-# Tutorial 04 — Writing a Custom Skill
+# Tutorial 03 — Writing a Custom Skill
 
 **Goal:** add a new skill the agent can call, end-to-end.
 
 ## Prerequisites
 
 - A local clone of OmegaClaw-Core (so you can edit MeTTa source).
-- Familiarity with running the agent — see [tutorial-01-first-run.md](./tutorial-01-first-run.md).
+- Familiarity with running the agent — see [Usage](/README.md#usage).
 
 ## The anatomy of a skill
 
@@ -60,7 +60,7 @@ The LLM should emit `(word-count "the quick brown fox")` and respond with `4`.
 
 ## Verification
 
-- The new skill appears in the prompt (`docker logs` and search for `word-count`).
+- The new skill appears in the prompt (search logs for `word-count`).
 - The LLM invokes it without prompting tweaks.
 - The return value shows up in `LAST_SKILL_USE_RESULTS` on the next turn.
 
@@ -68,4 +68,4 @@ The LLM should emit `(word-count "the quick brown fox")` and respond with `4`.
 
 - [reference-internals-skill-dispatch.md](./reference-internals-skill-dispatch.md) — how dispatch works.
 - [reference-internals-extension-points.md](./reference-internals-extension-points.md) — other places to hook in.
-- [tutorial-07-remote-agentverse-skills.md](./tutorial-07-remote-agentverse-skills.md) — delegate skills to a remote agent instead of running them locally.
+- [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md) — delegate skills to a remote agent instead of running them locally.

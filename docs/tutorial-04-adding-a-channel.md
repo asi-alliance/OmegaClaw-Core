@@ -1,4 +1,4 @@
-# Tutorial 05 — Adding a Channel
+# Tutorial 04 — Adding a Channel
 
 **Goal:** plug OmegaClaw into a new communication surface (Slack, Discord, a REST endpoint, a terminal) by writing a channel adapter.
 

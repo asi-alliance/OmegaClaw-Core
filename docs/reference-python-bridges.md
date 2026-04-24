@@ -25,7 +25,7 @@ Remote agent bridge.
 | `tavily_search(query)` | Forward a query to the remote Tavily search agent. |
 | `technical_analysis(ticker)` | Forward a ticker to the remote technical analysis agent. |
 
-Both use a fixed Agentverse address and return the remote agent's reply as a string. Add your own function following the same pattern — see [tutorial-07-remote-agentverse-skills.md](./tutorial-07-remote-agentverse-skills.md).
+Both use a fixed Agentverse address and return the remote agent's reply as a string. Add your own function following the same pattern — see [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
 
 ## `src/helper.py`
 

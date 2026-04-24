@@ -106,7 +106,7 @@ Complex questions usually cannot fit in one cycle because the LLM must emit all 
 | 3 | Revision with independent evidence; follow-up inference. |
 | 4 | Threshold check; decide whether to `send` an answer. |
 
-The LLM is expected to **pin** state between cycles so the next turn can continue from the same plan. See [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md).
+The LLM is expected to **pin** state between cycles so the next turn can continue from the same plan. See [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md).
 
 ---
 
@@ -122,7 +122,7 @@ Standard recovery:
 
 1. Reformulate premises (fix term order, copula, granularity).
 2. Switch engine if the pattern matches another.
-3. Inject external grounding — see [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md).
+3. Inject external grounding — see [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md).
 
 ---
 

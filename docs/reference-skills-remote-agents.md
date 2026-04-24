@@ -64,4 +64,4 @@ A string containing the remote analysis.
 
 ## Adding your own
 
-See [tutorial-07-remote-agentverse-skills.md](./tutorial-07-remote-agentverse-skills.md) for the pattern, and [reference-python-bridges.md](./reference-python-bridges.md) for the bridge surface.
+See [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md) for the pattern, and [reference-python-bridges.md](./reference-python-bridges.md) for the bridge surface.

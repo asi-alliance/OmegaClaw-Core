@@ -27,7 +27,7 @@ The captured stdout of the command as a string.
 ```
 
 ### Notes / Limits
-- Runs with the permissions of the OmegaClaw process. In Docker, the container user; otherwise, your user.
+- Runs with the permissions of the OmegaClaw process.
 - No sandboxing. Run in a container for anything resembling untrusted use.
 - Prefer writing complex commands to a file and invoking the file rather than embedding quotes-within-quotes.
 

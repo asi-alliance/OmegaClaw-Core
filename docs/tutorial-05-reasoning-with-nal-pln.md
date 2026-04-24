@@ -1,4 +1,4 @@
-# Tutorial 06 — Reasoning with NAL and PLN
+# Tutorial 05 — Reasoning with NAL and PLN
 
 **Goal:** invoke Non-Axiomatic Logic and Probabilistic Logic Networks from inside OmegaClaw using the `(metta ...)` skill, and read the truth values the engines emit.
 
@@ -72,7 +72,7 @@ Output:
 (--> cat dangerous) (stv 0.395 0.875)
 ```
 
-`f = 0.395, c = 0.875` is the engine saying: *"substantial but conflicting evidence."* Do not pick a side — surface the disagreement with both source citations. See [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md) §8.
+`f = 0.395, c = 0.875` is the engine saying: *"substantial but conflicting evidence."* Do not pick a side — surface the disagreement with both source citations. See [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) §8.
 
 ### Example 5 — Implication with variables
 
@@ -147,13 +147,13 @@ Starting with each premise at `c = 0.9`:
 | 3 | **< 0.5** (below ACT) |
 | 4 | ~0.25 (IGNORE) |
 
-**Practical implication:** keep deduction chains to 2–3 hops; use revision with independent evidence to restore confidence before continuing. See [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md).
+**Practical implication:** keep deduction chains to 2–3 hops; use revision with independent evidence to restore confidence before continuing. See [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md).
 
 ---
 
 ## Verification
 
-- `docker logs` shows the `(metta (|- ...))` or `(metta (|~ ...))` call and its conclusion with an updated `(stv ...)`.
+- Logs show the `(metta (|- ...))` or `(metta (|~ ...))` call and its conclusion with an updated `(stv ...)`.
 - Revision on shared terms produces confidence **strictly greater** than either input — this is a quick sanity check that revision is firing.
 - Deduction confidence matches `f₁ × f₂ × c₁ × c₂` within rounding.
 
@@ -166,7 +166,7 @@ Starting with each premise at `c = 0.9`:
 | Term order reversed | Inference returns empty | Verify which term is the subject vs. predicate. Asymmetric swap errors run ~16.6%. |
 | Wrong copula | Empty or nonsensical result | `-->` (inheritance), `==>` (implication), `<->` (similarity) — choose carefully. |
 | Chain too long | Conclusion below ACT | Insert revision with independent evidence. |
-| Self-assigned confidence | Overconfident conclusions | Ground the premise externally — see [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md). |
+| Self-assigned confidence | Overconfident conclusions | Ground the premise externally — see [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md). |
 
 ---
 
@@ -176,5 +176,5 @@ Starting with each premise at `c = 0.9`:
 - [reference-lib-pln.md](./reference-lib-pln.md) — PLN rule catalogue.
 - [reference-lib-ona.md](./reference-lib-ona.md) — the third (temporal) engine.
 - [reference-skills-reasoning.md](./reference-skills-reasoning.md) — the `metta` skill signature.
-- [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md) — external grounding.
-- [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md) — best practices.
+- [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md) — external grounding.
+- [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) — best practices.

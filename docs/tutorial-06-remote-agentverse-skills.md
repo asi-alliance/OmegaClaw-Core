@@ -1,4 +1,4 @@
-# Tutorial 07 — Remote Agentverse Skills
+# Tutorial 06 — Remote Agentverse Skills
 
 **Goal:** understand how OmegaClaw delegates work to remote agents through the Agentverse bridge, and when to use this pattern.
 

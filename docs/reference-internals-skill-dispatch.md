@@ -50,4 +50,4 @@ Bridges enter via:
 
 - [reference-internals-loop.md](./reference-internals-loop.md) — the full turn structure.
 - [reference-internals-extension-points.md](./reference-internals-extension-points.md) — where to hook in new skills.
-- [tutorial-04-writing-a-custom-skill.md](./tutorial-04-writing-a-custom-skill.md) — end-to-end skill addition.
+- [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md) — end-to-end skill addition.

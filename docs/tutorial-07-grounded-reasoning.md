@@ -1,4 +1,4 @@
-# Tutorial 08 — Grounded Reasoning
+# Tutorial 07 — Grounded Reasoning
 
 **Goal:** reduce reasoning failure by pulling premises from **verified external sources** instead of the LLM's internal weights.
 
@@ -97,7 +97,7 @@ Grounding a single fact **persists across sessions** through `remember`. Every s
 
 ## Verification
 
-- The fact is present in long-term memory with its source (grep `docker logs` or `query` for the source string).
+- The fact is present in long-term memory with its source (search logs for `query` for the source string).
 - Conclusions that depend on the grounded fact clear the ACT threshold (`f ≥ 0.6, c ≥ 0.5`) — see [reference-orchestration.md](./reference-orchestration.md).
 - Re-running the same question produces a stable answer (low variance).
 
@@ -107,6 +107,6 @@ The whitepaper-documented target is **automated retrieval**: the system pulls da
 
 ## Next steps
 
-- [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md) — chain depth, revision, thresholds.
+- [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) — chain depth, revision, thresholds.
 - [reference-failure-modes.md](./reference-failure-modes.md) — why grounding matters, in numbers.
-- [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md) — the underlying reasoning mechanics.
+- [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — the underlying reasoning mechanics.

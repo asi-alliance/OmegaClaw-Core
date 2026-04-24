@@ -120,4 +120,4 @@ When in doubt, try NAL first; PLN shines on `Implication` over `Inheritance` cha
 - [reference-lib-nal.md](./reference-lib-nal.md) — sibling symbolic engine.
 - [reference-lib-ona.md](./reference-lib-ona.md) — planned temporal engine (experimental, not installed).
 - [reference-orchestration.md](./reference-orchestration.md) — engine selection.
-- [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md) — worked examples.
+- [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — worked examples.

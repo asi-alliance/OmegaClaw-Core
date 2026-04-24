@@ -1,4 +1,4 @@
-# Tutorial 09 — Strategies for Reliable Reasoning
+# Tutorial 08 — Strategies for Reliable Reasoning
 
 **Goal:** a practical playbook for getting trustworthy conclusions out of the hybrid system, drawing on the failure modes measured in [reference-failure-modes.md](./reference-failure-modes.md).
 
@@ -25,7 +25,7 @@ A 4-hop chain bottoms out below the IGNORE threshold — the conclusion is unrel
 
 **Rule:** before feeding a premise into a chain, verify it against an external source and set confidence from source quality.
 
-See [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md). In short: primary sources → `c ≈ 0.9`; secondary → `c ≈ 0.7`; LLM prior alone → treat as overconfident by 15 percentage points.
+See [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md). In short: primary sources → `c ≈ 0.9`; secondary → `c ≈ 0.7`; LLM prior alone → treat as overconfident by 15 percentage points.
 
 ## 3. Use revision to restore confidence
 
@@ -143,5 +143,5 @@ A conclusion without this trail is just an assertion; a conclusion with it is au
 
 - [reference-orchestration.md](./reference-orchestration.md) — stopping criteria, thresholds, defense stack.
 - [reference-failure-modes.md](./reference-failure-modes.md) — measured failure rates.
-- [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md) — external grounding.
-- [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md) — the underlying mechanics.
+- [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md) — external grounding.
+- [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — the underlying mechanics.

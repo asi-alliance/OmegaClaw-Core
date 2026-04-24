@@ -9,7 +9,7 @@ Most common extension. Two edits:
 1. A line in `getSkills` (`src/skills.metta`) so the LLM knows the skill exists.
 2. A `(= (my-skill $arg) ...)` definition, either pure MeTTa or a `py-call` / `translatePredicate`.
 
-Full walkthrough: [tutorial-04-writing-a-custom-skill.md](./tutorial-04-writing-a-custom-skill.md).
+Full walkthrough: [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md).
 
 ## Add a remote skill
 
@@ -20,7 +20,7 @@ Same as above, but the body delegates to `src/agentverse.py`:
    (py-call (agentverse.my_remote_skill $arg)))
 ```
 
-Full walkthrough: [tutorial-07-remote-agentverse-skills.md](./tutorial-07-remote-agentverse-skills.md).
+Full walkthrough: [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
 
 ## Add a channel
 
@@ -30,7 +30,7 @@ Three touch points:
 2. A new branch in `initChannels`, `(receive)`, and `(send $msg)` in `src/channels.metta`.
 3. New parameters declared via `(= (MY_*) (empty))` and bound by `configure`.
 
-Full walkthrough: [tutorial-05-adding-a-channel.md](./tutorial-05-adding-a-channel.md).
+Full walkthrough: [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md).
 
 ## Add an LLM provider
 

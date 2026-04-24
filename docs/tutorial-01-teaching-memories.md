@@ -1,10 +1,10 @@
-# Tutorial 02 — Teaching Memories
+# Tutorial 01 — Teaching Memories
 
 **Goal:** understand and exercise the four memory skills: `remember`, `query`, `episodes`, and `pin`.
 
 ## Prerequisites
 
-- A running OmegaClaw (see [tutorial-01-first-run.md](./tutorial-01-first-run.md)).
+- A running OmegaClaw (see [Usage](/README.md#usage)).
 
 ## Background
 
@@ -12,7 +12,7 @@ OmegaClaw uses a **three-tier memory architecture**:
 
 1. **Working memory** — `pin` (volatile, single slot, session-local).
 2. **Long-term embedding memory** — `remember` / `query` (persistent across sessions).
-3. **AtomSpace** — atomized truth-valued atoms used by the reasoning engines. Separate; see [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md).
+3. **AtomSpace** — atomized truth-valued atoms used by the reasoning engines. Separate; see [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md).
 
 This tutorial covers tiers 1 and 2. For the full model, see [reference-internals-memory-store.md](./reference-internals-memory-store.md).
 
@@ -71,7 +71,7 @@ Change any of these by editing the `configure` calls in `initMemory` or passing 
 
 ## Verification
 
-- After `remember`, `docker logs` shows the ChromaDB write.
+- After `remember`, logs shows the ChromaDB write.
 - A semantically related question (not keyword match) recalls the fact.
 - `episodes` returns a contiguous block of history around the requested timestamp.
 

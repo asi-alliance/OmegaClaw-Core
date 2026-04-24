@@ -15,7 +15,7 @@ If you are new, read the Introduction in order, then pick tutorials that match w
 Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
 
 - [introduction.md](./introduction.md) — What OmegaClaw is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
-- [installation instruction](/README.md#installation) — Docker, manual MeTTa setup, environment variables, API keys.
+- [installation instruction](/README.md#installation) — Manual MeTTa setup, environment variables, API keys.
 
 ---
 
@@ -23,15 +23,14 @@ Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the
 
 Numbered in suggested reading order. Each tutorial is self-contained.
 
-- [tutorial-01-first-run.md](./tutorial-01-first-run.md) — Start OmegaClaw on IRC and hold your first conversation
-- [tutorial-02-teaching-memories.md](./tutorial-02-teaching-memories.md) — Use `remember`, `query`, `episodes`, and `pin`
-- [tutorial-03-shell-and-files.md](./tutorial-03-shell-and-files.md) — `shell`, `read-file`, `write-file`, `append-file`
-- [tutorial-04-writing-a-custom-skill.md](./tutorial-04-writing-a-custom-skill.md) — Add a new MeTTa skill end-to-end
-- [tutorial-05-adding-a-channel.md](./tutorial-05-adding-a-channel.md) — Build a new communication channel adapter
-- [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md) — Invoke NAL and PLN through `(metta ...)` with worked examples
-- [tutorial-07-remote-agentverse-skills.md](./tutorial-07-remote-agentverse-skills.md) — Delegate work to remote Agentverse agents
-- [tutorial-08-grounded-reasoning.md](./tutorial-08-grounded-reasoning.md) — External grounding — the primary reliability mitigation
-- [tutorial-09-reliable-reasoning.md](./tutorial-09-reliable-reasoning.md) — Strategy playbook — chain depth, revision, thresholds, anti-patterns
+- [tutorial-01-teaching-memories.md](./tutorial-01-teaching-memories.md) — Use `remember`, `query`, `episodes`, and `pin`
+- [tutorial-02-shell-and-files.md](./tutorial-02-shell-and-files.md) — `shell`, `read-file`, `write-file`, `append-file`
+- [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md) — Add a new MeTTa skill end-to-end
+- [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md) — Build a new communication channel adapter
+- [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — Invoke NAL and PLN through `(metta ...)` with worked examples
+- [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md) — Delegate work to remote Agentverse agents
+- [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md) — External grounding — the primary reliability mitigation
+- [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) — Strategy playbook — chain depth, revision, thresholds, anti-patterns
 
 ---
 

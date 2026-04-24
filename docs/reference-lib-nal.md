@@ -208,7 +208,7 @@ This is a **feature, not a bug** — the math honestly represents diminishing ce
 
 ## See also
 
-- [tutorial-06-reasoning-with-nal-pln.md](./tutorial-06-reasoning-with-nal-pln.md) — worked examples for each rule.
+- [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — worked examples for each rule.
 - [reference-lib-pln.md](./reference-lib-pln.md) — the probabilistic counterpart.
 - [reference-lib-ona.md](./reference-lib-ona.md) — planned real-time / temporal engine (experimental, not installed).
 - [reference-orchestration.md](./reference-orchestration.md) — when to pick NAL vs. PLN.
