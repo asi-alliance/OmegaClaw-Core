@@ -25,10 +25,12 @@ def _clean(text):
     return text.replace("_quote_", '"').replace("_apostrophe_", "'")
 
 def _chat(client, model, content, max_tokens=6000, **kwargs):
+    spl = content.split(":-:-:-:")
     try:
         resp = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": content}],
+            messages=[{"role": "system", "content": spl[0]},
+                      {"role": "user", "content": spl[1]}],
             max_tokens=max_tokens,
             extra_body={
                 "enable_thinking": True,
