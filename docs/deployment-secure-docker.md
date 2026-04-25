@@ -1,7 +1,8 @@
 # Secure Docker Compose Deployment
 
-This guide deploys OmegaClaw with three security layers that prevent the
-autonomous agent from accessing or exfiltrating API keys.
+This guide deploys OmegaClaw with security layers that prevent the
+autonomous agent from directly accessing API keys, with an optional
+restricted network mode for full isolation.
 
 ## Architecture
 
@@ -19,7 +20,8 @@ autonomous agent from accessing or exfiltrating API keys.
 │  ┌─────┴───────────────────────────┴──────┐                  │
 │  │            omegaclaw                   │                  │
 │  │   NO API keys in environment           │                  │
-│  │   NO direct internet access            │                  │
+│  │   Internet: direct (default) or        │                  │
+│  │             proxied-only (restricted)   │                  │
 │  └────────────────────────────────────────┘                  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -33,16 +35,17 @@ to the upstream provider. The agent process never sees the real key.
 backward-compatible direct-run mode), Python code uses `os.environ.pop()` to
 read secrets once and immediately remove them from the process environment.
 
-**Layer 3 — Network isolation.** The agent container sits on a Docker internal
-network with no route to the internet. It can only reach `llm-proxy` and
-`irc-proxy`, both of which bridge internal and external networks.
+**Layer 3 — Network isolation (restricted mode only).** In restricted mode,
+the agent container sits on a Docker internal network with no route to the
+internet. It can only reach `llm-proxy` and `irc-proxy`, both of which bridge
+internal and external networks.
 
 ## Prerequisites
 
 - Docker Engine 24+ with Compose V2
 - An API key for your chosen LLM provider (Anthropic, OpenAI, or ASI Cloud)
 
-## Quick Start (restricted mode)
+## Quick Start (default — full network)
 
 ```bash
 cd OmegaClaw-Core
@@ -64,6 +67,10 @@ docker compose logs -f omegaclaw
 The agent will connect to your IRC channel via the proxy. Authenticate with
 `auth <your-secret>` in the channel as usual.
 
+API keys are held by the proxy — the agent container never receives them.
+The agent has full outbound internet access for web search, RAG, and
+Agentverse integrations.
+
 ### Verify key isolation
 
 ```bash
@@ -74,29 +81,111 @@ docker compose exec omegaclaw env
 docker compose exec omegaclaw sh -c "cat /proc/self/environ | tr '\0' '\n' | sort"
 ```
 
-## Full-Network Mode (web search, RAG, Agentverse)
+## Restricted Mode (no direct internet)
 
-To give the agent direct internet access (required for DuckDuckGo search,
-Tavily agents, and Agentverse integrations):
+To run the agent with no direct internet access — only able to reach the
+LLM and IRC proxies:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.full-network.yml up -d
+docker compose -f docker-compose.restricted.yml up -d
 ```
 
-API keys remain hidden in the proxy even in full-network mode — this only
-opens outbound networking from the agent container.
+In this mode, features like DuckDuckGo search, Tavily agents, Agentverse
+integrations, and web scraping are not available unless their endpoints are
+explicitly allowlisted (see below).
+
+## Network Allowlist (restricted mode)
+
+In restricted mode the agent can only reach services on the Docker internal
+network. To grant access to specific external domains, add them as proxy
+pass-throughs. There are two approaches depending on whether you need HTTP(S)
+or raw TCP.
+
+### Option A — Add an nginx location (HTTP/HTTPS endpoints)
+
+Edit `proxy/nginx.conf.template` and add a `location` block inside the
+`server` section:
+
+```nginx
+location /tavily/ {
+    proxy_pass https://api.tavily.com/;
+    proxy_set_header Host api.tavily.com;
+    proxy_ssl_server_name on;
+    proxy_ssl_protocols TLSv1.2 TLSv1.3;
+    proxy_http_version 1.1;
+}
+```
+
+If the endpoint requires an API key, add the key variable to
+`proxy/entrypoint.sh` and pass it as an environment variable to `llm-proxy`
+in `docker-compose.restricted.yml`:
+
+```yaml
+# in docker-compose.restricted.yml, under llm-proxy.environment:
+- TAVILY_API_KEY=${TAVILY_API_KEY:-}
+```
+
+```nginx
+# in the nginx location block:
+proxy_set_header Authorization "Bearer ${TAVILY_API_KEY}";
+```
+
+Then rebuild the proxy:
+
+```bash
+docker compose -f docker-compose.restricted.yml up -d --build llm-proxy
+```
+
+The agent reaches the endpoint via `http://llm-proxy:8080/tavily/...` — no
+direct internet required.
+
+### Option B — Add a socat service (raw TCP endpoints)
+
+For non-HTTP services, add a new socat relay service in
+`docker-compose.restricted.yml`:
+
+```yaml
+services:
+  custom-proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile.socat
+    environment:
+      - IRC_UPSTREAM_HOST=example.com
+      - IRC_UPSTREAM_PORT=443
+    networks:
+      - internal
+      - external
+    restart: unless-stopped
+```
+
+Add `custom-proxy` to the omegaclaw service's `depends_on` list, then
+configure the agent to connect to `custom-proxy:<port>` instead of the
+external host directly.
+
+### Verifying the allowlist
+
+```bash
+# From inside the agent container, confirm the proxy is reachable:
+docker compose -f docker-compose.restricted.yml exec omegaclaw \
+  wget -qO- http://llm-proxy:8080/tavily/
+
+# Confirm direct internet is still blocked:
+docker compose -f docker-compose.restricted.yml exec omegaclaw \
+  wget -qO- http://example.com   # should fail with "network unreachable"
+```
 
 ## Feature Availability by Mode
 
-| Feature              | Restricted | Full-network |
-|----------------------|:----------:|:------------:|
-| IRC chat             | yes        | yes          |
-| LLM inference        | yes        | yes          |
-| API keys hidden      | yes        | yes          |
-| DuckDuckGo search    | —          | yes          |
-| Tavily agent search  | —          | yes          |
-| Agentverse agents    | —          | yes          |
-| Web scraping / RAG   | —          | yes          |
+| Feature              | Default | Restricted |
+|----------------------|:-------:|:----------:|
+| IRC chat             | yes     | yes        |
+| LLM inference        | yes     | yes        |
+| API keys hidden      | yes     | yes        |
+| DuckDuckGo search    | yes     | allowlist  |
+| Tavily agent search  | yes     | allowlist  |
+| Agentverse agents    | yes     | allowlist  |
+| Web scraping / RAG   | yes     | allowlist  |
 
 ## Configuration Reference
 
@@ -120,11 +209,13 @@ All settings are in `.env`. See `.env.example` for the full list.
 
 1. **OpenAI provider**: The `useGPT` function in PeTTa's `lib_llm` (outside
    this repo) reads `OPENAI_API_KEY` directly. The proxy cannot intercept
-   this. For `provider=OpenAI`, use full-network mode and add
-   `OPENAI_API_KEY` to the agent's environment in a compose override.
+   this. For `provider=OpenAI`, the default full-network mode handles this
+   naturally. In restricted mode, add `OPENAI_API_KEY` to the agent's
+   environment in a compose override.
 
 2. **Mattermost**: Connects directly to `chat.singularitynet.io` over
-   HTTPS/WSS. Requires full-network mode.
+   HTTPS/WSS. Works in default mode. In restricted mode, add a proxy entry
+   for `chat.singularitynet.io`.
 
 3. **`git-import!` at startup**: `run.metta` calls `git-import!` for repos
    already present in the Docker image. PeTTa skips cloning when the
@@ -139,6 +230,9 @@ docker compose down
 
 # Stop and remove volumes (deletes agent memory)
 docker compose down -v
+
+# For restricted mode:
+docker compose -f docker-compose.restricted.yml down
 ```
 
 ## Backward Compatibility

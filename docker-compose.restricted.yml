@@ -1,13 +1,12 @@
-# Default deployment: agent has full network access for web search, RAG, etc.
-# API keys remain hidden in the proxy — the agent never sees them.
+# Restricted deployment: agent has NO API keys and NO direct internet access.
+# The agent can only reach llm-proxy and irc-proxy on the internal network.
 # See docs/deployment-secure-docker.md for full documentation.
 #
-# Quick start:
-#   cp .env.example .env        # fill in API keys and IRC channel
-#   docker compose up -d
-#
-# Restricted mode (no direct internet — agent can only reach proxies):
+# Usage:
 #   docker compose -f docker-compose.restricted.yml up -d
+#
+# To allowlist additional domains, add proxy services or nginx locations —
+# see docs/deployment-secure-docker.md § "Network Allowlist".
 
 services:
 
@@ -35,7 +34,6 @@ services:
       - "embeddingprovider=${EMBEDDING_PROVIDER:-Local}"
     networks:
       - internal
-      - external
     depends_on:
       - llm-proxy
       - irc-proxy
