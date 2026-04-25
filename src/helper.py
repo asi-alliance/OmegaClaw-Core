@@ -42,8 +42,95 @@ def around_time(needle_time_str, k):
         ret += f"{lineno}:{line}"
     return ret
 
+def _parse_sexpr_end(s, i):
+    """Given s[i] == '(', return index just past the matching ')',
+       respecting double-quoted strings. Returns -1 on imbalance."""
+    if i >= len(s) or s[i] != "(":
+        return -1
+    depth = 0
+    in_str = False
+    esc = False
+    while i < len(s):
+        c = s[i]
+        if esc:
+            esc = False
+        elif c == "\\":
+            esc = True
+        elif c == '"':
+            in_str = not in_str
+        elif not in_str:
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+        i += 1
+    return -1
+
+
+def _try_parse_sexprs(s):
+    """Try to parse s as a whitespace-separated sequence of balanced
+       s-expressions (each starting with '('). Returns the list of
+       expression substrings, or None if the input isn't cleanly s-expr
+       shaped (e.g., bare tokens, malformed parens)."""
+    s = s.strip()
+    if not s:
+        return None
+    exprs = []
+    i = 0
+    n = len(s)
+    while i < n:
+        while i < n and s[i].isspace():
+            i += 1
+        if i >= n:
+            break
+        if s[i] != "(":
+            return None
+        end = _parse_sexpr_end(s, i)
+        if end < 0:
+            return None
+        exprs.append(s[i:end])
+        i = end
+    return exprs if exprs else None
+
+
+def _has_nested_paren(s):
+    """True if s contains a '(' nested at depth >= 2 (outside strings),
+       i.e. a sub-expression like a kwarg `(name value)` or a nested call.
+       Flat positional forms like `(send "hi")` return False and continue
+       to the legacy normalization path that quotes bare tokens."""
+    in_str = False
+    esc = False
+    depth = 0
+    for c in s:
+        if esc:
+            esc = False
+        elif c == "\\":
+            esc = True
+        elif c == '"':
+            in_str = not in_str
+        elif not in_str:
+            if c == "(":
+                depth += 1
+                if depth >= 2:
+                    return True
+            elif c == ")":
+                depth -= 1
+    return False
+
+
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
+    # Fast path: kwarg-shape or otherwise already-structured s-expressions
+    # (from lib_llm_ext's JSON→MeTTa adapter, or any model emitting nested
+    # forms). Pass through, only adding the outer list wrap. We require a
+    # nested '(' so plain positional inputs like `(send "hi")` still flow
+    # to the legacy normalizer below for bare-token quoting.
+    if _has_nested_paren(s):
+        parsed = _try_parse_sexprs(s)
+        if parsed is not None:
+            return "(" + " ".join(parsed) + ")"
     sexprs = []
     special_two_arg_cmds = {"write-file", "append-file"}
     for line in s.splitlines():

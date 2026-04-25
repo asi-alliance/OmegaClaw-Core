@@ -62,3 +62,32 @@
 
 (= (pin $x)
    PIN-SUCCESS)
+
+;; ----------------------------------------------------------------------
+;; Keyword-argument shims (B-tolerant, 2026-04-25).
+;;
+;; Reasoning models that emit JSON tool calls go through lib_llm_ext's
+;; format adapter, which produces kwarg-shaped MeTTa s-exprs:
+;;     (send (text "hi"))
+;;     (write-file (filename "x.txt") (content "hi"))
+;; The shims below match those forms and delegate to the existing
+;; positional rules. The original positional callsites still work, so
+;; Gemma/Qwen/Claude (metta-mode) see zero behavior change.
+;;
+;; Argument order in each shim head MUST match the order in
+;; lib_llm_ext._SKILL_ARG_ORDER for that skill.
+;; ----------------------------------------------------------------------
+
+(= (send         (text $x))                           (send         $x))
+(= (remember     (text $x))                           (remember     $x))
+(= (query        (text $x))                           (query        $x))
+(= (episodes     (time $x))                           (episodes     $x))
+(= (pin          (text $x))                           (pin          $x))
+(= (shell        (cmd $x))                            (shell        $x))
+(= (read-file    (filename $f))                       (read-file    $f))
+(= (write-file   (filename $f) (content $s))          (write-file   $f $s))
+(= (append-file  (filename $f) (content $s))          (append-file  $f $s))
+(= (search       (query $q))                          (search       $q))
+(= (tavily-search       (query $q))                   (tavily-search       $q))
+(= (technical-analysis  (ticker $t))                  (technical-analysis  $t))
+(= (metta        (code $s))                           (metta        $s))

@@ -1,11 +1,16 @@
-# embedded vector store
-memory/chroma_db/
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.egg-info/
 
-# pulled in repos
-repos/
+# Local backups
+*.bak
+*.orig
 
-# secrets
-.env
+# Local agent state — never commit these (per-deployment / personal)
+memory/history.metta.snapshot-*
+chroma_db/
+chroma_db.snapshot-*
 
-# editor backup files
-*~
+# Generated logs
+*.log

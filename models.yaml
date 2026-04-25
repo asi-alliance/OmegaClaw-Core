@@ -1,0 +1,59 @@
+# Per-model output-format hints used by lib_llm_ext.
+#
+# format:
+#   metta   — model emits raw MeTTa s-expressions (the original protocol).
+#   json    — model emits JSON tool calls in either {"skill":..., "args":{...}}
+#             or OpenAI-tools {"function":{"name":..., "arguments":"..."}} shape.
+#   either  — try MeTTa first; fall back to JSON detection.
+#
+# Unknown models default to "metta" (preserves zero-change guarantee for
+# established Gemma/Qwen/Claude models that follow the original protocol).
+#
+# Reasoning models (deepseek-r1 family, qwq, etc.) lack tool-call SFT and
+# emit prose. Configure them as "json" so the new lib_llm_ext adapter
+# translates their output into MeTTa s-exprs before sread sees them.
+
+deepseek-r1:14b:
+  format: json
+
+glm-4.7-flash:q4_K_M:
+  format: json
+
+qwen3:14b:
+  format: json
+
+mistral-small3.2:24b:
+  format: json
+
+phi4:14b:
+  format: json
+
+phi4-reasoning:14b:
+  format: json
+
+granite3.3:8b:
+  format: json
+
+qwen2.5-coder:14b:
+  format: json
+
+granite4:32b-a9b-h:
+  format: json
+
+gemma4:26b:
+  format: metta
+
+huihui_ai/Qwen3.6-abliterated:27b-q4_K:
+  format: metta
+
+huihui_ai/Qwen3.6-abliterated:35b-Claude-4.7-q4_K:
+  format: metta
+
+claude-haiku-4-5-20251001:
+  format: metta
+
+claude-opus-4-6:
+  format: metta
+
+minimax/minimax-m2.7:
+  format: metta
