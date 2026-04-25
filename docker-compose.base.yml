@@ -1,0 +1,49 @@
+# Shared service definitions — not intended to be run directly.
+# Use docker-compose.yml (full network) or docker-compose.restricted.yml.
+
+services:
+
+  omegaclaw-base:
+    build: .
+    image: ${OMEGACLAW_IMAGE:-omegaclaw-core:latest}
+    user: "65534:65534"
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /run:size=16m,mode=755
+      - /var/tmp:size=64m,mode=1777
+    volumes:
+      - omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory
+    environment:
+      - LLM_PROXY_URL=http://llm-proxy:8080
+      - OMEGACLAW_OWNER_SECRET=${OMEGACLAW_OWNER_SECRET:-}
+    command:
+      - "commchannel=${COMM_CHANNEL:-irc}"
+      - "provider=${PROVIDER:-Anthropic}"
+      - "embeddingprovider=${EMBEDDING_PROVIDER:-Local}"
+      - "IRC_channel=${IRC_CHANNEL:-}"
+      - "IRC_server=${IRC_SERVER:-irc.quakenet.org}"
+      - "IRC_port=${IRC_PORT:-6667}"
+      - "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}"
+      - "TG_POLL_TIMEOUT=${TG_POLL_TIMEOUT:-20}"
+      - "MM_URL=${MM_URL:-}"
+      - "MM_CHANNEL_ID=${MM_CHANNEL_ID:-}"
+      - "MM_BOT_TOKEN=${MM_BOT_TOKEN:-}"
+    restart: unless-stopped
+
+  llm-proxy-base:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ASI_API_KEY=${ASI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Add API keys here; also add a location in proxy/nginx.conf.template.
+      # The entrypoint auto-detects new ${VAR} references in the template.
+    restart: unless-stopped
+
+volumes:
+  omegaclaw-memory:

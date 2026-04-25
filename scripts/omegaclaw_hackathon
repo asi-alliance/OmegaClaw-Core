@@ -188,7 +188,7 @@ def config_run_omegaclaw(config_output_path):
     with open(config_output_path, "w", encoding="utf-8") as f:
         _write_kv(f, "api_token_var", api_token_var)
         _write_kv(f, "api_token", token)
-        _write_kv(f, "OMEGACLAW_AUTH_SECRET", secrets.token_urlsafe(24))
+        _write_kv(f, "OMEGACLAW_OWNER_SECRET", secrets.token_urlsafe(24))
         _write_kv(f, "provider", provider)
         _write_kv(f, "embeddingprovider", embeddingprovider)
         for key, value in channel_config.items():
@@ -219,7 +219,7 @@ Examine log file in case of problem:
   docker logs -f omegaclaw
 
 Auth secret (required once on first message in supported channels):
-  $OMEGACLAW_AUTH_SECRET
+  $OMEGACLAW_OWNER_SECRET
 
 EOF
 
@@ -243,7 +243,7 @@ cat <<EOF
 ============================================
 
 Open Telegram and send this auth message to your bot:
-  auth $OMEGACLAW_AUTH_SECRET
+  auth $OMEGACLAW_OWNER_SECRET
 
 EOF
 
@@ -275,7 +275,7 @@ docker_cmd=(
   --tmpfs /run:size=16m,mode=755
   --tmpfs /var/tmp:size=64m,mode=1777
   -e "${api_token_var}=${api_token}"
-  -e "OMEGACLAW_AUTH_SECRET=${OMEGACLAW_AUTH_SECRET}"
+  -e "OMEGACLAW_OWNER_SECRET=${OMEGACLAW_OWNER_SECRET}"
   "$image"
   "commchannel=${commchannel}"
   "provider=${provider}"

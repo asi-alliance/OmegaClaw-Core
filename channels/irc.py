@@ -41,7 +41,7 @@ def getLastMessage():
 def _set_auth_secret(secret=None):
     global _auth_secret, _authenticated_nick
     if secret is None:
-        secret = os.environ.pop("OMEGACLAW_AUTH_SECRET", "")
+        secret = os.environ.pop("OMEGACLAW_OWNER_SECRET", "")
     with _auth_lock:
         _auth_secret = (secret or "").strip()
         _authenticated_nick = None

@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-envsubst '${ANTHROPIC_API_KEY} ${ASI_API_KEY} ${OPENAI_API_KEY}' \
+SUBST_VARS=$(grep -o '\${[A-Z_0-9]*}' /etc/nginx/nginx.conf.template | sort -u | tr '\n' ' ')
+envsubst "$SUBST_VARS" \
     < /etc/nginx/nginx.conf.template \
     > /etc/nginx/nginx.conf
 
