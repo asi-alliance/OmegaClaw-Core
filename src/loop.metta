@@ -15,7 +15,7 @@
           (configure provider ASIOne) ;Anthropic or OpenAI or ASICloud or ASIOne
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
-          (configure wakeupInterval 120) ;120=2 minutes
+          (configure wakeupInterval 600) ;600=10 minutes
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &busy True)
