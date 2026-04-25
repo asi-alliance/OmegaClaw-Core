@@ -1,0 +1,5 @@
+FROM alpine:3.20
+RUN apk add --no-cache socat
+EXPOSE 6667
+ENTRYPOINT ["sh", "-c"]
+CMD ["exec socat TCP-LISTEN:6667,fork,reuseaddr TCP:${IRC_UPSTREAM_HOST}:${IRC_UPSTREAM_PORT}"]

@@ -1,0 +1,74 @@
+# Secure deployment: agent has NO API keys and NO internet access by default.
+# See docs/deployment-secure-docker.md for full documentation.
+#
+# Quick start:
+#   cp .env.example .env        # fill in API keys and IRC channel
+#   docker compose up -d
+#
+# Full-network mode (web search, RAG, Tavily, Agentverse):
+#   docker compose -f docker-compose.yml -f docker-compose.full-network.yml up -d
+
+services:
+
+  omegaclaw:
+    build: .
+    image: ${OMEGACLAW_IMAGE:-omegaclaw-core:latest}
+    user: "65534:65534"
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /run:size=16m,mode=755
+      - /var/tmp:size=64m,mode=1777
+    volumes:
+      - omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory
+    environment:
+      - LLM_PROXY_URL=http://llm-proxy:8080
+      - OMEGACLAW_AUTH_SECRET=${OMEGACLAW_AUTH_SECRET:-}
+    command:
+      - "IRC_channel=${IRC_CHANNEL:-##omegaclaw}"
+      - "IRC_server=irc-proxy"
+      - "IRC_port=6667"
+      - "provider=${PROVIDER:-Anthropic}"
+      - "embeddingprovider=${EMBEDDING_PROVIDER:-Local}"
+    networks:
+      - internal
+    depends_on:
+      - llm-proxy
+      - irc-proxy
+    restart: unless-stopped
+
+  llm-proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ASI_API_KEY=${ASI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    networks:
+      - internal
+      - external
+    restart: unless-stopped
+
+  irc-proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile.socat
+    environment:
+      - IRC_UPSTREAM_HOST=${IRC_SERVER:-irc.quakenet.org}
+      - IRC_UPSTREAM_PORT=${IRC_PORT:-6667}
+    networks:
+      - internal
+      - external
+    restart: unless-stopped
+
+networks:
+  internal:
+    internal: true
+  external:
+    driver: bridge
+
+volumes:
+  omegaclaw-memory:

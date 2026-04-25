@@ -1,0 +1,62 @@
+worker_processes 1;
+error_log /dev/stderr warn;
+pid       /tmp/nginx.pid;
+
+events {
+    worker_connections 128;
+}
+
+http {
+    client_body_temp_path /tmp/client_body;
+    proxy_temp_path       /tmp/proxy;
+    fastcgi_temp_path     /tmp/fastcgi;
+    uwsgi_temp_path       /tmp/uwsgi;
+    scgi_temp_path        /tmp/scgi;
+
+    access_log /dev/stdout;
+
+    client_max_body_size 16m;
+
+    proxy_connect_timeout 30s;
+    proxy_send_timeout    120s;
+    proxy_read_timeout    120s;
+
+    server {
+        listen 8080;
+
+        location /anthropic/ {
+            proxy_pass https://api.anthropic.com/v1/;
+            proxy_set_header Authorization "Bearer ${ANTHROPIC_API_KEY}";
+            proxy_set_header Host api.anthropic.com;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /asi/ {
+            proxy_pass https://inference.asicloud.cudos.org/v1/;
+            proxy_set_header Authorization "Bearer ${ASI_API_KEY}";
+            proxy_set_header Host inference.asicloud.cudos.org;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /openai/ {
+            proxy_pass https://api.openai.com/v1/;
+            proxy_set_header Authorization "Bearer ${OPENAI_API_KEY}";
+            proxy_set_header Host api.openai.com;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /health {
+            return 200 "ok\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}

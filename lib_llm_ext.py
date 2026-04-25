@@ -1,10 +1,25 @@
 import os, openai
 
+_PROXY_ROUTES = {
+    "https://api.anthropic.com/v1/":           "anthropic",
+    "https://inference.asicloud.cudos.org/v1": "asi",
+    "https://api.openai.com/v1":               "openai",
+}
+
 def _init_openai_client(var_name, base_url):
-    if var_name in os.environ:
-        return openai.OpenAI(api_key=os.environ[var_name], base_url=base_url)
-    else:
-        return None
+    proxy_url = os.environ.get("LLM_PROXY_URL")
+    if proxy_url:
+        prefix = _PROXY_ROUTES.get(base_url)
+        if prefix is None:
+            return None
+        return openai.OpenAI(
+            api_key="proxy",
+            base_url=f"{proxy_url.rstrip('/')}/{prefix}/",
+        )
+    key = os.environ.pop(var_name, None)
+    if key:
+        return openai.OpenAI(api_key=key, base_url=base_url)
+    return None
 
 ASI_CLIENT = _init_openai_client(
     var_name="ASI_API_KEY",
