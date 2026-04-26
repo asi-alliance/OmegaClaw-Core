@@ -279,10 +279,15 @@ def useClaude(content):
         content=content
     )
 
-def useGemma(content, num_predict=8000, timeout=600.0):
+def useGemma(content, num_predict=2000, timeout=600.0):
     """Despite the historical name, this hits Ollama at OLLAMA_BASE_URL with
        whatever model OLLAMA_MODEL is pointing at (gemma4, qwen, deepseek,
-       etc.). The format adapter handles the per-model output convention."""
+       etc.). The format adapter handles the per-model output convention.
+
+       num_predict default lowered from 8000 → 2000: at 5 tok/s on slow models
+       like Granite 4 H-Small that's still ~7 min worst-case rather than 27
+       min, which avoids the long lockups during a single response. Most Oma
+       turns produce 100-500 tokens anyway; 2000 is plenty of headroom."""
     fmt = _model_formats.get(OLLAMA_MODEL, _DEFAULT_FORMAT)
     if fmt in ("json", "either"):
         content = _un_string_safe(content)
