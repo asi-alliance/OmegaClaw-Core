@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      no_build_cache:
+        description: 'Do not use cached docker layers on image build'
+        required: false
+        default: false
+        type: boolean
       platforms:
         description: 'Comma separated list of platforms to be built'
         required: false
@@ -21,5 +26,6 @@ jobs:
       publish_docker: ${{ inputs.publish_docker }}
       tag_name: ${{ github.sha }}
       move_latest: false
+      no_build_cache: ${{ inputs.no_build_cache }}
       platforms: ${{ inputs.platforms }}
     secrets: inherit

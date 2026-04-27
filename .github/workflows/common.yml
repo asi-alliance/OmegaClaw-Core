@@ -21,6 +21,11 @@ on:
         required: false
         default: false
         type: boolean
+      no_build_cache:
+        description: 'Do not use cached docker layers on image build'
+        required: false
+        default: false
+        type: boolean
       platforms:
         description: 'Comma separated list of platforms to be built'
         required: false
@@ -59,6 +64,9 @@ jobs:
           tags: |
             singularitynet/omegaclaw:${{ inputs.tag_name }}
             singularitynet/omegaclaw:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          no-cache: ${{ inputs.no_build_cache }}
 
       - name: Build and push
         if: ${{ !inputs.move_latest }}
@@ -68,3 +76,6 @@ jobs:
           push: ${{ inputs.publish_docker }}
           tags: |
             singularitynet/omegaclaw:${{ inputs.tag_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          no-cache: ${{ inputs.no_build_cache }}

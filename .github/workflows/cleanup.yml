@@ -1,0 +1,29 @@
+name: clean cache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Prune GHA Caches
+        run: |
+          echo "Fetching caches"
+          cacheKeys=($(gh cache list --ref $GH_REF --limit 100 --json id --jq '.[].id'))
+
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting ${#cacheKeys[@]} caches..."
+          for cacheKey in "${cacheKeys[@]}"
+          do
+              echo "Delete cache $cacheKey"
+              gh cache delete $cacheKey
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_REF: ${{ github.ref }}
