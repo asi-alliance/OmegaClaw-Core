@@ -21,6 +21,14 @@ except Exception as _e:
 
 _DEFAULT_FORMAT = "metta"
 
+def _format_for_model(model, provider=None):
+    model = str(model or "")
+    if model in _model_formats:
+        return _model_formats[model]
+    if provider == "OpenAI" or model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
+        return "json"
+    return _DEFAULT_FORMAT
+
 # ----------------------------------------------------------------------------
 # Per-skill canonical arg order for kwarg→positional MeTTa synthesis.
 # Must stay in sync with the kwarg-shim rules in src/skills.metta.
@@ -38,17 +46,28 @@ _SKILL_ARG_ORDER = {
     "search":             ["query"],
     "tavily-search":      ["query"],
     "technical-analysis": ["ticker"],
+    "risk-register":      ["action", "payload"],
+    "risk-update":        ["risk_id", "payload"],
+    "risk-dashboard":     [],
     "metta":              ["code"],
 }
 
 # ----------------------------------------------------------------------------
 # Existing OpenAI clients + Ollama config (unchanged behavior)
 # ----------------------------------------------------------------------------
-def _init_openai_client(var_name, base_url):
+def _init_openai_client(var_name, base_url=None):
     if var_name in os.environ:
-        return openai.OpenAI(api_key=os.environ[var_name], base_url=base_url)
+        kwargs = {"api_key": os.environ[var_name]}
+        if base_url:
+            kwargs["base_url"] = base_url
+        return openai.OpenAI(**kwargs)
     else:
         return None
+
+OPENAI_CLIENT = _init_openai_client(
+    var_name="OPENAI_API_KEY",
+    base_url=os.environ.get("OPENAI_BASE_URL") or None
+)
 
 ASI_CLIENT = _init_openai_client(
     var_name="ASI_API_KEY",
@@ -60,10 +79,18 @@ ANTHROPIC_CLIENT = _init_openai_client(
     base_url="https://api.anthropic.com/v1/"
 )
 
+DEEPSEEK_CLIENT = _init_openai_client(
+    var_name="DEEPSEEK_API_KEY",
+    base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+)
+
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://192.168.86.22:11434")
 OLLAMA_MODEL    = os.environ.get("OLLAMA_MODEL", "deepseek-r1:14b")
+OPENAI_MODEL    = os.environ.get("OPENAI_MODEL", "gpt-5.5")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-6")
+DEEPSEEK_MODEL  = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
-CLAUDE_MODEL  = "claude-haiku-4-5-20251001"
+CLAUDE_MODEL  = ANTHROPIC_MODEL
 MINIMAX_MODEL = "minimax/minimax-m2.7"
 
 def _clean(text):
@@ -204,7 +231,7 @@ def _adapt_response(model, text):
     """Transform a raw model response into a MeTTa s-expression string,
        per the model's configured format. The result is what loop.metta's
        sread will see. Models in metta-mode pass through untouched."""
-    fmt = _model_formats.get(str(model), _DEFAULT_FORMAT)
+    fmt = _format_for_model(model)
     raw = (text or "").strip()
     if not raw:
         return raw
@@ -273,11 +300,85 @@ def useMiniMax(content):
     )
 
 def useClaude(content):
-    return _chat(
-        client=ANTHROPIC_CLIENT,
-        model=CLAUDE_MODEL,
-        content=content
-    )
+    fmt = _format_for_model(CLAUDE_MODEL, provider="Anthropic")
+    if fmt in ("json", "either"):
+        content = _un_string_safe(content)
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        print("[lib_llm_ext.useClaude] ANTHROPIC_API_KEY is not set")
+        return ""
+    try:
+        resp = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": key,
+                "anthropic-version": os.environ.get("ANTHROPIC_VERSION", "2023-06-01"),
+                "content-type": "application/json",
+            },
+            json={
+                "model": CLAUDE_MODEL,
+                "max_tokens": int(os.environ.get("ANTHROPIC_MAX_TOKENS", "6000")),
+                "messages": [{"role": "user", "content": content}],
+            },
+            timeout=float(os.environ.get("ANTHROPIC_TIMEOUT", "600")),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        raw = "".join(
+            part.get("text", "")
+            for part in data.get("content", [])
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+        return _adapt_response(CLAUDE_MODEL, _clean(raw))
+    except Exception as e:
+        print(f"[lib_llm_ext.useClaude] Exception while communicating with Anthropic: {e}")
+        return ""
+
+def useOpenAI(content, max_tokens=6000):
+    fmt = _format_for_model(OPENAI_MODEL, provider="OpenAI")
+    if fmt in ("json", "either"):
+        content = _un_string_safe(content)
+    if OPENAI_CLIENT is None:
+        print("[lib_llm_ext.useOpenAI] OPENAI_API_KEY is not set")
+        return ""
+    try:
+        resp = OPENAI_CLIENT.responses.create(
+            model=OPENAI_MODEL,
+            input=content,
+            max_output_tokens=max_tokens,
+            reasoning={"effort": os.environ.get("OPENAI_REASONING_EFFORT", "medium")},
+        )
+        raw = _clean(getattr(resp, "output_text", "") or "")
+        return _adapt_response(OPENAI_MODEL, raw)
+    except Exception as e:
+        print(f"[lib_llm_ext.useOpenAI] Exception while communicating with OpenAI: {e}")
+        return ""
+
+def useDeepSeek(content, max_tokens=6000):
+    fmt = _format_for_model(DEEPSEEK_MODEL, provider="DeepSeek")
+    if fmt in ("json", "either"):
+        content = _un_string_safe(content)
+    if DEEPSEEK_CLIENT is None:
+        print("[lib_llm_ext.useDeepSeek] DEEPSEEK_API_KEY is not set")
+        return ""
+    try:
+        kwargs = {
+            "model": DEEPSEEK_MODEL,
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": int(os.environ.get("DEEPSEEK_MAX_TOKENS", str(max_tokens))),
+            "temperature": float(os.environ.get("DEEPSEEK_TEMPERATURE", "0.2")),
+        }
+        thinking = os.environ.get("DEEPSEEK_THINKING", "disabled").lower()
+        if DEEPSEEK_MODEL.startswith("deepseek-v4") or DEEPSEEK_MODEL == "deepseek-reasoner":
+            kwargs["extra_body"] = {"thinking": {"type": "enabled" if thinking == "enabled" else "disabled"}}
+            if thinking == "enabled":
+                kwargs["reasoning_effort"] = os.environ.get("DEEPSEEK_REASONING_EFFORT", "high")
+        resp = DEEPSEEK_CLIENT.chat.completions.create(**kwargs)
+        raw = _clean(resp.choices[0].message.content or "")
+        return _adapt_response(DEEPSEEK_MODEL, raw)
+    except Exception as e:
+        print(f"[lib_llm_ext.useDeepSeek] Exception while communicating with DeepSeek: {e}")
+        return ""
 
 def useGemma(content, num_predict=2000, timeout=600.0):
     """Despite the historical name, this hits Ollama at OLLAMA_BASE_URL with
@@ -288,7 +389,7 @@ def useGemma(content, num_predict=2000, timeout=600.0):
        like Granite 4 H-Small that's still ~7 min worst-case rather than 27
        min, which avoids the long lockups during a single response. Most Oma
        turns produce 100-500 tokens anyway; 2000 is plenty of headroom."""
-    fmt = _model_formats.get(OLLAMA_MODEL, _DEFAULT_FORMAT)
+    fmt = _format_for_model(OLLAMA_MODEL)
     if fmt in ("json", "either"):
         content = _un_string_safe(content)
     try:
@@ -345,6 +446,9 @@ _JSON_HINT = (
     "   write-file/append-file: filename, content\n"
     "   search/tavily-search: query\n"
     "   technical-analysis: ticker\n"
+    "   risk-register: action, payload  (actions: append/list/get/dashboard; payload is JSON object text or a filter/id)\n"
+    "   risk-update: risk_id, payload  (payload is JSON patch text)\n"
+    "   risk-dashboard: no args\n"
     "   metta: code\n"
 )
 
@@ -353,13 +457,17 @@ def _format_for_provider(provider_atom):
     provider = str(provider_atom).strip()
     if provider == "Anthropic":
         model = CLAUDE_MODEL
+    elif provider == "OpenAI":
+        model = OPENAI_MODEL
+    elif provider == "DeepSeek":
+        model = DEEPSEEK_MODEL
     elif provider == "Ollama":
         model = OLLAMA_MODEL
     elif provider == "ASICloud":
         model = MINIMAX_MODEL
     else:
         model = ""
-    return _model_formats.get(model, _DEFAULT_FORMAT)
+    return _format_for_model(model, provider=provider)
 
 def get_output_format_hint(provider_atom):
     """Called from src/loop.metta. Returns the OUTPUT_FORMAT teaching block

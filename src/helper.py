@@ -120,8 +120,40 @@ def _has_nested_paren(s):
     return False
 
 
+_SIMPLE_KWARG_TOOL_RE = re.compile(
+    r'\((send|remember|query|pin)\s+\(text\s+("(?:(?:\\.)|[^"\\])*")\)\)'
+)
+_SINGLE_KWARG_TOOL_RE = re.compile(
+    r'\((episodes|shell|read-file|search|tavily-search|technical-analysis)\s+'
+    r'\((time|cmd|filename|query|ticker)\s+("(?:(?:\\.)|[^"\\])*")\)\)'
+)
+_RISK_UPDATE_RE = re.compile(
+    r'\((risk-update)\s+\(risk_id\s+("(?:(?:\\.)|[^"\\])*")\)\s+'
+    r'\(payload\s+("(?:(?:\\.)|[^"\\])*")\)\)'
+)
+_RISK_REGISTER_RE = re.compile(
+    r'\((risk-register)\s+\(action\s+("(?:(?:\\.)|[^"\\])*")\)\s+'
+    r'\(payload\s+("(?:(?:\\.)|[^"\\])*")\)\)'
+)
+
+
+def _normalize_kwarg_tool_forms(s):
+    """Accept local models that emit `(send (text "..."))` style calls."""
+    s = _SIMPLE_KWARG_TOOL_RE.sub(r'(\1 \2)', s)
+    s = _SINGLE_KWARG_TOOL_RE.sub(r'(\1 \3)', s)
+    s = _RISK_UPDATE_RE.sub(r'(\1 \2 \3)', s)
+    s = _RISK_REGISTER_RE.sub(r'(\1 \2 \3)', s)
+    return s
+
+
 def balance_parentheses(s):
+    if s is None:
+        return "()"
+    s = str(s)
+    if not s.strip():
+        return "()"
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
+    s = _normalize_kwarg_tool_forms(s)
     # Fast path: kwarg-shape or otherwise already-structured s-expressions
     # (from lib_llm_ext's JSON→MeTTa adapter, or any model emitting nested
     # forms). Pass through, only adding the outer list wrap. We require a
@@ -145,6 +177,8 @@ def balance_parentheses(s):
         if line.startswith("(") and line.endswith(")"):
             line = line[1:-1].strip()
         parts = line.split(maxsplit=1)
+        if not parts:
+            continue
         cmd = parts[0]
         rest = parts[1].strip() if len(parts) > 1 else ""
         if cmd in special_two_arg_cmds:

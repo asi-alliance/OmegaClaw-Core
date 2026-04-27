@@ -7,6 +7,7 @@
 !(import! &self (library OmegaClaw-Core lib_llm_ext.py))
 !(import! &self (library OmegaClaw-Core ./src/helper.py))
 !(import! &self (library OmegaClaw-Core ./src/agentverse.py))
+!(import! &self (library OmegaClaw-Core ./src/risk_register.py))
 !(import! &self (library OmegaClaw-Core ./channels/irc.py))
 !(import! &self (library OmegaClaw-Core ./channels/mattermost.py))
 !(import! &self (library OmegaClaw-Core ./channels/websearch.py))

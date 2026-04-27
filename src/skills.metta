@@ -14,6 +14,10 @@
     "- Search the web: search string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
+    ;CRO / ETHICS RISK GOVERNANCE:
+    "- Add, list, get, or summarize structured AI ethics and enterprise risk records: risk-register action payload_json_or_text"
+    "- Update an existing structured risk record by ID: risk-update risk_id patch_json"
+    "- Return JSON dashboard data for the AI ethics and risk cockpit: risk-dashboard"
     ;CODE EXECUTION:
     "- Execute MeTTa expression: metta sexpression"
     "Example to invoke Non-Axiomatic Logic via MeTTa: "
@@ -54,6 +58,18 @@
 (= (technical-analysis $ticker)
    (py-call (agentverse.technical_analysis $ticker)))
 
+(= (risk-register $action $payload)
+   (py-call (risk_register.risk_register $action $payload)))
+
+(= (risk-register $action)
+   (py-call (risk_register.risk_register $action "")))
+
+(= (risk-update $risk_id $payload)
+   (py-call (risk_register.risk_register_update $risk_id $payload)))
+
+(= (risk-dashboard)
+   (py-call (risk_register.dashboard_data)))
+
 !(import_prolog_functions_from_file (library OmegaClaw-Core ./src/skills.pl) (shell first_char))
 
 (= (metta $str)
@@ -90,4 +106,7 @@
 (= (search       (query $q))                          (search       $q))
 (= (tavily-search       (query $q))                   (tavily-search       $q))
 (= (technical-analysis  (ticker $t))                  (technical-analysis  $t))
+(= (risk-register       (action $a) (payload $p))     (risk-register       $a $p))
+(= (risk-register       (action $a))                  (risk-register       $a))
+(= (risk-update         (risk_id $id) (payload $p))   (risk-update         $id $p))
 (= (metta        (code $s))                           (metta        $s))

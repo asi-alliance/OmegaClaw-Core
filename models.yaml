@@ -16,6 +16,18 @@
 deepseek-r1:14b:
   format: json
 
+deepseek-v4-pro:
+  format: json
+
+deepseek-v4-flash:
+  format: json
+
+deepseek-chat:
+  format: json
+
+deepseek-reasoner:
+  format: json
+
 glm-4.7-flash:q4_K_M:
   format: json
 
@@ -38,6 +50,12 @@ qwen2.5-coder:14b:
   format: json
 
 granite4:32b-a9b-h:
+  format: json
+
+gpt-5.2:
+  format: json
+
+gpt-5.5:
   format: json
 
 gemma4:26b:

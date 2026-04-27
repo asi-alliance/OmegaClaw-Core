@@ -22,6 +22,7 @@ import re
 import shlex
 import socketserver
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -30,11 +31,49 @@ from urllib.parse import urlparse
 PORT = 22333  # RAW nod: 23 enigma + 33 (apple of discord). The fnord is a feature.
 LOG_PATH = "/tmp/omegaclaw.log"
 IN_FIFO = "/tmp/oma-in"
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_local_env():
+    """Load repo-local secrets/config without committing them.
+
+    Values already present in the process environment win, so shell/systemd
+    config can override .env.local cleanly.
+    """
+    path = os.path.join(REPO_ROOT, ".env.local")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path) as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except Exception as e:
+        print(f"[webui] warning: could not load .env.local: {e}")
+
+
+load_local_env()
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://192.168.86.22:11434")
+SRC_DIR = os.path.join(REPO_ROOT, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+import risk_register
 
 # --- caching -----------------------------------------------------------------
 _ollama_cache = {"ts": 0, "data": {}}
 _OLLAMA_CACHE_TTL = 5.0
+_openai_models_cache = {"ts": 0, "models": [], "err": ""}
+_OPENAI_MODELS_CACHE_TTL = 300.0
+_anthropic_models_cache = {"ts": 0, "models": [], "err": ""}
+_ANTHROPIC_MODELS_CACHE_TTL = 300.0
+_deepseek_models_cache = {"ts": 0, "models": [], "err": ""}
+_DEEPSEEK_MODELS_CACHE_TTL = 300.0
 
 # tps probe — periodically asks Ollama for a tiny generation to read its own
 # eval_count / eval_duration. Cached so we don't beat up the GPU; runs in a
@@ -58,6 +97,225 @@ def find_swipl():
         return int(parts[0]), parts[1] if len(parts) > 1 else ""
     except Exception:
         return None, ""
+
+
+def _cmd_arg_value(cmd, key):
+    m = re.search(r"(?:^|\s)" + re.escape(key) + r"=([^\s]+)", cmd or "")
+    return m.group(1) if m else ""
+
+
+def active_provider_model():
+    pid, cmd = find_swipl()
+    provider = _cmd_arg_value(cmd, "provider") or "Ollama"
+    llm = _cmd_arg_value(cmd, "LLM")
+    env = {}
+    if pid:
+        try:
+            env = dict(
+                p.split("=", 1)
+                for p in open(f"/proc/{pid}/environ").read().split("\0")
+                if "=" in p
+            )
+        except Exception:
+            env = {}
+    if provider == "OpenAI":
+        model = llm or env.get("OPENAI_MODEL") or os.environ.get("OPENAI_MODEL", "gpt-5.5")
+    elif provider == "Ollama":
+        state = ollama_state()
+        model = env.get("OLLAMA_MODEL") or (
+            state["loaded"][0]["name"] if state.get("loaded") else ""
+        )
+    elif provider == "Anthropic":
+        model = llm or env.get("ANTHROPIC_MODEL") or os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-6")
+    elif provider == "DeepSeek":
+        model = llm or env.get("DEEPSEEK_MODEL") or os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
+    else:
+        model = llm or ""
+    return {"provider": provider, "model": model, "route": f"{provider.lower()}:{model}" if model else ""}
+
+
+def _is_openai_text_model(model_id):
+    mid = (model_id or "").lower()
+    if not mid.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
+        return False
+    excluded = (
+        "audio", "realtime", "image", "embedding", "moderation", "transcribe",
+        "tts", "whisper", "sora", "dall-e", "computer-use", "search-preview",
+    )
+    return not any(x in mid for x in excluded)
+
+
+def _openai_sort_key(model_id):
+    mid = model_id.lower()
+    family_rank = 0 if mid.startswith("gpt-5") else 1 if mid.startswith("gpt-4") else 2
+    size_rank = 2 if "nano" in mid or "mini" in mid else 0
+    return (family_rank, size_rank, mid)
+
+
+def openai_model_ids():
+    load_local_env()
+    if not os.environ.get("OPENAI_API_KEY"):
+        return [], ""
+    now = time.time()
+    if now - _openai_models_cache["ts"] < _OPENAI_MODELS_CACHE_TTL:
+        return list(_openai_models_cache["models"]), _openai_models_cache["err"]
+    try:
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/models",
+            headers={"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.load(r)
+        ids = sorted(
+            {m.get("id", "") for m in data.get("data", []) if _is_openai_text_model(m.get("id", ""))},
+            key=_openai_sort_key,
+        )
+        _openai_models_cache.update({"ts": now, "models": ids, "err": ""})
+    except Exception as e:
+        _openai_models_cache.update({"ts": now, "models": [], "err": f"OpenAI model list failed: {e}"})
+    return list(_openai_models_cache["models"]), _openai_models_cache["err"]
+
+
+def _anthropic_sort_key(model_id):
+    mid = model_id.lower()
+    family_rank = 0 if "opus" in mid else 1 if "sonnet" in mid else 2 if "haiku" in mid else 3
+    return (family_rank, mid)
+
+
+def anthropic_model_ids():
+    load_local_env()
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return [], ""
+    now = time.time()
+    if now - _anthropic_models_cache["ts"] < _ANTHROPIC_MODELS_CACHE_TTL:
+        return list(_anthropic_models_cache["models"]), _anthropic_models_cache["err"]
+    try:
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/models",
+            headers={
+                "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+                "anthropic-version": os.environ.get("ANTHROPIC_VERSION", "2023-06-01"),
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.load(r)
+        ids = sorted(
+            {m.get("id", "") for m in data.get("data", []) if str(m.get("id", "")).startswith("claude-")},
+            key=_anthropic_sort_key,
+        )
+        _anthropic_models_cache.update({"ts": now, "models": ids, "err": ""})
+    except Exception as e:
+        fallback = [os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-6")]
+        _anthropic_models_cache.update({"ts": now, "models": fallback, "err": f"Anthropic model list failed: {e}"})
+    return list(_anthropic_models_cache["models"]), _anthropic_models_cache["err"]
+
+
+def _deepseek_sort_key(model_id):
+    mid = model_id.lower()
+    if mid == "deepseek-v4-pro":
+        rank = 0
+    elif mid == "deepseek-v4-flash":
+        rank = 1
+    elif mid == "deepseek-reasoner":
+        rank = 2
+    elif mid == "deepseek-chat":
+        rank = 3
+    else:
+        rank = 4
+    return (rank, mid)
+
+
+def deepseek_model_ids():
+    load_local_env()
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        return [], ""
+    now = time.time()
+    if now - _deepseek_models_cache["ts"] < _DEEPSEEK_MODELS_CACHE_TTL:
+        return list(_deepseek_models_cache["models"]), _deepseek_models_cache["err"]
+    fallback = ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-reasoner", "deepseek-chat"]
+    try:
+        base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+        req = urllib.request.Request(
+            f"{base_url}/models",
+            headers={"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.load(r)
+        ids = sorted(
+            {m.get("id", "") for m in data.get("data", []) if str(m.get("id", "")).startswith("deepseek-")},
+            key=_deepseek_sort_key,
+        )
+        if not ids:
+            ids = fallback
+        _deepseek_models_cache.update({"ts": now, "models": ids, "err": ""})
+    except Exception:
+        _deepseek_models_cache.update({"ts": now, "models": fallback, "err": ""})
+    return list(_deepseek_models_cache["models"]), _deepseek_models_cache["err"]
+
+
+def model_routes():
+    load_local_env()
+    state = ollama_state()
+    routes = []
+    for name in state.get("available", []):
+        routes.append({
+            "id": f"ollama:{name}",
+            "label": f"Local · {name}",
+            "provider": "Ollama",
+            "model": name,
+            "available": True,
+        })
+    openai_key_set = bool(os.environ.get("OPENAI_API_KEY"))
+    openai_model = os.environ.get("OPENAI_MODEL", "gpt-5.5")
+    openai_label = os.environ.get("OPENAI_DISPLAY_NAME", "ChatGPT 5.5")
+    openai_models, openai_err = openai_model_ids()
+    if openai_model and openai_model not in openai_models:
+        openai_models.insert(0, openai_model)
+    for model in openai_models:
+        label = f"{openai_label} · OpenAI API ({model})" if model == openai_model else f"OpenAI · {model}"
+        routes.append({
+            "id": f"openai:{model}",
+            "label": label,
+            "provider": "OpenAI",
+            "model": model,
+            "available": openai_key_set and not openai_err,
+            "reason": "" if openai_key_set and not openai_err
+                      else (openai_err or "set OPENAI_API_KEY in .env.local"),
+        })
+    anthropic_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    anthropic_model = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-6")
+    anthropic_models, anthropic_err = anthropic_model_ids()
+    if anthropic_model and anthropic_model not in anthropic_models:
+        anthropic_models.insert(0, anthropic_model)
+    for model in anthropic_models:
+        label = f"Claude · {model}"
+        routes.append({
+            "id": f"anthropic:{model}",
+            "label": label,
+            "provider": "Anthropic",
+            "model": model,
+            "available": anthropic_key_set and not anthropic_err,
+            "reason": "" if anthropic_key_set and not anthropic_err
+                      else (anthropic_err or "set ANTHROPIC_API_KEY in .env.local"),
+        })
+    deepseek_key_set = bool(os.environ.get("DEEPSEEK_API_KEY"))
+    deepseek_model = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
+    deepseek_label = os.environ.get("DEEPSEEK_DISPLAY_NAME", "DeepSeek V4 Pro")
+    deepseek_models, deepseek_err = deepseek_model_ids()
+    if deepseek_model and deepseek_model not in deepseek_models:
+        deepseek_models.insert(0, deepseek_model)
+    for model in deepseek_models:
+        label = f"{deepseek_label} · DeepSeek API ({model})" if model == deepseek_model else f"DeepSeek · {model}"
+        routes.append({
+            "id": f"deepseek:{model}",
+            "label": label,
+            "provider": "DeepSeek",
+            "model": model,
+            "available": deepseek_key_set and not deepseek_err,
+            "reason": "" if deepseek_key_set and not deepseek_err
+                      else (deepseek_err or "set DEEPSEEK_API_KEY in .env.local"),
+        })
+    return routes
 
 
 def proc_rss_mb(pid):
@@ -324,6 +582,8 @@ def settings_view():
         ("repo", repo),
         ("history.metta", os.path.join(repo, "memory", "history.metta")),
         ("prompt.txt", os.path.join(repo, "memory", "prompt.txt")),
+        ("prompt-esther.txt", os.path.join(repo, "memory", "prompt-esther.txt")),
+        ("risks.jsonl", risk_register.RISK_PATH),
         ("models.yaml", os.path.join(repo, "models.yaml")),
         ("chroma_db", "/home/omaclaw/PeTTa/chroma_db"),
         ("runtime log", LOG_PATH),
@@ -363,10 +623,16 @@ def settings_view():
                 if "=" in kv:
                     k, v = kv.split("=", 1)
                     if k in ("OMEGACLAW_AUTH_SECRET", "OLLAMA_MODEL", "OLLAMA_BASE_URL",
-                             "ANTHROPIC_API_KEY"):
+                             "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_DISPLAY_NAME",
+                             "OPENAI_BASE_URL", "OPENAI_REASONING_EFFORT",
+                             "OMEGACLAW_PROMPT_FILE", "OMEGACLAW_RISK_REGISTER",
+                             "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_VERSION",
+                             "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL",
+                             "DEEPSEEK_DISPLAY_NAME", "DEEPSEEK_THINKING",
+                             "DEEPSEEK_REASONING_EFFORT"):
                         if k == "OMEGACLAW_AUTH_SECRET" and v:
                             v = "(set)"
-                        elif k == "ANTHROPIC_API_KEY" and v:
+                        elif k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY") and v:
                             v = v[:10] + "…" + v[-4:]
                         env_pairs[k] = v
         except Exception:
@@ -396,13 +662,92 @@ def _dir_size_mb(d):
     return round(total / 1024 / 1024, 2)
 
 
-def relaunch_swipl(new_model):
-    """Kill the running swipl Oma and relaunch with a different OLLAMA_MODEL.
-       Preserves the prior auth secret + provider + commchannel + token args
-       by reading them from /proc/<pid>/environ and /proc/<pid>/cmdline."""
+def _route_from_id(route_id):
+    provider, sep, model = (route_id or "").partition(":")
+    if not sep or not provider or not model:
+        raise ValueError("route must be provider:model")
+    provider = {
+        "ollama": "Ollama",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "deepseek": "DeepSeek",
+    }.get(provider.lower())
+    if not provider:
+        raise ValueError("unsupported provider")
+    return provider, model
+
+
+def _set_run_arg(args, key, value):
+    out = []
+    replaced = False
+    prefix = key + "="
+    for arg in args:
+        if arg.startswith(prefix):
+            if value:
+                out.append(prefix + value)
+            replaced = True
+        else:
+            out.append(arg)
+    if value and not replaced:
+        out.append(prefix + value)
+    return out
+
+
+def context_budget_for_route(provider, model):
+    model_l = (model or "").lower()
+    if provider == "Ollama":
+        if any(name in model_l for name in ("granite", "gemma", "phi4", "qwen", "deepseek", "glm", "mistral")):
+            return {
+                "maxHistory": "12000",
+                "maxFeedback": "12000",
+                "maxRecallItems": "8",
+                "maxEpisodeRecallLines": "12",
+            }
+        return {
+            "maxHistory": "16000",
+            "maxFeedback": "16000",
+            "maxRecallItems": "10",
+            "maxEpisodeRecallLines": "12",
+        }
+    if provider in ("OpenAI", "Anthropic", "DeepSeek"):
+        return {
+            "maxHistory": "42000",
+            "maxFeedback": "30000",
+            "maxRecallItems": "16",
+            "maxEpisodeRecallLines": "20",
+        }
+    return {
+        "maxHistory": "24000",
+        "maxFeedback": "16000",
+        "maxRecallItems": "10",
+        "maxEpisodeRecallLines": "12",
+    }
+
+
+def append_switch_marker(provider, model, budget):
+    try:
+        path = os.path.join(REPO_ROOT, "memory", "history.metta")
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(
+                f'("{time.strftime("%Y-%m-%d %H:%M:%S")}" MODEL_SWITCH: '
+                f'provider={provider} model={model} '
+                f'maxHistory={budget.get("maxHistory")} maxFeedback={budget.get("maxFeedback")})\n'
+            )
+    except OSError:
+        pass
+
+
+def relaunch_swipl(route_id):
+    """Kill the running swipl Oma and relaunch with a provider/model route.
+       Preserves secrets/config by reading /proc env and passing env directly
+       into the child process, never via shell-expanded export commands."""
     pid, _cmd = find_swipl()
     if not pid:
         return False, "no swipl currently running"
+    try:
+        provider, model = _route_from_id(route_id)
+    except ValueError as e:
+        return False, str(e)
     try:
         env_pairs = open(f"/proc/{pid}/environ").read().split("\0")
         env = dict(p.split("=", 1) for p in env_pairs if "=" in p)
@@ -418,7 +763,31 @@ def relaunch_swipl(new_model):
     except Exception as e:
         return False, f"cmdline read failed: {e}"
 
-    auth_secret = env.get("OMEGACLAW_AUTH_SECRET", "")
+    child_env = os.environ.copy()
+    for key in (
+        "OMEGACLAW_AUTH_SECRET", "OMEGACLAW_PROMPT_FILE", "OMEGACLAW_RISK_REGISTER",
+        "OLLAMA_BASE_URL", "OLLAMA_MODEL", "OPENAI_API_KEY", "OPENAI_MODEL",
+        "OPENAI_BASE_URL", "OPENAI_REASONING_EFFORT", "ANTHROPIC_API_KEY",
+        "ANTHROPIC_MODEL", "ANTHROPIC_VERSION", "DEEPSEEK_API_KEY",
+        "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL", "DEEPSEEK_DISPLAY_NAME",
+        "DEEPSEEK_THINKING", "DEEPSEEK_REASONING_EFFORT", "ASI_API_KEY",
+    ):
+        if env.get(key) and key not in child_env:
+            child_env[key] = env[key]
+    if provider == "Ollama":
+        child_env["OLLAMA_MODEL"] = model
+    elif provider == "OpenAI":
+        child_env["OPENAI_MODEL"] = model
+    elif provider == "Anthropic":
+        child_env["ANTHROPIC_MODEL"] = model
+    elif provider == "DeepSeek":
+        child_env["DEEPSEEK_MODEL"] = model
+    budget = context_budget_for_route(provider, model)
+    run_args = _set_run_arg(run_args, "provider", provider)
+    run_args = _set_run_arg(run_args, "LLM", model if provider in ("OpenAI", "Anthropic", "DeepSeek") else "")
+    for key, value in budget.items():
+        run_args = _set_run_arg(run_args, key, value)
+    append_switch_marker(provider, model, budget)
     args_str = " ".join(shlex.quote(a) for a in run_args)
     # Stop existing swipl, give it a moment, then relaunch.
     subprocess.run(["pkill", "-TERM", "-f", "[s]wipl.*main.pl"], check=False)
@@ -428,8 +797,6 @@ def relaunch_swipl(new_model):
     launch = (
         "cd /home/omaclaw/PeTTa && "
         "source .venv/bin/activate && "
-        f"export OMEGACLAW_AUTH_SECRET={shlex.quote(auth_secret)} && "
-        f"export OLLAMA_MODEL={shlex.quote(new_model)} && "
         ": > /tmp/omegaclaw.log && "
         f"nohup setsid sh run.sh {args_str} </dev/null "
         ">>/tmp/omegaclaw.log 2>&1 & disown"
@@ -438,11 +805,11 @@ def relaunch_swipl(new_model):
         subprocess.Popen(
             ["bash", "-c", launch],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, start_new_session=True,
+            stderr=subprocess.DEVNULL, start_new_session=True, env=child_env,
         )
     except Exception as e:
         return False, f"launch failed: {e}"
-    return True, f"swapped to {new_model}"
+    return True, f"swapped to {provider} · {model}"
 
 
 def git_branch():
@@ -556,12 +923,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             pid, cmd = find_swipl()
             ollama = ollama_state()
             loaded = ollama["loaded"][0] if ollama["loaded"] else None
+            active = active_provider_model()
             return self._json({
                 "running": pid is not None,
                 "pid": pid,
-                "model": loaded["name"] if loaded else "?",
+                "model": active["model"] or (loaded["name"] if loaded else "?"),
+                "provider": active["provider"],
+                "active_route": active["route"],
                 "vram_mb": loaded["vram_mb"] if loaded else 0,
                 "available_models": ollama["available"],
+                "model_routes": model_routes(),
                 "iter_total": grep_count(r"^\(---------iteration"),
                 "iter_per_min": iter_rate_per_min(),
                 "ollama_calls": grep_count(r"11434/api/chat"),
@@ -597,6 +968,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                "messages": all_msgs[start:end]})
         if path == "/channels":
             return self._json(channels_status())
+        if path == "/risks":
+            try:
+                risks = json.loads(risk_register.list_risks())
+                dash = json.loads(risk_register.dashboard_data())
+                return self._json({"ok": True, "risks": risks.get("risks", []), "dashboard": dash})
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
+        if path == "/heatmap":
+            try:
+                return self._json(json.loads(risk_register.dashboard_data()))
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
+        if path == "/ecosystem":
+            try:
+                return self._json(json.loads(risk_register.ecosystem_data()))
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
+        if path == "/org":
+            try:
+                qs = dict(p.split("=", 1) for p in (urlparse(self.path).query or "").split("&") if "=" in p)
+                return self._json(json.loads(risk_register.org_data(qs.get("id", ""))))
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
         if path == "/settings":
             return self._json(settings_view())
         self.send_error(404)
@@ -620,13 +1014,31 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except OSError as e:
                 return self._json({"ok": False, "err": f"fifo write failed: {e}"}, 503)
 
+        if path == "/risks":
+            try:
+                result = json.loads(risk_register.append_risk(body))
+                return self._json(result, 200 if result.get("ok") else 400)
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
+
+        if path == "/demo/seed":
+            try:
+                result = json.loads(risk_register.seed_demo_data())
+                return self._json(result, 200 if result.get("ok") else 500)
+            except Exception as e:
+                return self._json({"ok": False, "err": str(e)}, 500)
+
         if path == "/switch":
-            target = (body.get("model") or "").strip()
+            target = (body.get("route") or body.get("model") or "").strip()
             if not target:
                 return self._json({"ok": False, "err": "no model"}, 400)
-            avail = ollama_state().get("available", [])
-            if target not in avail:
-                return self._json({"ok": False, "err": f"unknown model {target}"}, 400)
+            if ":" not in target:
+                target = f"ollama:{target}"
+            routes = {r["id"]: r for r in model_routes()}
+            if target not in routes:
+                return self._json({"ok": False, "err": f"unknown model route {target}"}, 400)
+            if not routes[target].get("available"):
+                return self._json({"ok": False, "err": routes[target].get("reason") or "route unavailable"}, 400)
             ok, msg = relaunch_swipl(target)
             return self._json({"ok": ok, "msg": msg}, 200 if ok else 500)
 
@@ -635,12 +1047,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # Wipes in-process MeTTa state (&prevmsg, &lastsend, &loops, etc.)
             # and per-channel state (auth set, recent-sends dedup) without
             # touching history.metta or chroma_db (long-term memory preserved).
-            state = ollama_state()
-            current_model = state["loaded"][0]["name"] if state["loaded"] else \
-                            os.environ.get("OLLAMA_MODEL", "")
-            if not current_model:
-                return self._json({"ok": False, "err": "no current model detected"}, 500)
-            ok, msg = relaunch_swipl(current_model)
+            active = active_provider_model()
+            if not active["route"]:
+                return self._json({"ok": False, "err": "no current model route detected"}, 500)
+            ok, msg = relaunch_swipl(active["route"])
             return self._json({"ok": ok, "msg": "in-process state cleared · " + (msg or "")}, 200 if ok else 500)
 
         return self.send_error(404)
@@ -690,6 +1100,104 @@ INDEX_HTML = """<!DOCTYPE html>
            font-size: 10px; font-weight: 600; margin-left: 6px; }
   .badge.on { background: var(--snet-teal); color: var(--snet-deep); }
   .badge.off { background: transparent; color: var(--dim); border: 1px solid var(--dim); }
+  .badge.low { background: #2ea043; color: #fff; }
+  .badge.medium { background: #d29922; color: #0d1117; }
+  .badge.high { background: #db6d28; color: #fff; }
+  .badge.critical { background: var(--warn); color: #fff; }
+  .risk-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom: 12px; }
+  .risk-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+               background: rgba(255,255,255,0.02); margin-bottom: 8px; }
+  .risk-card .title { color: var(--fg); font-weight: 600; margin-bottom: 6px; }
+  .risk-card .meta { color: var(--dim); font-size: 11px; line-height: 1.5; }
+  .risk-card .desc { color: var(--fg); font-size: 12px; margin-top: 6px; white-space: pre-wrap; }
+  .risk-form { display:grid; grid-template-columns: 1.5fr 0.8fr 0.8fr 1fr; gap:8px; margin-bottom: 10px; }
+  .risk-form textarea { grid-column: 1 / -1; min-height: 64px; resize: vertical;
+                        background: var(--card); color: var(--fg); border:1px solid var(--border);
+                        border-radius:4px; padding:8px 10px; font-family: inherit; font-size:12px; }
+  .heatmap { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  .heatmap th, .heatmap td { border: 1px solid var(--border); text-align: center;
+                             padding: 10px; min-height: 42px; }
+  .heatmap th { color: var(--dim); font-weight: 500; font-size: 11px; }
+  .heatmap td { color: var(--fg); font-weight: 700; }
+  .heat-0 { background: rgba(255,255,255,0.02); color: var(--dim) !important; }
+  .heat-1 { background: rgba(46,160,67,0.35); }
+  .heat-2 { background: rgba(210,153,34,0.42); }
+  .heat-3 { background: rgba(219,109,40,0.48); }
+  .heat-4 { background: rgba(255,123,114,0.55); }
+  .viz-wrap { display:grid; grid-template-columns: 1.3fr 0.9fr; gap:12px; align-items: stretch; }
+  .network-panel { min-height: 420px; border: 1px solid var(--border); border-radius: 6px;
+                   background: radial-gradient(circle at 50% 50%, rgba(22,212,212,0.08), rgba(255,255,255,0.02) 48%, rgba(217,70,239,0.04));
+                   padding: 14px; overflow: hidden; }
+  .org-chart { display:flex; flex-direction:column; gap:10px; min-width: 0; }
+  .command-row { border:1px solid rgba(22,212,212,0.45); border-radius:6px;
+                 background: linear-gradient(135deg, rgba(22,212,212,0.11), rgba(217,70,239,0.07));
+                 padding:10px; }
+  .nexi-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .nexi-mark { width:32px; height:32px; border-radius:50%;
+               background: radial-gradient(circle at 35% 30%, #fff, var(--snet-teal) 38%, var(--snet-magenta));
+               box-shadow: 0 0 18px rgba(22,212,212,0.22); flex-shrink:0; }
+  .nexi-kicker { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+  .nexi-title { color:var(--fg); font-size:15px; font-weight:700; }
+  .nexi-copy { color:var(--fg); font-size:12px; line-height:1.45; margin:6px 0 10px; max-width: 900px; }
+  .defense-row { border:1px solid rgba(48,54,61,0.85); border-radius:6px;
+                 background: rgba(13,17,23,0.72); padding:10px; }
+  .defense-head { display:flex; align-items:baseline; justify-content:space-between;
+                  gap:10px; margin-bottom:8px; }
+  .defense-title { font-weight:700; font-size:12px; color:var(--fg); }
+  .defense-note { color:var(--dim); font-size:10px; text-align:right; }
+  .defense-cards { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+  .defense-row.assurance .defense-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .defense-row.domain .defense-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .org-card { border:1px solid var(--border); border-left:4px solid var(--snet-teal);
+              border-radius:6px; padding:9px 10px; min-height:84px;
+              background: rgba(255,255,255,0.025); cursor:pointer; transition: border-color .15s, background .15s; }
+  .org-card:hover { border-color: var(--accent); background: rgba(121,192,255,0.08); }
+  .org-card.line1 { border-left-color: var(--you); }
+  .org-card.line2 { border-left-color: var(--snet-teal); }
+  .org-card.line3 { border-left-color: var(--snet-magenta); }
+  .org-card.command { border-left-color: var(--accent); background: rgba(121,192,255,0.08); border-color: rgba(121,192,255,0.45); }
+  .org-card.domain { border-left-color: var(--oma); }
+  .org-card.primary { background: rgba(22,212,212,0.08); border-color: rgba(22,212,212,0.5); }
+  .org-card .org-card-name { color:var(--fg); font-size:13px; font-weight:700; margin-bottom:4px; }
+  .org-card .org-card-role { color:var(--dim); font-size:10px; line-height:1.35; }
+  .org-card .org-card-meta { margin-top:8px; display:flex; gap:5px; flex-wrap:wrap; }
+  .mini-pill { color:var(--dim); border:1px solid rgba(110,118,129,0.5); border-radius:10px;
+               padding:1px 6px; font-size:9px; white-space:nowrap; }
+  .flow-strip { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; color:var(--dim);
+                font-size:10px; gap:8px; padding:1px 8px; }
+  .flow-strip:before, .flow-strip:after { content:""; height:1px; background:linear-gradient(90deg, transparent, rgba(121,192,255,0.45), transparent); }
+  .flow-strip span { color:var(--snet-teal); white-space:nowrap; }
+  .line-band { border-left: 3px solid var(--border); padding: 8px 10px; margin-bottom: 8px;
+               background: rgba(255,255,255,0.02); border-radius: 4px; }
+  .line-band.l1 { border-left-color: var(--you); }
+  .line-band.l2 { border-left-color: var(--snet-teal); }
+  .line-band.l3 { border-left-color: var(--snet-magenta); }
+  .report { padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,0.7); }
+  .report:last-child { border-bottom: 0; }
+  .report .r-head { color: var(--fg); font-weight: 600; font-size: 12px; }
+  .report .r-meta { color: var(--dim); font-size: 10px; margin-top: 2px; }
+  .report-builder { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:12px; }
+  .report-builder label { display:flex; flex-direction:column; gap:4px; color:var(--dim); font-size:10px;
+                          text-transform:uppercase; letter-spacing:.4px; }
+  .report-builder select, .report-builder input { width:100%; box-sizing:border-box; }
+  .report-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0 2px; }
+  .report-preview { border:1px solid var(--border); border-radius:6px; background:rgba(255,255,255,0.02);
+                    padding:14px; white-space:pre-wrap; line-height:1.5; font-size:12px; max-height:520px; overflow:auto; }
+  .report-matrix { width:100%; border-collapse:collapse; table-layout:fixed; font-size:11px; }
+  .report-matrix th, .report-matrix td { border:1px solid var(--border); padding:8px; vertical-align:top; }
+  .report-matrix th { color:var(--dim); font-weight:600; text-align:left; }
+  .report-matrix td { color:var(--fg); overflow-wrap:anywhere; }
+  .org-hero { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:12px; }
+  .org-title { font-size: 20px; font-weight: 700; color: var(--snet-teal); margin-bottom: 4px; }
+  .org-sub { color: var(--dim); font-size: 12px; line-height: 1.5; }
+  .chip { display:inline-block; border:1px solid var(--border); color:var(--fg);
+          padding:3px 7px; border-radius:12px; margin:2px; font-size:10px; background:rgba(255,255,255,0.02); }
+  @media (max-width: 980px) {
+    .viz-wrap { grid-template-columns: 1fr; }
+    .risk-grid { grid-template-columns: repeat(2, 1fr); }
+    .report-builder { grid-template-columns: 1fr; }
+    .defense-cards, .defense-row.assurance .defense-cards, .defense-row.domain .defense-cards { grid-template-columns: 1fr; }
+  }
   .history-msg { padding: 6px 10px; margin: 3px 0; border-radius: 4px;
                  border-left: 3px solid var(--dim); white-space: pre-wrap; font-size: 12px; }
   .history-msg.you { border-left-color: var(--you); }
@@ -809,7 +1317,11 @@ INDEX_HTML = """<!DOCTYPE html>
   <nav class="sidebar">
     <div class="nav-section">Pages</div>
     <a class="nav-link active" data-page="chat">Current chat</a>
+    <a class="nav-link" data-page="ecosystem">Ecosystem</a>
     <a class="nav-link" data-page="history">History</a>
+    <a class="nav-link" data-page="risks">Risks</a>
+    <a class="nav-link" data-page="heatmap">Heatmap</a>
+    <a class="nav-link" data-page="reports">Reports</a>
     <a class="nav-link" data-page="channels">Channels</a>
     <a class="nav-link" data-page="settings">Settings</a>
   </nav>
@@ -865,6 +1377,157 @@ INDEX_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- ============ Page: Ecosystem ============ -->
+    <div class="page" id="page-ecosystem">
+      <div class="page-content">
+        <div class="section">
+          <h2>SingularityNET ecosystem risk cockpit</h2>
+          <div class="pager">
+            <button id="seed_demo">Seed sample dashboard</button>
+            <span>Demo data: synthetic reports from autonomous agents mapped to NIST IR 8286.</span>
+          </div>
+          <div class="viz-wrap">
+            <div class="network-panel" id="network_panel">loading…</div>
+            <div>
+              <div class="line-band l1"><strong>Line 1</strong><br><span style="color:var(--dim)">Operational owners: NuNet and Hyperon agents report local control and system telemetry.</span></div>
+              <div class="line-band l2"><strong>Line 2</strong><br><span style="color:var(--dim)">Risk function: Oma synthesizes governance, ethics, model, and evidence signals.</span></div>
+              <div class="line-band l3"><strong>Line 3</strong><br><span style="color:var(--dim)">Oversight: AgentGriff provides independent InterNetwork Defense CRO challenge, claims review, fallback accountability, and board-facing evidence review.</span></div>
+              <div class="section" style="margin:10px 0 0;padding:10px 12px">
+                <h2>Incoming agent reports</h2>
+                <div id="report_feed">loading…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Page: Organization detail ============ -->
+    <div class="page" id="page-org">
+      <div class="page-content">
+        <div class="section">
+          <button id="org_back" class="reset" style="margin:0 0 10px 0">← ecosystem</button>
+          <div class="org-title" id="org_name">Organization</div>
+          <div class="org-sub" id="org_summary">loading…</div>
+        </div>
+        <div class="org-hero">
+          <div class="tile"><div class="label">Line of defense</div><div class="value" id="org_line">—</div></div>
+          <div class="tile"><div class="label">Mapped risks</div><div class="value" id="org_risk_count">—</div></div>
+          <div class="tile"><div class="label">Agent reports</div><div class="value" id="org_report_count">—</div></div>
+        </div>
+        <div class="section">
+          <h2>Control focus</h2>
+          <div id="org_controls">loading…</div>
+        </div>
+        <div class="section">
+          <h2>Mapped risks</h2>
+          <div id="org_risks">loading…</div>
+        </div>
+        <div class="section">
+          <h2>Autonomous agent reports</h2>
+          <div id="org_reports">loading…</div>
+        </div>
+        <div class="section">
+          <h2>Next actions</h2>
+          <div id="org_actions">loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Page: Risks ============ -->
+    <div class="page" id="page-risks">
+      <div class="page-content">
+        <div class="section">
+          <h2>Risk Radar</h2>
+          <div class="risk-grid">
+            <div class="tile"><div class="label">Open risks</div><div class="value" id="risk_open">—</div></div>
+            <div class="tile"><div class="label">Critical</div><div class="value" id="risk_critical">—</div></div>
+            <div class="tile"><div class="label">High</div><div class="value" id="risk_high">—</div></div>
+            <div class="tile"><div class="label">Need attention</div><div class="value" id="risk_attention">—</div></div>
+          </div>
+          <div id="risk_list">loading…</div>
+        </div>
+        <div class="section">
+          <h2>AI system intake</h2>
+          <div class="risk-form">
+            <input type="text" id="risk_title" placeholder="Risk title">
+            <input type="text" id="risk_owner" placeholder="Decision owner">
+            <input type="text" id="risk_likelihood" placeholder="Likelihood 1-5">
+            <input type="text" id="risk_impact" placeholder="Impact 1-5">
+            <textarea id="risk_desc" placeholder="Use case, evidence, recommendation, residual risk, required human approval"></textarea>
+          </div>
+          <button id="risk_add">Add draft risk</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Page: Heatmap ============ -->
+    <div class="page" id="page-heatmap">
+      <div class="page-content">
+        <div class="section">
+          <h2>Likelihood x Impact Heatmap</h2>
+          <div id="heatmap_table">loading…</div>
+        </div>
+        <div class="section">
+          <h2>Risks needing attention</h2>
+          <div id="attention_list">loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Page: Reports ============ -->
+    <div class="page" id="page-reports">
+      <div class="page-content">
+        <div class="section">
+          <h2>Compliance Report Generator</h2>
+          <div class="report-builder">
+            <label>Framework
+              <select id="report_framework">
+                <option value="nist-ai-rmf">NIST AI RMF</option>
+                <option value="iso-42001">ISO/IEC 42001</option>
+                <option value="eu-ai-act">EU AI Act</option>
+                <option value="nist-ir-8286">NIST IR 8286</option>
+                <option value="combined">Combined board pack</option>
+              </select>
+            </label>
+            <label>Report Type
+              <select id="report_type">
+                <option value="executive">Executive brief</option>
+                <option value="controls">Controls evidence matrix</option>
+                <option value="assessment">Risk and impact assessment</option>
+                <option value="audit">Audit readiness note</option>
+              </select>
+            </label>
+            <label>Scope
+              <input type="text" id="report_scope" value="SingularityNET agentic AI ecosystem">
+            </label>
+            <label>Audience
+              <input type="text" id="report_audience" value="CRO / Chief Ethics Officer / board-risk committee">
+            </label>
+            <label>Owner
+              <input type="text" id="report_owner" value="Esther Galfalvi">
+            </label>
+            <label>Period
+              <input type="text" id="report_period" value="Current review cycle">
+            </label>
+          </div>
+          <div class="report-actions">
+            <button id="report_generate">Generate draft</button>
+            <button id="report_copy" class="reset">copy markdown</button>
+            <span id="report_status" style="color:var(--dim); font-size:11px">Drafts support governance workflows; they do not certify compliance.</span>
+          </div>
+        </div>
+        <div class="section">
+          <h2>Draft Report</h2>
+          <div id="report_brief" class="report-preview">loading…</div>
+        </div>
+        <div class="section">
+          <h2>Controls-to-Evidence Matrix</h2>
+          <div id="report_matrix">loading…</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ Page: Channels ============ -->
     <div class="page" id="page-channels">
       <div class="page-content">
@@ -912,18 +1575,20 @@ let _availSeen = '';
 async function fetchStats() {
   try {
     const r = await fetch('/stats'); const d = await r.json();
-    // Populate model dropdown from /api/tags (only rebuild when list changes)
+    // Populate provider-aware model dropdown.
     const sel = $('model_select');
-    const avail = (d.available_models || []);
-    const availKey = avail.join(',');
+    const routes = (d.model_routes || (d.available_models || []).map(m => ({
+      id: `ollama:${m}`, label: m, available: true
+    })));
+    const availKey = routes.map(r => `${r.id}:${r.available ? 1 : 0}`).join(',');
     if (availKey !== _availSeen) {
       _availSeen = availKey;
-      sel.innerHTML = avail.map(m =>
-        `<option value="${m}"${m === d.model ? ' selected' : ''}>${m}</option>`
+      sel.innerHTML = routes.map(r =>
+        `<option value="${escapeHtml(r.id)}"${r.id === d.active_route ? ' selected' : ''}${r.available ? '' : ' disabled'}>${escapeHtml(r.label)}${r.available ? '' : ' · unavailable'}</option>`
       ).join('');
-    } else if (sel.value !== d.model && !sel.dataset.userSwitching) {
-      // Sync selection if active model changed externally
-      sel.value = d.model;
+    } else if (sel.value !== d.active_route && !sel.dataset.userSwitching) {
+      // Sync selection if active route changed externally
+      sel.value = d.active_route;
     }
     $('channel').textContent = d.channel;
     $('status').textContent = d.running ? `pid ${d.pid} · up ${d.uptime}` : 'NOT RUNNING';
@@ -974,7 +1639,8 @@ $('reset_btn').addEventListener('click', async () => {
 
 $('model_select').addEventListener('change', async (e) => {
   const target = e.target.value;
-  const ok = confirm(`Swap Oma to "${target}"? This kills swipl and relaunches; in-flight conversation will reset.`);
+  const label = e.target.options[e.target.selectedIndex]?.textContent || target;
+  const ok = confirm(`Swap Oma to "${label}"? This kills swipl and relaunches; in-flight conversation will reset.`);
   if (!ok) {
     // revert UI selection on cancel
     fetchStats();
@@ -984,7 +1650,7 @@ $('model_select').addEventListener('change', async (e) => {
   e.target.disabled = true;
   try {
     const r = await fetch('/switch', {method:'POST', headers:{'Content-Type':'application/json'},
-                                      body: JSON.stringify({model: target})});
+                                      body: JSON.stringify({route: target})});
     const d = await r.json();
     if (!d.ok) alert('Switch failed: ' + (d.err || d.msg || 'unknown'));
   } catch (err) {
@@ -1112,6 +1778,10 @@ function showPage(name) {
   if (link) link.classList.add('active');
   // Lazy load page-specific data
   if (name === 'history') loadHistory();
+  if (name === 'ecosystem') loadEcosystem();
+  if (name === 'risks') loadRisks();
+  if (name === 'heatmap') loadHeatmap();
+  if (name === 'reports') loadReport();
   if (name === 'channels') loadChannels();
   if (name === 'settings') loadSettings();
 }
@@ -1121,6 +1791,7 @@ document.querySelectorAll('.nav-link').forEach(a => {
 
 // ============ History page ============
 let _histOffset = 0;
+let _currentOrgId = '';
 async function loadHistory() {
   try {
     const r = await fetch(`/history?offset=${_histOffset}&limit=100`);
@@ -1138,6 +1809,399 @@ document.getElementById('hist_older').addEventListener('click', () => {
 });
 document.getElementById('hist_newer').addEventListener('click', () => {
   _histOffset = Math.max(0, _histOffset - 100); loadHistory();
+});
+
+// ============ Ecosystem page ============
+async function loadEcosystem() {
+  try {
+    const r = await fetch('/ecosystem'); const d = await r.json();
+    const nodes = d.nodes || [];
+    const reports = d.reports || [];
+    const risks = (d.dashboard || {}).top_risks || [];
+    const reportCounts = {};
+    const riskCounts = {};
+    for (const rep of reports) {
+      const risk = risks.find(x => x.id === rep.mapped_risk);
+      const key = nodes.find(n => rep.source.toLowerCase().startsWith(n.label.toLowerCase()))?.id
+               || nodes.find(n => (risk?.id || '').toLowerCase().includes(n.id))?.id;
+      if (key) reportCounts[key] = (reportCounts[key] || 0) + 1;
+    }
+    for (const risk of risks) {
+      const text = `${risk.id || ''} ${risk.title || ''} ${risk.description || ''}`.toLowerCase();
+      for (const n of nodes) {
+        if (text.includes(n.id) || text.includes((n.label || '').toLowerCase())) {
+          riskCounts[n.id] = (riskCounts[n.id] || 0) + 1;
+        }
+      }
+    }
+    const lineMeta = {
+      1: ['Line 1 · Risk Owner Agents', 'Model agnostic · current config: local GPU mix'],
+      2: ['Line 2 · Risk Manager Agents', 'Model agnostic · current config: larger local models + API; sample route ChatGPT 5.5'],
+      3: ['Line 3 · AgentGriff CRO Challenge', 'Model agnostic · current config: Claude Opus 4.7'],
+    };
+    const renderCard = n => `
+      <div class="org-card ${escapeHtml(n.tier || '')} line${n.line || 0}${n.id === 'oma' ? ' primary' : ''}" data-org="${escapeHtml(n.id)}">
+        <div class="org-card-name">${escapeHtml(n.label)}</div>
+        <div class="org-card-role">${escapeHtml(n.role || n.summary || '')}</div>
+        <div class="org-card-meta">
+          <span class="mini-pill">${escapeHtml(n.owner || 'owner tbd')}</span>
+          ${(n.models || []).slice(0, 3).map(m => `<span class="mini-pill">${escapeHtml(m)}</span>`).join('')}
+          <span class="mini-pill">${riskCounts[n.id] || 0} risks</span>
+          <span class="mini-pill">${reportCounts[n.id] || 0} reports</span>
+        </div>
+      </div>`;
+    const command = nodes.find(n => n.tier === 'command');
+    const assurance = nodes.filter(n => n.tier === 'assurance');
+    const domains = nodes.filter(n => n.tier === 'domain');
+    let html = '<div class="org-chart" role="img" aria-label="Oma above NIST IR 8286 assurance lines org chart">';
+    if (command) {
+      html += `<div class="command-row">
+        <div class="nexi-head">
+          <div class="nexi-mark"></div>
+          <div>
+            <div class="nexi-kicker">Esther Galfalvi's AI governance companion</div>
+            <div class="nexi-title">Nexi supports Esther across all three assurance lines</div>
+          </div>
+        </div>
+        <div class="defense-head">
+          <div class="defense-title">Top layer · Nexi reporting to Esther</div>
+          <div class="defense-note">Dynamic model routing · current examples: ChatGPT 5.5 primary, Claude Opus 4.7 fallback, local IBM Granite for ISO/IEC 42001 support</div>
+        </div>
+        <div class="defense-cards">${renderCard(command)}</div>
+      </div>
+      <div class="flow-strip"><span>Nexi gathers assurance signals; AgentGriff can challenge evidence and provide third-party CRO advice</span></div>`;
+    }
+    html += '<div class="defense-row assurance"><div class="defense-head"><div class="defense-title">Assurance agent layers</div><div class="defense-note">NIST IR 8286 lines reporting upward into Nexi, with AgentGriff available for independent challenge</div></div><div class="defense-cards">';
+    for (const line of [1, 2, 3]) {
+      html += assurance.filter(n => n.line === line).map(renderCard).join('');
+    }
+    html += '</div></div><div class="flow-strip"><span>sub-org Line 1 and Line 2 agents feed the assurance layers</span></div>';
+    for (const line of [1, 2, 3]) {
+      const [title, note] = lineMeta[line];
+      html += `<div class="defense-row line${line}">
+        <div class="defense-head">
+          <div class="defense-title">${title}</div>
+          <div class="defense-note">${note}</div>
+        </div>
+        <div class="defense-cards">${assurance.filter(n => n.line === line).map(renderCard).join('')}</div>
+      </div>`;
+    }
+    html += `<div class="defense-row domain">
+      <div class="defense-head">
+        <div class="defense-title">SingularityNET ecosystem domains</div>
+        <div class="defense-note">Each domain can host Line 1 risk-owner agents, Line 2 risk-manager agents, and optional Line 3 internal-audit agents; model routes stay dynamic</div>
+      </div>
+      <div class="defense-cards">${domains.map(renderCard).join('')}</div>
+    </div>`;
+    html += '</div>';
+    $('network_panel').innerHTML = html;
+    document.querySelectorAll('#network_panel .org-card').forEach(el => {
+      el.addEventListener('click', () => openOrg(el.dataset.org));
+    });
+    $('report_feed').innerHTML = (d.reports || []).map(rep => `
+      <div class="report">
+        <div class="r-head">Line ${rep.line} · ${escapeHtml(rep.agent)}</div>
+        <div>${escapeHtml(rep.summary)}</div>
+        <div class="r-meta">${escapeHtml(rep.source)} · maps to ${escapeHtml(rep.mapped_risk)} · confidence ${escapeHtml(String(rep.confidence))}</div>
+      </div>
+    `).join('');
+  } catch (e) { $('network_panel').textContent = 'load failed: ' + e; }
+}
+
+async function openOrg(id) {
+  _currentOrgId = id;
+  showPage('org');
+  await loadOrg(id);
+}
+
+async function loadOrg(id) {
+  try {
+    const r = await fetch(`/org?id=${encodeURIComponent(id)}`); const d = await r.json();
+    if (!d.ok) throw new Error(d.err || 'unknown org');
+    const org = d.org || {};
+    $('org_name').textContent = org.label || id;
+    $('org_summary').textContent = `${org.role || ''} · ${org.summary || ''}`;
+    $('org_line').textContent = org.line ? `Line ${org.line}` : '—';
+    $('org_risk_count').textContent = (d.risks || []).length;
+    $('org_report_count').textContent = (d.reports || []).length;
+    $('org_controls').innerHTML = (org.controls || []).map(x => `<span class="chip">${escapeHtml(x)}</span>`).join('');
+    $('org_actions').innerHTML = (org.actions || []).map(x => `<button class="reset" style="margin:3px 6px 3px 0">${escapeHtml(x)}</button>`).join('');
+    $('org_risks').innerHTML = renderRiskCards(d.risks || []);
+    $('org_reports').innerHTML = (d.reports || []).map(rep => `
+      <div class="report">
+        <div class="r-head">Line ${rep.line} · ${escapeHtml(rep.agent)}</div>
+        <div>${escapeHtml(rep.summary)}</div>
+        <div class="r-meta">${escapeHtml(rep.source)} · maps to ${escapeHtml(rep.mapped_risk)} · confidence ${escapeHtml(String(rep.confidence))}</div>
+      </div>
+    `).join('') || '<div class="row"><span class="v" style="color:var(--dim)">No agent reports mapped yet.</span></div>';
+  } catch (e) {
+    $('org_name').textContent = id || 'Organization';
+    $('org_summary').textContent = 'load failed: ' + e;
+  }
+}
+
+$('org_back').addEventListener('click', () => showPage('ecosystem'));
+
+async function seedDemo() {
+  const btn = $('seed_demo');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/demo/seed', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    const d = await r.json();
+    if (!d.ok) return alert('seed failed: ' + (d.err || 'unknown'));
+    await loadEcosystem();
+    await loadRisks();
+    alert(`Seeded ${d.inserted} sample risks. Total structured risks: ${d.total}.`);
+  } catch (e) { alert('seed error: ' + e); }
+  finally { btn.disabled = false; }
+}
+$('seed_demo').addEventListener('click', seedDemo);
+
+// ============ Risk pages ============
+function riskBadge(tier) {
+  const t = (tier || 'low').toLowerCase();
+  return `<span class="badge ${escapeHtml(t)}">${escapeHtml(t.toUpperCase())}</span>`;
+}
+
+function renderRiskCards(rows) {
+  if (!rows || rows.length === 0) {
+    return '<div class="row"><span class="v" style="color:var(--dim)">No structured risks captured yet.</span></div>';
+  }
+  return rows.map(r => `
+    <div class="risk-card">
+      <div class="title">${escapeHtml(r.title || 'Untitled risk')} ${riskBadge(r.risk_tier)}</div>
+      <div class="meta">
+        ${escapeHtml(r.id || '')} · status ${escapeHtml(r.status || 'open')} · score ${escapeHtml(String(r.priority || 0))}
+        · L${escapeHtml(String(r.likelihood || 0))} x I${escapeHtml(String(r.impact || 0))}
+      </div>
+      <div class="meta">owner ${escapeHtml(r.decision_owner || 'unassigned')} · review ${escapeHtml(r.next_review_date || 'not set')}</div>
+      ${r.description ? `<div class="desc">${escapeHtml(r.description)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function loadRisks() {
+  try {
+    const r = await fetch('/risks'); const d = await r.json();
+    const dash = d.dashboard || {};
+    const tiers = dash.by_tier || {};
+    $('risk_open').textContent = dash.open || 0;
+    $('risk_critical').textContent = tiers.critical || 0;
+    $('risk_high').textContent = tiers.high || 0;
+    $('risk_attention').textContent = (dash.attention || []).length;
+    $('risk_list').innerHTML = renderRiskCards(d.risks || []);
+  } catch (e) { $('risk_list').textContent = 'load failed: ' + e; }
+}
+
+async function addRisk() {
+  const title = $('risk_title').value.trim();
+  const description = $('risk_desc').value.trim();
+  if (!title && !description) return alert('Add a title or description first.');
+  const payload = {
+    title: title || description.slice(0, 80),
+    description,
+    decision_owner: $('risk_owner').value.trim(),
+    likelihood: $('risk_likelihood').value.trim(),
+    impact: $('risk_impact').value.trim(),
+    framework: 'NIST AI RMF / ISO 42001 / NIST IR 8286',
+    status: 'open'
+  };
+  const btn = $('risk_add');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/risks', {method:'POST', headers:{'Content-Type':'application/json'},
+                                    body: JSON.stringify(payload)});
+    const d = await r.json();
+    if (!d.ok) return alert('risk add failed: ' + (d.err || 'unknown'));
+    ['risk_title','risk_owner','risk_likelihood','risk_impact','risk_desc'].forEach(id => $(id).value = '');
+    loadRisks();
+  } catch (e) { alert('risk add error: ' + e); }
+  finally { btn.disabled = false; }
+}
+$('risk_add').addEventListener('click', addRisk);
+
+async function loadHeatmap() {
+  try {
+    const r = await fetch('/heatmap'); const d = await r.json();
+    const heat = d.heatmap || [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]];
+    let html = '<table class="heatmap"><thead><tr><th>Impact \\ Likelihood</th>';
+    for (let l = 1; l <= 5; l++) html += `<th>${l}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let impact = 5; impact >= 1; impact--) {
+      html += `<tr><th>${impact}</th>`;
+      for (let likelihood = 1; likelihood <= 5; likelihood++) {
+        const count = (heat[impact - 1] || [])[likelihood - 1] || 0;
+        const score = likelihood * impact;
+        const level = count === 0 ? 0 : (score >= 20 ? 4 : score >= 12 ? 3 : score >= 6 ? 2 : 1);
+        html += `<td class="heat-${level}">${count || '—'}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    $('heatmap_table').innerHTML = html;
+    $('attention_list').innerHTML = renderRiskCards(d.attention || []);
+  } catch (e) { $('heatmap_table').textContent = 'load failed: ' + e; }
+}
+
+async function loadReport() {
+  try {
+    await generateComplianceReport();
+  } catch (e) { $('report_brief').textContent = 'load failed: ' + e; }
+}
+
+function reportProfile(framework) {
+  const profiles = {
+    'nist-ai-rmf': {
+      title: 'NIST AI RMF Governance Report',
+      note: 'Uses NIST AI RMF 1.0 as the default AI governance frame and maps current risks to Govern, Map, Measure, and Manage.',
+      controls: ['Govern: policies, roles, accountability, risk appetite', 'Map: context, impacts, stakeholders, intended use', 'Measure: evaluation, monitoring, evidence, uncertainty', 'Manage: treatment, escalation, residual risk, review cadence'],
+      caution: 'This draft supports NIST AI RMF workflow documentation; it is not a certification or external attestation.'
+    },
+    'iso-42001': {
+      title: 'ISO/IEC 42001 AIMS Support Report',
+      note: 'Organizes evidence for AI management system planning, operation, review, and improvement.',
+      controls: ['Leadership and role clarity', 'AI risk and impact assessment', 'Operational planning and monitoring', 'Documented information and evidence', 'Management review and corrective action'],
+      caution: 'This draft helps prepare audit evidence for an AIMS; it does not certify ISO/IEC 42001 conformity.'
+    },
+    'eu-ai-act': {
+      title: 'EU AI Act Readiness Report',
+      note: 'Frames current risks around risk classification, human oversight, transparency, data governance, logging, and post-market monitoring.',
+      controls: ['Risk classification and intended purpose', 'Human oversight', 'Transparency and user information', 'Data governance and evidence', 'Logging, monitoring, and incident handling'],
+      caution: 'This draft supports readiness analysis only; legal classification and conformity assessment require qualified review.'
+    },
+    'nist-ir-8286': {
+      title: 'NIST IR 8286 Enterprise Risk Integration Report',
+      note: 'Shows how Line 1, Line 2, and Line 3 agent reports roll up into enterprise risk decisions.',
+      controls: ['Line 1 operational ownership', 'Line 2 risk management synthesis', 'Line 3 independent review', 'Risk appetite and escalation', 'Board-risk reporting'],
+      caution: 'This draft supports ERM alignment and board-risk preparation; it is not an assurance opinion.'
+    },
+    combined: {
+      title: 'Combined AI Governance Board Pack',
+      note: 'Combines NIST AI RMF, ISO/IEC 42001, EU AI Act readiness, and NIST IR 8286 enterprise risk framing.',
+      controls: ['Governance and accountability', 'Risk and impact assessment', 'Human oversight and approval', 'Evidence and logging', 'Incident, treatment, and review cadence'],
+      caution: 'This is a consolidated governance artifact for decision support; it does not certify compliance.'
+    }
+  };
+  return profiles[framework] || profiles.combined;
+}
+
+function reportTypeLabel(type) {
+  return {
+    executive: 'Executive brief',
+    controls: 'Controls evidence matrix',
+    assessment: 'Risk and impact assessment',
+    audit: 'Audit readiness note'
+  }[type] || 'Executive brief';
+}
+
+function classifyControl(profile, risk) {
+  const text = `${risk.framework || ''} ${(risk.control_mapping || []).join(' ')} ${risk.description || ''}`.toLowerCase();
+  if (text.includes('incident') || text.includes('monitor')) return profile.controls.find(x => /monitor|manage|operation|post-market|Line 1/i.test(x)) || profile.controls[0];
+  if (text.includes('impact') || text.includes('map') || text.includes('consent') || text.includes('data')) return profile.controls.find(x => /impact|map|data|classification|context/i.test(x)) || profile.controls[0];
+  if (text.includes('audit') || text.includes('line 3') || text.includes('evidence') || text.includes('documented')) return profile.controls.find(x => /evidence|audit|Line 3|documented|logging/i.test(x)) || profile.controls[0];
+  if (text.includes('govern') || text.includes('owner') || text.includes('approval')) return profile.controls.find(x => /govern|role|oversight|accountability|approval/i.test(x)) || profile.controls[0];
+  return profile.controls[0];
+}
+
+function riskLine(r) {
+  return `- ${r.id || 'RISK'}: ${r.title || 'Untitled'} [${(r.risk_tier || 'low').toUpperCase()}] L${r.likelihood || 0} x I${r.impact || 0}; owner: ${r.decision_owner || 'unassigned'}; approval: ${r.required_human_approval || 'not specified'}.`;
+}
+
+function evidenceText(r) {
+  const ev = Array.isArray(r.evidence_sources) ? r.evidence_sources : [];
+  return ev.length ? ev.join('; ') : 'Evidence source not attached yet';
+}
+
+async function generateComplianceReport() {
+  const [riskResp, ecoResp] = await Promise.all([fetch('/risks'), fetch('/ecosystem')]);
+  const riskData = await riskResp.json();
+  const ecoData = await ecoResp.json();
+  const risks = riskData.risks || [];
+  const dash = riskData.dashboard || {};
+  const reports = ecoData.reports || [];
+  const framework = $('report_framework').value;
+  const type = $('report_type').value;
+  const profile = reportProfile(framework);
+  const scope = $('report_scope').value.trim() || 'AI system portfolio';
+  const audience = $('report_audience').value.trim() || 'governance leadership';
+  const owner = $('report_owner').value.trim() || 'decision owner';
+  const period = $('report_period').value.trim() || 'current period';
+  const tiers = dash.by_tier || {};
+  const top = [...risks].sort((a, b) => (b.priority || 0) - (a.priority || 0)).slice(0, 6);
+  const attention = dash.attention || [];
+  const open = dash.open || risks.filter(r => (r.status || 'open') !== 'closed').length;
+  const reportLines = reports.slice(0, 6).map(r => `- Line ${r.line} ${r.agent}: ${r.summary} (${r.source}; maps to ${r.mapped_risk})`);
+  const controlRows = top.map(r => ({
+    control: classifyControl(profile, r),
+    risk: `${r.id || ''}: ${r.title || ''}`,
+    evidence: evidenceText(r),
+    gap: attention.find(x => x.id === r.id) ? 'Needs owner, evidence, treatment, review date, or escalation completion' : 'Evidence present for draft review',
+    owner: r.decision_owner || 'unassigned',
+  }));
+  const decisions = top.filter(r => ['critical', 'high'].includes((r.risk_tier || '').toLowerCase()) || r.required_human_approval).map(riskLine);
+  const sections = [
+    `# ${profile.title}`,
+    `Report type: ${reportTypeLabel(type)}`,
+    `Scope: ${scope}`,
+    `Audience: ${audience}`,
+    `Owner: ${owner}`,
+    `Period: ${period}`,
+    '',
+    '## Executive Summary',
+    `${profile.note} Current portfolio posture shows ${open} open risks: ${tiers.critical || 0} critical, ${tiers.high || 0} high, ${tiers.medium || 0} medium, and ${tiers.low || 0} low. ${attention.length} item(s) need attention before this pack should be treated as board-ready.`,
+    '',
+    '## Governance Language',
+    profile.caution,
+    '',
+    '## Decisions Needed',
+    decisions.length ? decisions.join('\\n') : '- No high-priority decision items identified in the structured risk register.',
+    '',
+    '## Top Risk Register Items',
+    top.length ? top.map(riskLine).join('\\n') : '- No structured risks captured yet.',
+    '',
+    '## Assurance Inputs',
+    reportLines.length ? reportLines.join('\\n') : '- No autonomous agent reports available.',
+    '',
+    '## Framework Focus Areas',
+    profile.controls.map(x => `- ${x}`).join('\\n'),
+    '',
+    '## Evidence Gaps and Next Steps',
+    attention.length ? attention.slice(0, 8).map(r => `- ${r.id}: ${r.title || 'Untitled risk'} needs completion before final approval.`).join('\\n') : '- No immediate evidence gaps flagged by the dashboard.',
+  ];
+  if (type === 'controls') {
+    sections.splice(8, 0, '## Controls Evidence Summary', controlRows.map(x => `- ${x.control}: ${x.risk}; evidence: ${x.evidence}; gap: ${x.gap}`).join('\\n'));
+  } else if (type === 'assessment') {
+    sections.splice(8, 0, '## Risk and Impact Assessment', top.map(r => `- ${r.title}: likelihood ${r.likelihood || 0}, impact ${r.impact || 0}, residual risk: ${r.residual_risk || 'not documented'}, treatment: ${r.treatment || 'not documented'}.`).join('\\n'));
+  } else if (type === 'audit') {
+    sections.splice(8, 0, '## Audit Readiness', `Evidence readiness is strongest where risk entries include owner, approval path, evidence sources, treatment, and next review date. ${attention.length} item(s) should be remediated before an external audit or board assurance review.`);
+  }
+  const markdown = sections.join('\\n');
+  $('report_brief').textContent = markdown;
+  $('report_brief').dataset.markdown = markdown;
+  $('report_matrix').innerHTML = `
+    <table class="report-matrix">
+      <thead><tr><th>Framework focus</th><th>Mapped risk</th><th>Evidence</th><th>Gap / action</th><th>Owner</th></tr></thead>
+      <tbody>
+        ${controlRows.map(x => `<tr><td>${escapeHtml(x.control)}</td><td>${escapeHtml(x.risk)}</td><td>${escapeHtml(x.evidence)}</td><td>${escapeHtml(x.gap)}</td><td>${escapeHtml(x.owner)}</td></tr>`).join('') || '<tr><td colspan="5">No risk evidence available.</td></tr>'}
+      </tbody>
+    </table>`;
+  $('report_status').textContent = `Generated ${reportTypeLabel(type)} for ${profile.title}.`;
+}
+
+['report_framework','report_type'].forEach(id => $(id).addEventListener('change', generateComplianceReport));
+['report_scope','report_audience','report_owner','report_period'].forEach(id => $(id).addEventListener('input', () => {
+  clearTimeout(window._reportTimer);
+  window._reportTimer = setTimeout(generateComplianceReport, 350);
+}));
+$('report_generate').addEventListener('click', generateComplianceReport);
+$('report_copy').addEventListener('click', async () => {
+  const text = $('report_brief').dataset.markdown || $('report_brief').textContent || '';
+  try {
+    await navigator.clipboard.writeText(text);
+    $('report_status').textContent = 'Copied report markdown to clipboard.';
+  } catch (e) {
+    $('report_status').textContent = 'Clipboard unavailable; select the draft text manually.';
+  }
 });
 
 // ============ Channels page ============
@@ -1195,7 +2259,7 @@ setInterval(fetchMessages, 1500);
 """
 
 
-class _ReusableServer(socketserver.TCPServer):
+class _ReusableServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
     daemon_threads = True
 

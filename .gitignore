@@ -8,7 +8,9 @@ __pycache__/
 *.orig
 
 # Local agent state — never commit these (per-deployment / personal)
+.env.local
 memory/history.metta.snapshot-*
+memory/risks.jsonl
 chroma_db/
 chroma_db.snapshot-*
 

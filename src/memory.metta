@@ -16,11 +16,13 @@
               (py-call (lib_llm_ext.initLocalEmbedding)) _)))
 
 (= (getPrompt)
-   (read-file (library OmegaClaw-Core ./memory/prompt.txt)))
+   (read-file (py-call (risk_register.prompt_file))))
 
 (= (getHistory)
-   (let $ret (read-file (library OmegaClaw-Core ./memory/history.metta))
-        (last_chars $ret (maxHistory))))
+   (let* (($ret (read-file (library OmegaClaw-Core ./memory/history.metta)))
+          ($snapshot (py-call (risk_register.context_snapshot)))
+          ($tail (last_chars $ret (maxHistory))))
+         (py-str ("CONTEXT_SNAPSHOT: " $snapshot " RECENT_HISTORY: " $tail))))
 
 (= (addToHistory $lastmessage $response $sexpr $msgnew)
    (if $msgnew
