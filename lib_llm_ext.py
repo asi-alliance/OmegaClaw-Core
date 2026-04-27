@@ -20,16 +20,20 @@ def _clean(text):
     return text.replace("_quote_", '"').replace("_apostrophe_", "'")
 
 def _chat(client, model, content, max_tokens=6000):
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": content}],
-        max_tokens=max_tokens,
-        extra_body={
-            "enable_thinking": True,
-            "thinking_budget": 6000 
-        }
-    )
-    return _clean(resp.choices[0].message.content)
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": content}],
+            max_tokens=max_tokens,
+            extra_body={
+                "enable_thinking": True,
+                "thinking_budget": 6000 
+            }
+        )
+        return _clean(resp.choices[0].message.content)
+    except Exception as e:
+        print(f"[lib_llm_ext._chat] Exception while communicating with LLM: {e}")
+        return ""
 
 def useMiniMax(content):
     return _chat(

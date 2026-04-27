@@ -1,6 +1,6 @@
 profile_name: telegram_mode_v1
 description: >
-  Telegram-only MeTTaClaw profile. Callable capabilities are restricted to
+  Telegram-only OmegaClaw profile. Callable capabilities are restricted to
   Telegram reply generation and safe search lookup. Learning is allowed only
   through an internal gated store and may not expand external powers.
 

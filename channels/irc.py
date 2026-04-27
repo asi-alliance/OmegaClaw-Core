@@ -2,6 +2,8 @@ import os
 import random
 import socket
 import threading
+import time
+import textwrap
 
 _running = False
 _sock = None
@@ -18,6 +20,7 @@ def _send(cmd):
     with _sock_lock:
         if _sock:
             _sock.sendall((cmd + "\r\n").encode())
+    time.sleep(1)
 
 def _set_last(msg):
     global _last_message
@@ -154,5 +157,14 @@ def stop_irc():
     _running = False
 
 def send_message(text):
-    if _connected:
-        _send(f"PRIVMSG {_channel} :{text}")
+    max_len = 400
+    segments = text.replace("\r", "").split("\\n")
+    lines = []
+    for segment in segments:
+        lines.extend(textwrap.wrap(segment, width=max_len, break_long_words=True, break_on_hyphens=False))
+    for chunk in lines:
+        try:
+            if _connected and _channel:
+                 _send(f"PRIVMSG {_channel} :{chunk}")
+        except Exception as e:
+            print(f"[IRC] error in send_message on channel {_channel}: {e}")

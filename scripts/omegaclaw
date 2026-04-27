@@ -122,36 +122,45 @@ python3 "$tmp_py_file" "$tmp_config_file" </dev/tty
 . "$tmp_config_file"
 
 cat <<EOF
-============================================
- QuakeNet / OmegaClaw Instructions
-============================================
-Please go to https://webchat.quakenet.org/
-and enter your name and channel.
 
-Authentication step (required):
-  In your channel, send this one-time secret exactly once:
-  auth ${OMEGACLAW_AUTH_SECRET}
-  The first nickname that sends it becomes the only accepted user.
-  Messages from all other users will be silently ignored.
+============================================
+ HOW TO START AND STOP OMEGACLAW IRC
+============================================
 
 Stop OmegaClaw:
   docker stop omegaclaw
 
 Restart OmegaClaw:
-  docker start omegaclaw
+  --> Simply rerun this script
 
 Examine log file in case of problem:
   docker logs -f omegaclaw
+
+============================================
+ HOW TO INTERACT WITH OMEGACLAW IRC
+============================================
+
+Please go to https://webchat.quakenet.org/ or any IRC client. 
+Then, enter a unique username and this channel:
+  $IRC_channel
+
+Authentication step (required):
+  Once in the $IRC_channel channel, send this one-time secret exactly once:
+  auth ${OMEGACLAW_AUTH_SECRET}
+  The first nickname that sends it becomes the only accepted user.
+  Messages from all other users will be silently ignored.
 
 EOF
 
 docker rm -f omegaclaw 2>/dev/null || true
 
 docker run -d -it \
+  --pull always \
   --name omegaclaw \
   --user 65534:65534 \
   --security-opt no-new-privileges:true \
   --init \
+  --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory \
   --tmpfs /tmp:size=64m,mode=1777 \
   --tmpfs /run:size=16m,mode=755 \
   --tmpfs /var/tmp:size=64m,mode=1777 \
