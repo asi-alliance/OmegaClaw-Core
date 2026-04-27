@@ -21,11 +21,21 @@ on:
         required: false
         default: false
         type: boolean
+      no_build_cache:
+        description: 'Do not use cached docker layers on image build'
+        required: false
+        default: false
+        type: boolean
       platforms:
         description: 'Comma separated list of platforms to be built'
         required: false
         default: 'linux/amd64,linux/arm64'
         type: string
+      run_tests:
+        description: 'Run tests'
+        required: false
+        default: false
+        type: boolean
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -50,21 +60,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push and move latest
-        if: ${{ inputs.move_latest }}
+      - name: Build image (no push)
         uses: docker/build-push-action@v7
         with:
           platforms: ${{ inputs.platforms }}
-          push: ${{ inputs.publish_docker }}
-          tags: |
-            singularitynet/omegaclaw:${{ inputs.tag_name }}
-            singularitynet/omegaclaw:latest
+          load: ${{ inputs.run_tests }}
+          push: false
+          tags: singularitynet/omegaclaw:${{ inputs.tag_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          no-cache: ${{ inputs.no_build_cache }}
 
-      - name: Build and push
-        if: ${{ !inputs.move_latest }}
+      - name: Run auto tests
+        if: inputs.run_tests
+        run: echo "No autotests yet"
+
+      - name: Build and push (release)
+        if: success() && inputs.publish_docker
         uses: docker/build-push-action@v7
         with:
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |
             singularitynet/omegaclaw:${{ inputs.tag_name }}
+            ${{ inputs.move_latest && 'singularitynet/omegaclaw:latest' || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
