@@ -44,7 +44,6 @@ def around_time(needle_time_str, k):
 
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
-    s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
     special_two_arg_cmds = {"write-file", "append-file"}
     for line in s.splitlines():

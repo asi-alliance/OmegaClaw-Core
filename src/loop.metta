@@ -69,11 +69,9 @@
                                      (change-state! &loops (maxNewInputLoops)) _)))
                             (if (> (get-state &loops) 0)
                                 (let* (
-                                   ;     ($knowledge (getKnowledge (string-safe $msg)))
                                        ($lastmessage (if $msgnew (HUMAN-MSG: $msg) (if (spamShield) " DO NOT RE-SEND OR SPAM!" "")))
                                        ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
                                        ($_ (println! $lastmessage))
-                                   ;     ($send (py-str ($prompt " KNOWLEDGE_CONTEXT: " $knowledge " " $lastmessage)))
                                        ($send (py-str ($prompt $lastmessage)))
                                        ($_ (println! (CHARS_SENT: (string_length $send) $send)))
                                        ($respi (if (== (provider) OpenAI)

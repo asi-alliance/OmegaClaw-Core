@@ -189,11 +189,13 @@ def init_knowledge():
         knowledge_dir = _resolve_knowledge_dir()
 
         if not os.path.isdir(knowledge_dir):
-            return f"Knowledge dir not found: {knowledge_dir}"
+            logger.warning(f"Knowledge directory not found at {knowledge_dir}. Skipping indexing.")
+            return "Knowledge: Directory missing (skipping)"
 
         md_files = sorted(glob.glob(os.path.join(knowledge_dir, "*.md")))
         if not md_files:
-            return "No .md files found in knowledge-priors/"
+            logger.info("No knowledge prior files (.md) found. Nothing to index.")
+            return "Knowledge: 0 files found"
 
         unchanged = 0
         reindexed = 0
@@ -204,7 +206,7 @@ def init_knowledge():
             stored_hash = _get_stored_hash(collection, filename)
 
             if stored_hash == current_hash:
-                print(f"  {filename}: unchanged (skipped)")
+                logger.info(f"  {filename}: unchanged (skipped)")
                 unchanged += 1
                 continue
 
@@ -225,7 +227,7 @@ def init_knowledge():
             texts = [c["text"] for c in chunks]
             embeddings = _embed_batch(texts)
             if not embeddings:
-                print(f"  {filename}: embedding failed, skipping")
+                logger.warning(f"  {filename}: embedding failed, skipping")
                 continue
 
             if _embedding_dim is None:
@@ -251,15 +253,14 @@ def init_knowledge():
 
             # Store hash sentinel
             _store_hash(collection, filename, current_hash, _embedding_dim)
-
-            print(f"  {filename}: indexed {len(chunks)} chunks")
+            logger.info(f"  {filename}: indexed {len(chunks)} chunks")
             reindexed += 1
 
         total = unchanged + reindexed
         return f"Knowledge: {total} files ({unchanged} unchanged, {reindexed} re-indexed)"
 
     except Exception as e:
-        traceback.print_exc()
+        logger.exception(f"Knowledge init failed: {e}")
         return f"Knowledge init failed: {e}"
 
 
