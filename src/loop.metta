@@ -23,10 +23,6 @@
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))))
 
-(= (initKnowledge)
-   (progn (println! "Initializing knowledge base")
-          (println! (py-call (rag.init_knowledge)))))
-
 (= (getContext)
    (let* (($prompt (getPrompt))
           ($skills (getSkills))
@@ -47,10 +43,6 @@
                                           (change-state! &error $new)))
                  ($else $sexpr))))
 
-(= (metta $str)
-   (let $code (sread $str)
-        (repr (swrite (eval $code)))))
-
 (= (omegaclaw)
    (omegaclaw 1))
 (= (omegaclaw $k)
@@ -68,8 +60,7 @@
                              ($_ (if (and (> $k 1) $msgnew)
                                      (change-state! &loops (maxNewInputLoops)) _)))
                             (if (> (get-state &loops) 0)
-                                (let* (
-                                       ($lastmessage (if $msgnew (HUMAN-MSG: $msg) (if (spamShield) " DO NOT RE-SEND OR SPAM!" "")))
+                                (let* (($lastmessage (if $msgnew (HUMAN-MSG: $msg) (if (spamShield) " DO NOT RE-SEND OR SPAM!" "")))
                                        ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
                                        ($_ (println! $lastmessage))
                                        ($send (py-str ($prompt $lastmessage)))

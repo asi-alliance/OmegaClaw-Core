@@ -56,5 +56,9 @@
 
 !(import_prolog_functions_from_file (library OmegaClaw-Core ./src/skills.pl) (shell first_char))
 
+(= (metta $str)
+   (let $code (sread $str)
+        (repr (swrite (eval $code)))))
+
 (= (pin $x)
    PIN-SUCCESS)

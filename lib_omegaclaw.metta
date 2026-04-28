@@ -16,7 +16,6 @@
 !(import! &self (library OmegaClaw-Core ./src/config_helper.py))
 !(import! &self (library OmegaClaw-Core ./src/skills))
 !(import! &self (library OmegaClaw-Core ./src/memory))
-!(import! &self (library OmegaClaw-Core ./src/rag.py))
 !(import! &self (library OmegaClaw-Core ./src/loop))
 !(git-import! "https://github.com/patham9/petta_lib_chromadb.git")
 !(import! &self (library petta_lib_chromadb lib_chromadb))
