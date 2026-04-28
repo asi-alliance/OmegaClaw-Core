@@ -8,7 +8,7 @@ on:
     inputs:
       publish_docker:
         description: 'Publish Docker images to Docker Hub'
-        required: true
+        required: false
         default: false
         type: boolean
       tag_name:
@@ -16,6 +16,11 @@ on:
         required: false
         default: 'latest'
         type: string
+      move_latest:
+        description: 'Move latest version to the new one'
+        required: false
+        default: false
+        type: boolean
       platforms:
         description: 'Comma separated list of platforms to be built'
         required: false
@@ -45,7 +50,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push
+      - name: Build and push and move latest
+        if: ${{ inputs.move_latest }}
         uses: docker/build-push-action@v7
         with:
           platforms: ${{ inputs.platforms }}
@@ -53,3 +59,12 @@ jobs:
           tags: |
             singularitynet/omegaclaw:${{ inputs.tag_name }}
             singularitynet/omegaclaw:latest
+
+      - name: Build and push
+        if: ${{ !inputs.move_latest }}
+        uses: docker/build-push-action@v7
+        with:
+          platforms: ${{ inputs.platforms }}
+          push: ${{ inputs.publish_docker }}
+          tags: |
+            singularitynet/omegaclaw:${{ inputs.tag_name }}

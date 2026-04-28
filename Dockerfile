@@ -101,15 +101,18 @@ COPY --from=builder /PeTTa /PeTTa
 COPY --from=builder /opt/huggingface /opt/huggingface
 COPY --from=builder /opt/sentence_transformers /opt/sentence_transformers
 
-# Bring in only local OmegaClaw source (filtered by .dockerignore).
-COPY . /PeTTa/repos/OmegaClaw-Core
+ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
+ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
 
-RUN cp /PeTTa/repos/OmegaClaw-Core/run.metta /PeTTa/run.metta \
- && mkdir ./chroma_db \
- && chown -R 65534:65534 ./chroma_db \
- && chown -R 65534:65534 /PeTTa/repos/OmegaClaw-Core/memory \
- && find /PeTTa/repos/OmegaClaw-Core/memory -type f -exec chmod 0644 {} \; \
- && chmod 0444 /PeTTa/repos/OmegaClaw-Core/memory/prompt.txt \
+# Bring in only local OmegaClaw source (filtered by .dockerignore).
+COPY . ${OMEGACLAW_DIR}
+
+RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
+ && mkdir ${MEMORY_DIR}/chroma_db \
+ && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
+ && chown -R 65534:65534 ${MEMORY_DIR} \
+ && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
+ && chmod 0444 ${MEMORY_DIR}/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
 USER 65534:65534
