@@ -56,6 +56,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     --index-url https://download.pytorch.org/whl/cpu \
     torch \
  && python3 -m pip install --no-cache-dir --break-system-packages \
+    aiogram \
     chromadb \
     janus-swi \
     openai \
@@ -103,14 +104,16 @@ COPY --from=builder /opt/sentence_transformers /opt/sentence_transformers
 
 ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
 ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
+ENV LOG_DIR=${OMEGACLAW_DIR}/logs
 
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
 COPY . ${OMEGACLAW_DIR}
 
 RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
+ && mkdir -p ${LOG_DIR} \
  && mkdir ${MEMORY_DIR}/chroma_db \
  && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
- && chown -R 65534:65534 ${MEMORY_DIR} \
+ && chown -R 65534:65534 ${MEMORY_DIR} ${LOG_DIR} \
  && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
