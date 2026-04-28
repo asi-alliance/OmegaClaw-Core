@@ -1,6 +1,7 @@
 """Shared test infrastructure for OmegaClaw smoke tests."""
 import atexit
 import inspect
+import os
 import re
 import socket
 import subprocess
@@ -9,15 +10,22 @@ import time
 
 import pytest
 
-CHANNEL = "#metaclaw777"
-CONTAINER = "omegaclaw"
+CHANNEL = os.environ.get("OMEGACLAW_IRC_CHANNEL") or "#metaclaw777"
+CONTAINER = os.environ.get("OMEGACLAW_CONTAINER") or "omegaclaw"
 IRC_SERVER = "irc.quakenet.org"
 IRC_PORT = 6667
 WAIT = 120
 POLL = 3
 
-HISTORY_FILE = "/PeTTa/repos/omegaclaw/memory/history.metta"
+HISTORY_FILE = "/PeTTa/repos/OmegaClaw-Core/memory/history.metta"
 CHROMA_SQLITE = "/PeTTa/chroma_db/chroma.sqlite3"
+
+GIT_TOKEN_ENV = "OMEGACLAW_GIT_TOKEN"
+GIT_REMOTE_ENV = "OMEGACLAW_GIT_REMOTE"
+GIT_DEFAULT_REMOTE = "https://github.com/OmegaSing/Test-Repopo"
+GIT_AUTHOR_NAME = "OmegaClaw Test"
+GIT_AUTHOR_EMAIL = "test@omegaclaw.local"
+GIT_CREDENTIALS_PATH = "/etc/git-credentials"
 
 
 def dexec(*args):
@@ -469,13 +477,24 @@ def make_prompt(run_id, task):
 
 
 class Checker:
+    # Grade: 1 = solved on first try, 2 = after clarifying prompt, 0 = failed.
+    GRADE_FIRST_TRY = 1
+    GRADE_AFTER_CLARIFY = 2
+    GRADE_FAIL = 0
+
     def __init__(self, name, cleanup_dirs=None):
         self.name = name
         self.total = 0
         self.passed = 0
         self.run_id = int(time.time())
+        self.grade = None
         self._cleanup_dirs = cleanup_dirs or []
         self._cleanup_markers = [_prompt_tag(self.run_id), str(self.run_id)]
+
+    def set_grade(self, level):
+        self.grade = level
+        label = {1: "FIRST TRY", 2: "AFTER CLARIFY", 0: "FAIL"}.get(level, str(level))
+        print(f"       [GRADE] level={level} ({label})", flush=True)
 
     def add_cleanup_marker(self, marker):
         """Register an extra string to match in chromadb docs / history records
@@ -494,16 +513,29 @@ class Checker:
         return self
 
     def __exit__(self, _exc_type, _exc_val, _exc_tb):
+        # Agent runs a continuous loop; ask it to drop pinned tasks before
+        # we wipe the filesystem, otherwise it recreates files mid-teardown.
+        if self._cleanup_dirs:
+            self.step("teardown: cancel agent's pending work")
+            send_prompt(make_prompt(
+                self.run_id,
+                f"All tasks for run-id {self.run_id} are CANCELLED. Stop "
+                f"writing to {', '.join(self._cleanup_dirs)}. "
+                f"Acknowledge with one short send and then idle.",
+            ))
+            time.sleep(15)
+
         self.step("teardown: cleanup test artifacts")
         for path in self._cleanup_dirs:
             cleanup_dir(path)
+            time.sleep(3)
+            cleanup_dir(path)
             if dexec("test", "-e", path).returncode == 0:
-                print(f"       [WARN] {path} still exists after teardown", flush=True)
+                print(f"       [WARN] {path} still exists", flush=True)
             else:
                 print(f"       removed {path}", flush=True)
         h_removed = history_cleanup_by_markers(self._cleanup_markers)
-        print(f"       history: {h_removed} blocks removed "
-              f"(markers={self._cleanup_markers})", flush=True)
+        print(f"       history: {h_removed} blocks removed", flush=True)
         c_removed = chromadb_cleanup_by_markers(self._cleanup_markers)
         print(f"       chromadb: {c_removed} vectors removed", flush=True)
         return False
@@ -527,9 +559,86 @@ class Checker:
         print(f"[ OK ] {name}{extra}", flush=True)
 
     def fail(self, name, detail):
+        # If a graded step succeeded earlier but a later step fails the
+        # test, the grade is no longer meaningful — collapse it to FAIL so
+        # the printed result matches the test outcome.
+        if self.grade is not None and self.grade != self.GRADE_FAIL:
+            self.grade = self.GRADE_FAIL
+        grade_str = f" [grade={self.grade}]" if self.grade is not None else ""
         print(f"[FAIL] {name} -- {detail}", flush=True)
-        print(f"\n[FAIL] {self.passed}/{self.total} checks passed\n", flush=True)
+        print(f"\n[FAIL] {self.passed}/{self.total} checks passed{grade_str}\n", flush=True)
         pytest.fail(f"{name}: {detail}", pytrace=False)
 
     def done(self):
-        print(f"\n[PASS] {self.passed}/{self.total} checks passed\n", flush=True)
+        grade_str = f" [grade={self.grade}]" if self.grade is not None else ""
+        print(f"\n[PASS] {self.passed}/{self.total} checks passed{grade_str}\n", flush=True)
+
+
+def get_git_token():
+    return os.environ.get(GIT_TOKEN_ENV)
+
+
+def get_git_remote():
+    return os.environ.get(GIT_REMOTE_ENV) or GIT_DEFAULT_REMOTE
+
+
+def setup_git_in_container(token):
+    """Install HTTPS credential helper and author identity inside the
+    container so the agent can `git push` without seeing the token."""
+    creds_line = f"https://x-access-token:{token}@github.com\n"
+    py = (
+        "import os\n"
+        f"with open({GIT_CREDENTIALS_PATH!r}, 'w') as f: f.write({creds_line!r})\n"
+        f"os.chmod({GIT_CREDENTIALS_PATH!r}, 0o644)\n"
+    )
+    res = dexec_root("python3", "-c", py)
+    if res.returncode != 0:
+        return False, f"writing creds failed: {res.stderr!r}"
+
+    for args in (
+        ["git", "config", "--system", "credential.helper",
+         f"store --file={GIT_CREDENTIALS_PATH}"],
+        ["git", "config", "--system", "user.email", GIT_AUTHOR_EMAIL],
+        ["git", "config", "--system", "user.name", GIT_AUTHOR_NAME],
+        ["git", "config", "--system", "init.defaultBranch", "main"],
+        ["git", "config", "--system", "safe.directory", "*"],
+    ):
+        res = dexec_root(*args)
+        if res.returncode != 0:
+            return False, f"{args!r} failed: {res.stderr!r}"
+    return True, "ok"
+
+
+def teardown_git_in_container():
+    dexec_root("rm", "-f", GIT_CREDENTIALS_PATH)
+    for key in ("credential.helper", "user.email", "user.name",
+                "init.defaultBranch", "safe.directory"):
+        dexec_root("git", "config", "--system", "--unset-all", key)
+
+
+def try_with_clarification(c, ready_check, clarification_prompt,
+                           timeout_first=120, timeout_second=240):
+    """Poll ready_check; on first-attempt timeout, send clarification and
+    retry. Returns (grade, value) — grade 1/2 on success, 0 on final fail."""
+    deadline = time.time() + timeout_first
+    while time.time() < deadline:
+        result = ready_check()
+        if result is not None:
+            return Checker.GRADE_FIRST_TRY, result
+        time.sleep(POLL)
+
+    print(f"\n>> first attempt timed out after {timeout_first}s — sending clarification",
+          flush=True)
+    follow = make_prompt(c.run_id, clarification_prompt)
+    if not send_prompt(follow):
+        print("       [WARN] could not deliver clarification IRC message", flush=True)
+        return Checker.GRADE_FAIL, None
+
+    deadline = time.time() + timeout_second
+    while time.time() < deadline:
+        result = ready_check()
+        if result is not None:
+            return Checker.GRADE_AFTER_CLARIFY, result
+        time.sleep(POLL)
+
+    return Checker.GRADE_FAIL, None
