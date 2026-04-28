@@ -13,7 +13,7 @@
 !(import! &self (library OmegaClaw-Core ./channels/tg_channel.py))
 !(import! &self (library OmegaClaw-Core ./src/utils))
 !(import! &self (library OmegaClaw-Core ./src/channels))
-!(import! &self (library OmegaClaw-Core ./src/config_helper.py))
+!(import! &self (library OmegaClaw-Core ./src/tg_config_helper.py))
 !(import! &self (library OmegaClaw-Core ./src/skills))
 !(import! &self (library OmegaClaw-Core ./src/memory))
 !(import! &self (library OmegaClaw-Core ./src/loop))

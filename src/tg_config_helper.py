@@ -29,22 +29,6 @@ def _load_config():
         
     return _config_cache
 
-def is_tool_disabled(tool_name):
-    """Checks if a specified tool is disabled in the configuration."""
-    config = _load_config()
-    return config.get("disabled_tools", {}).get(tool_name, False)
-
-def get_blocked_ethics_categories():
-    """Retrieves the list of blocked ethics categories."""
-    config = _load_config()
-    categories = config.get("ethics_pass", {}).get("blocked_categories", [])
-    return categories
-
-def get_forbidden_memory_categories():
-    """Retrieves the list of forbidden categories for memory storage."""
-    config = _load_config()
-    return config.get("internal_learning", {}).get("durable_memory", {}).get("categories_forbidden", [])
-
 async def use_model(text, categories):
     """Uses an LLM to classify if text violates the provided categories."""
     config = _load_config()

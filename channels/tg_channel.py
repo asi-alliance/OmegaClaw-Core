@@ -7,7 +7,7 @@ import os
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from src.config_helper import is_category_blocked, get_spam_protection_config
+from src.tg_config_helper import is_category_blocked, get_spam_protection_config
 
 
 log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
