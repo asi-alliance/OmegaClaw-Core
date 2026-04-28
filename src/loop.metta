@@ -9,8 +9,7 @@
 (= (spamShield) (empty))
 
 (= (initLoop)
-   (progn (println! "=== OmegaClaw Configuration ===")
-          (configure maxNewInputLoops 50)
+   (progn (configure maxNewInputLoops 50) ;20
           (configure maxWakeLoops 1)
           (configure spamShield True)
           (configure sleepInterval 1) ;10
