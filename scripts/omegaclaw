@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
-########################################################
-#  Required parameter is Docker image 
-#  Invoke this script:  "./omegaclaw_setup.sh <image>  
-#######################################################
-image="${1:?usage: $0 <container-image>}"
+bootstrap() {
 
 # Create temporary files
 tmp_config_file="$(mktemp)"
@@ -152,21 +147,110 @@ Authentication step (required):
 
 EOF
 
-docker rm -f omegaclaw 2>/dev/null || true
+start
 
-docker run -d -it \
-  --pull always \
-  --name omegaclaw \
-  --user 65534:65534 \
-  --security-opt no-new-privileges:true \
-  --init \
-  --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory \
-  --tmpfs /tmp:size=64m,mode=1777 \
-  --tmpfs /run:size=16m,mode=755 \
-  --tmpfs /var/tmp:size=64m,mode=1777 \
-  -e ${api_token_var}="${api_token}" \
-  -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET" \
-  "$image" \
-  IRC_channel="$IRC_channel" \
-  provider="$provider" \
-  embeddingprovider="$embeddingprovider"
+}
+
+help() {
+    echo -e "Usage: ${0} [<image tag> | command] [options]"
+    echo
+    echo -e "If used with <image tag> instead of command then boostrap Docker container"
+    echo -e "in interactive mode."
+    echo
+    echo -e "Commands:"
+    echo -e "\tstart start new docker container"
+    echo -e "\tstop stop docker container"
+    echo -e "\tclean remove container and clean up memory"
+    echo
+    echo -e "Options:"
+    echo -e "\t-s <auth secret> set secret for the communication channel (default is 0000)"
+    echo -e "\t-p <provider> set LLM API provider (default is ASICloud)."
+    echo -e "\t              Pass API token via environment variable."
+    echo -e "\t-c <IRC channel> set IRC channel"
+    echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
+}
+
+options() {
+    OMEGACLAW_AUTH_SECRET=0000
+    provider=ASICloud
+    image=singularitynet/omegaclaw:latest
+    command=${1}
+    shift 1
+
+    while getopts s:t:p:c:d: flag
+    do
+        case "${flag}" in
+            s) OMEGACLAW_AUTH_SECRET=${OPTARG};;
+            p) provider=${OPTARG};;
+            c) IRC_channel=${OPTARG};;
+            d) image=${OPTARG};;
+            *) help
+               return 1
+               ;;
+        esac
+    done
+
+    case "${provider}" in
+        Anthropic)
+            embeddingprovider="Local"
+            api_token_var="ANTHROPIC_API_KEY"
+            ;;
+        ASICloud)
+            embeddingprovider="Local"
+            api_token_var="ASI_API_KEY"
+            ;;
+        OpenAI)
+            embeddingprovider="OpenAI"
+            api_token_var="OPENAI_API_KEY"
+            ;;
+        *) help
+           return 1
+           ;;
+    esac
+    if [[ -v ${api_token_var} ]]; then
+        api_token="${!api_token_var}"
+    fi
+}
+
+start() {
+    docker rm -f omegaclaw 2>/dev/null || true
+
+    docker run -d -it \
+        --pull always \
+        --name omegaclaw \
+        --user 65534:65534 \
+        --security-opt no-new-privileges:true \
+        --init \
+        --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory \
+        --tmpfs /tmp:size=64m,mode=1777 \
+        --tmpfs /run:size=16m,mode=755 \
+        --tmpfs /var/tmp:size=64m,mode=1777 \
+        -e "${api_token_var}"="${api_token}" \
+        -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET" \
+        "$image" \
+        IRC_channel="$IRC_channel" \
+        provider="$provider" \
+        embeddingprovider="$embeddingprovider"
+}
+
+stop() {
+    docker stop omegaclaw
+}
+
+clean() {
+    docker rm -f omegaclaw
+    docker volume rm omegaclaw-memory
+}
+
+set -euo pipefail
+options "$@"
+case "${command}" in
+    start) start ;;
+    stop) stop ;;
+    clean) clean ;;
+    -h) help ;;
+    *) image="${command}"
+       bootstrap
+       ;;
+esac
+
