@@ -14,6 +14,10 @@
     "- Search the web: search string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
+    ;SUBAGENT DISPATCH:
+    "- Delegate a bounded sub-task to a specialist subagent and receive a digest: delegate goal"
+    "  Example: (delegate \"find recent papers on Non-Axiomatic Logic and summarize themes\")"
+    "  The subagent uses the persona config at memory/personas-subagent/<key>.json — by default the 'researcher' persona — to pick which model executes."
     ;CODE EXECUTION:
     "- Execute MeTTa expression: metta sexpression"
     "Example to invoke Non-Axiomatic Logic via MeTTa: "
@@ -62,3 +66,25 @@
 
 (= (pin $x)
    PIN-SUCCESS)
+
+;; ----------------------------------------------------------------------
+;; Subagent dispatch — see docs/reference-skills-subagent.md
+;; and docs/tutorial-09-subagents.md for the full design.
+;;
+;; The dispatch primitive runs a bounded child LLM loop against a
+;; configurable provider/model/endpoint (per the persona's JSON
+;; config) and returns a single-string digest. Self-contained Python
+;; module — no new dependencies beyond what lib_llm_ext already pulls in.
+;; ----------------------------------------------------------------------
+
+(= (delegate $goal $tools $persona $max_turns)
+   (py-call (subagent.dispatch $goal $tools $persona $max_turns)))
+
+(= (delegate $goal $tools $persona)
+   (py-call (subagent.dispatch $goal $tools $persona 8)))
+
+;; 1-arg form for OmegaClaw's single-arg-per-skill convention.
+;; Hardcodes "researcher" as the default persona; deployments provide
+;; their own persona config at memory/personas-subagent/researcher.json.
+(= (delegate $goal)
+   (py-call (subagent.dispatch $goal "" "researcher" 8)))
