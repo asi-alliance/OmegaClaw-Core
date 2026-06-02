@@ -11,5 +11,5 @@ on:
 
 jobs:
   sonar:
-    uses: asi-alliance/security-workflows-public/.github/workflows/sonar.yml@main
+    uses: asi-alliance/security-workflows-public/.github/workflows/sonar.yml@master
     secrets: inherit
