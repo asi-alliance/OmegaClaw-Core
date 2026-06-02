@@ -11,10 +11,5 @@ on:
 
 jobs:
   sonar:
-    uses: singnet/security-workflows/.github/workflows/sonar.yml@master
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      OPENSEARCH_URL: ${{ secrets.OPENSEARCH_URL }}
-      OPENSEARCH_USER: ${{ secrets.OPENSEARCH_USER }}
-      OPENSEARCH_PASS: ${{ secrets.OPENSEARCH_PASS }}
+    uses: asi-alliance/security-workflows-public/.github/workflows/sonar.yml@main
+    secrets: inherit
