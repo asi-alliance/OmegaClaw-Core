@@ -26,7 +26,11 @@
     "You can also use PLN:"
     "metta (|~ ((Implication (Inheritance $1 (IntSet Feathered))"
     "           (Inheritance $1 Bird)) (stv 1.0 0.9))"
-    "          ((Inheritance Pingu (IntSet Feathered)) (stv 1.0 0.9)))"))
+    "          ((Inheritance Pingu (IntSet Feathered)) (stv 1.0 0.9)))"
+    ;DEFEASIBLE / DEONTIC REASONING:
+    "- Defeasible + deontic reasoning over a theory file (tagged conclusions): deontic-conclude path"
+    "- Conclusions under Standard Deontic Logic closure (O/P/F, F p = O not p): deontic-norms path"
+    "- Detect unresolved deontic dilemmas (O p and O not p both applicable): deontic-conflicts path"))
 
 
 (= (read-file $file)
