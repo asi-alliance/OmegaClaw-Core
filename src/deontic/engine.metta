@@ -19,21 +19,35 @@
           ($_2 (mm_load_into $path &plan)))
      (collapse (mm_ingest (match &plan $f $f) &theory &ground &herb &st))))
 
-; Grounding and reasoning use the fast indexed Prolog engines (mm_ground /
-; mm_reason); ground.metta and reason.metta remain as readable reference
-; implementations. mm_reason populates &st (defp/dft) for the MeTTa layer.
-(= (dl-ground!) (mm_ground &theory &ground &herb &st))
-(= (dl-reason-only!) (mm_reason &ground &theory &st))
+; Reasoning backend, switchable: prolog (fast indexed kernel, default) | native
+; (the atomspace-native MeTTa engine in ground.metta / reason.metta — identical
+; conclusions, ideal for propositional plans and inspection). Set per run with
+; (dl-engine! native) or $OMEGACLAW_DL_ENGINE=native. Native reasoning is at
+; parity, but native grounding runs ~4-5x the Prolog kernel on grounding-heavy
+; theories (per-operation MeTTa-eval overhead, not algorithmic — see the perf
+; note in ground.metta), so prolog stays the default.
+(= (dl-engine! $m) (mm_dl_engine_set $m))
+
+(= (dl-ground!)
+   (case (mm_dl_engine_get)
+     ((native (ground-sn!))
+      ($_     (mm_ground &theory &ground &herb &st)))))
+(= (dl-reason-only!)
+   (case (mm_dl_engine_get)
+     ((native (reason!))
+      ($_     (mm_reason &ground &theory &st)))))
 
 (= (dl-reason!)
    (let* (($_1 (dl-ground!))
           ($_2 (dl-reason-only!)))
      ()))
 
-; conclusions come from the fast Prolog enumerator (mm_conclusions reads the
-; interned integer-indexed status directly); reason.metta's (conclusions) stays
-; as the reference. sort-atom normalizes ordering to match test expectations.
-(= (dl-conclusions) (sort-atom (mm_conclusions)))
+; conclusions: prolog reads the interned integer-indexed status (mm_conclusions);
+; native reads off reason.metta's (conclusions). sort-atom normalizes ordering.
+(= (dl-conclusions)
+   (case (mm_dl_engine_get)
+     ((native (sort-atom (conclusions)))
+      ($_     (sort-atom (mm_conclusions))))))
 
 (= (dl-run $path)
    (let* (($_1 (dl-load $path))

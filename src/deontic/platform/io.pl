@@ -102,6 +102,17 @@ mm_open_mode(Opts, Mode) :-
 'file-get-size!'(Handle, Size) :- once(stream_property(Handle, file_name(F))), size_file(F, Size).
 'file-seek!'(Handle, Pos, true) :- once(seek(Handle, Pos, bof, _)).
 
+%% DL reasoning backend: native (atomspace MeTTa engine) | prolog (fast kernel).
+%% Default reads $OMEGACLAW_DL_ENGINE (else prolog); a runtime set overrides it.
+%% The same theory runs through either path with identical conclusions.
+:- dynamic mm_dl_engine_mode/1.
+mm_dl_engine_get(M) :-
+    ( mm_dl_engine_mode(M0) -> M = M0
+    ; getenv('OMEGACLAW_DL_ENGINE', E), downcase_atom(E, native) -> M = native
+    ; M = prolog ).
+mm_dl_engine_set(M, true) :-
+    once(( retractall(mm_dl_engine_mode(_)), assertz(mm_dl_engine_mode(M)) )).
+
 %% Minimal logger (same spirit as petta_lib_logger, zero external deps).
 :- dynamic mm_log_level/1, mm_log_path/1.
 mm_log_level(info).

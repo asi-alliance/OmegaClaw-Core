@@ -13,6 +13,7 @@
    (mm_append_file mm_write_file mm_read_file mm_exists
     mm_now_iso mm_clear_space mm_gensym mm_halt mm_print mm_parse_lit mm_srand
     mm_log mm_log_set_level mm_log_set_path
+    mm_dl_engine_get mm_dl_engine_set
     mm_arith_eval mm_acmp mm_num_eq mm_tcmp mm_pct mm_tp_le
     mm_load_into mm_plan_format mm_load_dfl mm_ingest mm_add_fact mm_at_filter
     mm_lit_str mm_concl_str mm_trust_str

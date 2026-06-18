@@ -79,6 +79,13 @@ Reach the engine through the `(metta …)` skill. A theory is loaded from a path
 ### Temporal (Event Calculus)
 `(ec-intervals …)`, `(ec-holds-at …)`, `(ec-violated-at …)`, `(ec-timeline …)`.
 
+### Engine backends
+The reasoner ships two interchangeable backends with **identical conclusions**:
+`prolog` (default — the fast indexed kernel) and `native` (the atomspace-native MeTTa
+engine). Switch with `(dl-engine! native)` or `$OMEGACLAW_DL_ENGINE=native`. Use
+`prolog` for grounding-heavy theories and `native` for propositional plans /
+inspection — see [deontic/README.md](./deontic/README.md#two-reasoning-backends--the-engine-toggle).
+
 ---
 
 ## Worked examples
