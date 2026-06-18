@@ -1,0 +1,90 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# PLAN: Build a secure REST API with database
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# This plan uses propositional logic with positive facts only.
+# Tasks become ready when their dependencies are complete.
+
+# ───────────────────────────────────────────────────────────────────────────
+# FACTS: Context
+# ───────────────────────────────────────────────────────────────────────────
+
+f1: >> goal_buildSecureAPI
+f2: >> requires_security
+
+# ───────────────────────────────────────────────────────────────────────────
+# FACTS: Agent availability
+# ───────────────────────────────────────────────────────────────────────────
+
+f10: >> agent_architect_available
+f11: >> agent_coder_available
+f12: >> agent_security_available
+
+# ───────────────────────────────────────────────────────────────────────────
+# FACTS: Task definitions
+# ───────────────────────────────────────────────────────────────────────────
+
+f20: >> task_models
+f21: >> task_auth
+f22: >> task_crud
+f23: >> task_tests
+f24: >> task_review
+
+# Task properties
+f30: >> security_related_auth
+f31: >> security_related_review
+
+# Tasks with no dependencies (ready from the start)
+f50: >> no_deps_models
+f51: >> no_deps_auth
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STRICT RULES: Invariants
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Complex goals need decomposition
+r1: goal_buildSecureAPI, requires_security -> needs_decomposition
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEFEASIBLE RULES: Task readiness (only when deps complete)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Tasks with no dependencies are ready
+r40: task_models, no_deps_models => ready_models
+r41: task_auth, no_deps_auth => ready_auth
+
+# Tasks with dependencies become ready when deps complete
+r42: task_crud, completed_models => ready_crud
+r43: task_tests, completed_crud, completed_auth => ready_tests
+r44: task_review, completed_tests => ready_review
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEFEASIBLE RULES: Assignments
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Coder handles general tasks by default
+r10: ready_models, agent_coder_available => assignTo_models_coder
+r11: ready_auth, agent_coder_available => assignTo_auth_coder
+r12: ready_crud, agent_coder_available => assignTo_crud_coder
+r13: ready_tests, agent_coder_available => assignTo_tests_coder
+r14: ready_review, agent_coder_available => assignTo_review_coder
+
+# Security agent handles security-related tasks
+r20: ready_auth, security_related_auth, agent_security_available => assignTo_auth_security
+r21: ready_review, security_related_review, agent_security_available => assignTo_review_security
+
+# Architect handles decomposition
+r30: needs_decomposition, agent_architect_available => assignTo_decompose_architect
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SUPERIORITY: Conflict resolution
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Security beats coder for security-related tasks
+r20 > r11
+r21 > r14
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DYNAMIC FACTS: Added as work progresses
+# Completion facts mark a task as done
+# ═══════════════════════════════════════════════════════════════════════════

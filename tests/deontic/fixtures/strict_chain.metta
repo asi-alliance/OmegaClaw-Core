@@ -1,0 +1,5 @@
+(given a)
+(always s1 a b)
+(always s2 b c)
+(normally r1 c d)
+(normally r2 e f)

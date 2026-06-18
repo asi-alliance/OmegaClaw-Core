@@ -1,0 +1,6 @@
+(given base)
+(normally r1 base p)
+(normally r2 base (not p))
+(normally r3 base p)
+(prefer r3 r2)
+(prefer r2 r1)

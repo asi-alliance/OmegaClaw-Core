@@ -1,0 +1,6 @@
+# Classic penguin example in DFL
+>> bird
+>> penguin
+r1: bird => flies
+r2: penguin => -flies
+r2 > r1

@@ -1,0 +1,5 @@
+# strict + defeater + negation
+>> bird
+>> injured
+r1: bird => flies
+d1: injured ~> -flies

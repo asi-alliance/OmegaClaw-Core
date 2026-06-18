@@ -1,0 +1,6 @@
+(trusts alice 0.9)
+(trusts bob 0.5)
+(claims alice (given rain))
+(claims bob (given cold))
+(normally r1 (and rain cold) miserable)
+(threshold credible 0.6)

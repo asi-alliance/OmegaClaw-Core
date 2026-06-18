@@ -1,0 +1,38 @@
+# Annotated example demonstrating semantic annotations for explainability
+
+# Facts
+f1: >> task_auth
+f2: >> no_deps_auth
+f3: >> security_sensitive_auth
+f4: >> agent_coder_available
+f5: >> agent_security_available
+
+# Readiness rule with annotation
+---
+description: "Auth task is ready when it has no dependencies"
+dc:source: "policy/task-scheduling.md"
+---
+r10: task_auth, no_deps_auth => ready_auth
+
+# Default assignment
+---
+description: "Coder agent handles tasks by default"
+confidence: 0.7
+---
+r20: ready_auth, agent_coder_available => assignTo_auth_coder
+
+# Security assignment override
+---
+@id: :security-assignment
+description: "Security-sensitive tasks require security agent"
+dc:source: "policy/security-guidelines.md"
+confidence: 0.95
+justification: "Per security policy section 3.2"
+---
+r21: ready_auth, security_sensitive_auth, agent_security_available => assignTo_auth_security
+
+# Superiority with justification
+---
+justification: "Security expertise required for sensitive data handling"
+---
+r21 > r20

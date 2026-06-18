@@ -1,0 +1,5 @@
+(given a)
+(given b)
+(always s1 a (not p))
+(normally r1 b p)
+(prefer r1 s1)

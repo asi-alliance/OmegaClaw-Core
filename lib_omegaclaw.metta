@@ -4,6 +4,7 @@
 !(import! &self (library lib_combinatorics))
 !(import! &self (library OmegaClaw-Core lib_nal))
 !(import! &self (library OmegaClaw-Core lib_pln))
+!(import! &self (library OmegaClaw-Core lib_deontic))
 !(import! &self (library OmegaClaw-Core lib_llm_ext.py))
 !(import! &self (library OmegaClaw-Core ./src/helper.py))
 !(import! &self (library OmegaClaw-Core ./src/agentverse.py))

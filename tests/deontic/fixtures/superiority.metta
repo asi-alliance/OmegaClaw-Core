@@ -1,0 +1,5 @@
+(given a)
+(normally r1 a p)
+(normally r2 a (not p))
+(normally r3 a p)
+(prefer r3 r2)
