@@ -220,6 +220,17 @@ _register_provider_instance(OpenRouterProvider(name="OpenRouter", var_name="OPEN
 _register_provider_instance(TestProvider())
 _register_provider_instance(OpenAIProvider(name="OpenAI", var_name="OPENAI_API_KEY", model_name="gpt-5.4", base_url="https://api.openai.com/v1"))
 
+# Codex (ChatGPT subscription auth) — opt-in, self-contained (no openai SDK; reuses ~/.codex/auth.json).
+try:
+    import sys as _sys
+    _codex_base = os.path.dirname(os.path.abspath(__file__)) if globals().get("__file__") else os.environ.get("OMEGACLAW_DIR", ".")
+    if _codex_base not in _sys.path:
+        _sys.path.insert(0, _codex_base)
+    from lib_codex_auth import CodexProvider as _CodexProvider
+    _register_provider_instance(_CodexProvider(name="Codex"))
+except Exception as _codex_err:
+    print(f"[lib_llm_ext] Codex provider not registered: {_codex_err}")
+
 
 def callProvider(provider_name: str, content: str, max_tokens: int = 6000, reasoning: str = "medium") -> str:
     """Generic dispatcher for MeTTa."""
