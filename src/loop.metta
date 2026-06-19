@@ -11,7 +11,7 @@
 (= (initLoop)
    (progn (configure maxNewInputLoops 50) ;20
           (configure maxWakeLoops 1)
-          (configure spamShield True)
+          (configure spamShield False)
           (configure sleepInterval 1) ;10
           (configure LLM gpt-5.4)
           (configure provider Anthropic) ;Anthropic or OpenAI or ASICloud or ASIOne or Test
