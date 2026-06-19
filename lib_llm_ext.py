@@ -151,15 +151,11 @@ class OpenAIProvider(AIProvider):
         if self._client is None:
             raise RuntimeError(f"{self.name} not configured (set {self._var_name})")
 
-        if ":-:-:-:" in content:
-            sysmsg, usermsg = content.split(":-:-:-:", 1)
-        else:
-            sysmsg, usermsg = "", content
+        content = content.replace(":-:-:-:", " ")
         try:
             response = self._client.responses.create(
                 model=self._model_name,
-                instructions=sysmsg,
-                input=usermsg,
+                input=content,
                 max_output_tokens=max_tokens,
                 reasoning={"effort": reasoning},
                 **kwargs
