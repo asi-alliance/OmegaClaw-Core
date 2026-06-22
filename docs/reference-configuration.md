@@ -37,7 +37,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `commchannel` | `irc` | Active channel — `irc`, `telegram`, `slack`, or `mattermost`. |
+| `commchannel` | `irc` | Active channel — `irc`, `telegram`, `slack`, `discord`, or `mattermost`. |
 | `IRC_channel` | `##omegaclaw` | IRC channel to join. |
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname. |
 | `IRC_port` | 6667 | IRC port. |
@@ -46,6 +46,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `TG_POLL_TIMEOUT` | 20 | Telegram long-poll timeout in seconds. |
 | `SL_CHANNEL_ID` | *(empty — auto-bind supported)* | Optional Slack channel ID where OmegaClaw reads/writes messages. Leave empty to auto-bind on first valid inbound auth/message. |
 | `SL_POLL_INTERVAL` | 60 | Slack poll interval in seconds (minimum effective value is 60). |
+| `DC_CHANNEL_ID` | *(empty — auto-bind supported)* | Optional Discord channel ID where OmegaClaw reads/writes messages. Leave empty to auto-bind on first valid inbound auth/message. |
+| `DC_GATEWAY_INTENTS` | 37377 | Discord Gateway intent bitmask. The default requests guilds, guild messages, direct messages, and message content. |
 | `MM_URL` | `https://chat.singularitynet.io` | Mattermost base URL. |
 | `MM_CHANNEL_ID` | `8fjrmabjx7gupy7e5kjznpt5qh` | Target channel ID. |
 
@@ -54,6 +56,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `TG_BOT_TOKEN` | Telegram bot token (from BotFather). |
 | `MM_BOT_TOKEN` | Bot auth token. |
 | `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
+| `DC_BOT_TOKEN` | Discord bot token. The bot must have the Message Content privileged intent enabled to receive message text. |
 
 ## Command-line overrides
 
@@ -67,6 +70,18 @@ Slack example:
 
 ```bash
 SL_BOT_TOKEN=xoxb-... metta run.metta commchannel=slack SL_CHANNEL_ID=C0123456789
+```
+
+Discord example:
+
+```bash
+DC_BOT_TOKEN=... metta run.metta commchannel=discord DC_CHANNEL_ID=123456789012345678
+```
+
+Docker launch wrapper example:
+
+```bash
+DC_BOT_TOKEN=... DC_CHANNEL_ID=123456789012345678 scripts/omegaclaw start -t discord
 ```
 
 The `argk` helper parses `key=value` pairs from `argv`.

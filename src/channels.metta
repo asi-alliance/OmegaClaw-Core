@@ -10,6 +10,8 @@
 (= (TG_POLL_TIMEOUT) (empty))
 (= (SL_CHANNEL_ID) (empty))
 (= (SL_POLL_INTERVAL) (empty))
+(= (DC_CHANNEL_ID) (empty))
+(= (DC_GATEWAY_INTENTS) (empty))
 
 ;Connect all the channels:
 (= (initChannels)
@@ -29,11 +31,15 @@
                       (progn (configure SL_CHANNEL_ID "")
                              (configure SL_POLL_INTERVAL 60)
                              (py-call (slack.start_slack (SL_CHANNEL_ID) (SL_POLL_INTERVAL))))
-                      (if (== (commchannel) mattermost)
-                          (progn (configure MM_URL "https://chat.singularitynet.io")
-                                 (configure MM_CHANNEL_ID "8fjrmabjx7gupy7e5kjznpt5qh")
-                                 (py-call (mattermost.start_mattermost (MM_URL) (MM_CHANNEL_ID))))
-                          (py-call (mock.start_mock))))))))
+                      (if (== (commchannel) discord)
+                          (progn (configure DC_CHANNEL_ID "")
+                                 (configure DC_GATEWAY_INTENTS 37377)
+                                 (py-call (discord.start_discord (DC_CHANNEL_ID) (DC_GATEWAY_INTENTS))))
+                          (if (== (commchannel) mattermost)
+                              (progn (configure MM_URL "https://chat.singularitynet.io")
+                                     (configure MM_CHANNEL_ID "8fjrmabjx7gupy7e5kjznpt5qh")
+                                     (py-call (mattermost.start_mattermost (MM_URL) (MM_CHANNEL_ID))))
+                              (py-call (mock.start_mock)))))))))
 
 ;Receive the latest user message considering all communication channels:
 (= (receive)
@@ -43,9 +49,11 @@
            (py-call (telegram.getLastMessage))
            (if (== (commchannel) slack)
                (py-call (slack.getLastMessage))
-               (if (== (commchannel) mattermost)
-                   (py-call (mattermost.getLastMessage))
-                   (py-call (mock.getLastMessage)))))))
+               (if (== (commchannel) discord)
+                   (py-call (discord.getLastMessage))
+                   (if (== (commchannel) mattermost)
+                       (py-call (mattermost.getLastMessage))
+                       (py-call (mock.getLastMessage))))))))
 
 ;Send a message to all communication channels:
 !(change-state! &lastsend "")
@@ -59,9 +67,11 @@
                            (let $temp (cut) (py-call (telegram.send_message $safemsg)))
                            (if (== (commchannel) slack)
                                (let $temp (cut) (py-call (slack.send_message $safemsg)))
-                               (if (== (commchannel) mattermost)
-                                   (let $temp (cut) (py-call (mattermost.send_message $safemsg)))
-                                   (let $temp (cut) (py-call (mock.send_message $safemsg))))))))) _))
+                               (if (== (commchannel) discord)
+                                   (let $temp (cut) (py-call (discord.send_message $safemsg)))
+                                   (if (== (commchannel) mattermost)
+                                       (let $temp (cut) (py-call (mattermost.send_message $safemsg)))
+                                       (let $temp (cut) (py-call (mock.send_message $safemsg)))))))))) _))
 
 ;Search the internet for some information:
 (= (search $msg)

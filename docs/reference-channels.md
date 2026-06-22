@@ -22,7 +22,9 @@ The MeTTa side reads `commchannel` and branches:
            (py-call (telegram.getLastMessage))
            (if (== (commchannel) slack)
                (py-call (slack.getLastMessage))
-               (py-call (mattermost.getLastMessage))))))
+               (if (== (commchannel) discord)
+                   (py-call (discord.getLastMessage))
+                   (py-call (mattermost.getLastMessage)))))))
 ```
 
 ## `channels/irc.py`
@@ -58,6 +60,17 @@ Slack adapter using Slack Web API polling.
 - If `SL_CHANNEL_ID` is empty, the adapter auto-binds to the first channel where auth succeeds.
 - Adapter respects Slack `Retry-After` backoff on HTTP 429 and enforces a minimum 60s poll interval.
 - Uses the same one-time `auth <secret>` ownership gate as the other adapters.
+
+## `channels/discord.py`
+
+Discord adapter using the Discord Gateway for inbound messages and the HTTP API for outbound messages.
+
+- `start_discord(channel_id, gateway_intents)` — starts the Gateway listener.
+- `DC_CHANNEL_ID` is optional.
+- The bot user must be invited to the server/channel or DM where it should receive messages.
+- If `DC_CHANNEL_ID` is empty, the adapter auto-binds to the first channel where auth succeeds.
+- Requires `DC_BOT_TOKEN`; receiving message text also requires Discord's Message Content privileged intent.
+- Outbound messages are chunked below Discord's 2000-character message limit and suppress automatic mentions.
 
 ## `channels/websearch.py`
 

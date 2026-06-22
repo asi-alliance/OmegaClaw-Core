@@ -127,7 +127,7 @@ If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `commchannel` | `irc` | Type of the communication channel for agent to use - `irc`, `telegram`, `mattermost` or `slack` |
+| `commchannel` | `irc` | Type of the communication channel for agent to use - `irc`, `telegram`, `mattermost`, `slack` or `discord` |
 | `IRC_channel` | `##omegaclaw` | IRC channel to join |
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname |
 | `IRC_port` | 6667 | IRC port |
@@ -136,6 +136,8 @@ If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START
 | `TG_POLL_TIMEOUT` | 20 | Telegram polling timeout in seconds. |
 | `SL_CHANNEL_ID` |  | Optional Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message. |
 | `SL_POLL_INTERVAL` | 60 | Slack polling interval in seconds (minimum effective value is 60). |
+| `DC_CHANNEL_ID` |  | Optional Discord channel ID. If empty, OmegaClaw auto-binds on first successful auth message. |
+| `DC_GATEWAY_INTENTS` | 37377 | Discord Gateway intents. Default enables guilds, guild messages, direct messages, and message content. |
 | `MM_URL` | `https://chat.singularitynet.io` | Mattermost base URL. |
 | `MM_CHANNEL_ID` | `8fjrmabjx7gupy7e5kjznpt5qh` | Mattermost channel ID. |
 
@@ -144,6 +146,17 @@ If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START
 | `TG_BOT_TOKEN` | Telegram bot token. |
 | `MM_BOT_TOKEN` | Mattermost bot token. |
 | `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
+| `DC_BOT_TOKEN` | Discord bot token. The bot must have the Message Content privileged intent enabled. |
+
+Discord launch example:
+```
+DC_BOT_TOKEN=<discord-bot-token> scripts/omegaclaw start -t discord
+```
+
+To bind to a specific Discord channel, provide its channel ID:
+```
+DC_BOT_TOKEN=<discord-bot-token> DC_CHANNEL_ID=<discord-channel-id> scripts/omegaclaw start -t discord
+```
 
 ---
 
