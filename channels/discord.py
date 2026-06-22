@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import threading
 import time
 import urllib.error
@@ -15,20 +16,29 @@ _msg_lock = threading.Lock()
 _state_lock = threading.Lock()
 _ws_lock = threading.Lock()
 
+_DEFAULT_GATEWAY_INTENTS = 37377
+
 _bot_token = ""
 _api_base = "https://discord.com/api/v10"
 _gateway_url = "wss://gateway.discord.gg/?v=10&encoding=json"
 _channel_id = ""
-_gateway_intents = 37377
+_gateway_intents = _DEFAULT_GATEWAY_INTENTS
 _bot_user_id = ""
 _connected = False
 _ws = None
 _last_sequence = None
+_session_id = ""
+_resume_gateway_url = ""
+_heartbeat_acked = True
 
 _authenticated_user_id = None
 _message_content_warning_logged = False
 
 _MAX_MESSAGE_LEN = 1900
+
+# Cap on back-to-back fast RESUME attempts before falling back to a full
+# re-IDENTIFY with normal backoff, so a flapping connection can't thrash.
+_MAX_RESUME_ATTEMPTS = 3
 
 
 def _set_last(msg):
@@ -186,9 +196,24 @@ def _send_heartbeat(ws):
 
 
 def _heartbeat_loop(ws, interval_seconds):
+    global _heartbeat_acked
     while _running:
         time.sleep(max(1.0, interval_seconds))
         if not _running:
+            return
+        with _state_lock:
+            if _ws is not ws:
+                return
+            acked = _heartbeat_acked
+            _heartbeat_acked = False
+        if not acked:
+            # No HEARTBEAT_ACK since the last beat: the connection is zombied.
+            # Force a close so the gateway loop reconnects (and resumes).
+            print("[DISCORD] Heartbeat not acknowledged; reconnecting")
+            try:
+                ws.close()
+            except Exception:
+                pass
             return
         try:
             _send_heartbeat(ws)
@@ -210,6 +235,23 @@ def _identify(ws):
                     "browser": "omegaclaw",
                     "device": "omegaclaw",
                 },
+            },
+        },
+    )
+
+
+def _resume(ws):
+    with _state_lock:
+        session_id = _session_id
+        seq = _last_sequence
+    _send_gateway_payload(
+        ws,
+        {
+            "op": 6,
+            "d": {
+                "token": _bot_token,
+                "session_id": session_id,
+                "seq": seq,
             },
         },
     )
@@ -252,19 +294,40 @@ def _handle_message_create(message):
 
 def _gateway_loop():
     global _connected, _ws, _last_sequence, _bot_user_id
+    global _session_id, _resume_gateway_url, _heartbeat_acked
 
     print("[DISCORD] Gateway listener started")
     retry_delay = 5
+    want_resume = False
+    resume_attempts = 0
 
     while _running:
         ws = None
         try:
+            with _state_lock:
+                can_resume = bool(
+                    _session_id and _last_sequence is not None and _resume_gateway_url
+                )
+                resume_url = _resume_gateway_url
+            do_resume = want_resume and can_resume and resume_attempts < _MAX_RESUME_ATTEMPTS
+            if do_resume:
+                resume_attempts += 1
+            elif want_resume:
+                # Resume not possible (or too many attempts): start fresh.
+                with _state_lock:
+                    _session_id = ""
+                    _last_sequence = None
+            connect_url = resume_url if do_resume else _gateway_url
+
             ws = websocket.WebSocket()
-            ws.connect(_gateway_url)
+            ws.connect(connect_url)
             ws.settimeout(1)
             with _state_lock:
                 _ws = ws
-                _last_sequence = None
+                _heartbeat_acked = True
+                if not do_resume:
+                    _last_sequence = None
+                    _session_id = ""
 
             identified = False
 
@@ -281,7 +344,9 @@ def _gateway_loop():
                 op = payload.get("op")
                 seq = payload.get("s")
                 event_type = payload.get("t")
-                data = payload.get("d") or {}
+                data = payload.get("d")
+                if not isinstance(data, dict):
+                    data = {}
 
                 if seq is not None:
                     with _state_lock:
@@ -289,20 +354,43 @@ def _gateway_loop():
 
                 if op == 10:
                     interval = float(data.get("heartbeat_interval", 45000)) / 1000.0
+                    with _state_lock:
+                        _heartbeat_acked = True
                     threading.Thread(
                         target=_heartbeat_loop,
                         args=(ws, interval),
                         daemon=True,
                     ).start()
-                    _identify(ws)
+                    if do_resume:
+                        print("[DISCORD] Resuming gateway session")
+                        _resume(ws)
+                    else:
+                        _identify(ws)
                     identified = True
+                elif op == 11:
+                    with _state_lock:
+                        _heartbeat_acked = True
                 elif op == 1:
                     _send_heartbeat(ws)
                 elif op == 7:
+                    # Reconnect requested: the session can be resumed.
                     print("[DISCORD] Gateway requested reconnect")
+                    want_resume = True
                     break
                 elif op == 9:
-                    print("[DISCORD] Gateway session invalidated")
+                    # Invalid session. The payload is a boolean telling us
+                    # whether the session may be resumed.
+                    resumable = payload.get("d") is True
+                    print(f"[DISCORD] Gateway session invalidated (resumable={resumable})")
+                    if resumable:
+                        want_resume = True
+                    else:
+                        want_resume = False
+                        with _state_lock:
+                            _session_id = ""
+                            _last_sequence = None
+                        # Discord asks for a 1-5s wait before re-identifying.
+                        time.sleep(random.uniform(1.0, 5.0))
                     break
                 elif op != 0:
                     continue
@@ -310,12 +398,25 @@ def _gateway_loop():
                 if event_type == "READY":
                     user = data.get("user") or {}
                     ready_user_id = str(user.get("id", "") or "").strip()
-                    if ready_user_id:
-                        with _state_lock:
+                    session_id = str(data.get("session_id", "") or "").strip()
+                    resume_url = str(data.get("resume_gateway_url", "") or "").strip()
+                    with _state_lock:
+                        if ready_user_id:
                             _bot_user_id = ready_user_id
+                        _session_id = session_id
+                        if resume_url:
+                            _resume_gateway_url = resume_url
                     _connected = True
                     retry_delay = 5
+                    want_resume = False
+                    resume_attempts = 0
                     print("[DISCORD] Gateway ready")
+                elif event_type == "RESUMED":
+                    _connected = True
+                    retry_delay = 5
+                    want_resume = False
+                    resume_attempts = 0
+                    print("[DISCORD] Gateway resumed")
                 elif event_type == "MESSAGE_CREATE":
                     _connected = True
                     _handle_message_create(data)
@@ -325,6 +426,10 @@ def _gateway_loop():
         except Exception as exc:
             _connected = False
             print(f"[DISCORD] Gateway error: {exc}")
+            # An unexpected drop after a live session can be resumed.
+            with _state_lock:
+                if _session_id and _last_sequence is not None:
+                    want_resume = True
         finally:
             try:
                 if ws is not None:
@@ -337,8 +442,12 @@ def _gateway_loop():
             _connected = False
 
         if _running:
-            time.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, 60)
+            if want_resume and resume_attempts < _MAX_RESUME_ATTEMPTS:
+                # A resume is pending: retry promptly rather than backing off.
+                time.sleep(1)
+            else:
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
 
     print("[DISCORD] Gateway listener stopped")
 
@@ -347,6 +456,7 @@ def start_discord(channel_id="", gateway_intents=""):
     global _running, _bot_token, _api_base, _gateway_url, _channel_id
     global _gateway_intents, _connected, _authenticated_user_id
     global _message_content_warning_logged
+    global _session_id, _resume_gateway_url, _last_sequence, _heartbeat_acked
 
     _bot_token = os.environ.get("DC_BOT_TOKEN", "").strip()
     if not _bot_token:
@@ -364,13 +474,17 @@ def start_discord(channel_id="", gateway_intents=""):
         try:
             _gateway_intents = int(intents_value)
         except Exception:
-            _gateway_intents = 37377
+            _gateway_intents = _DEFAULT_GATEWAY_INTENTS
     else:
-        _gateway_intents = 37377
+        _gateway_intents = _DEFAULT_GATEWAY_INTENTS
 
     _connected = False
     _authenticated_user_id = None
     _message_content_warning_logged = False
+    _session_id = ""
+    _resume_gateway_url = ""
+    _last_sequence = None
+    _heartbeat_acked = True
 
     _initialize_identity()
     if _channel_id:
