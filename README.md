@@ -158,6 +158,10 @@ To bind to a specific Discord channel, provide its channel ID:
 DC_BOT_TOKEN=<discord-bot-token> DC_CHANNEL_ID=<discord-channel-id> scripts/omegaclaw start -t discord
 ```
 
+Interactive setup also reads `DC_BOT_TOKEN` and `DC_CHANNEL_ID` from the environment. If Discord returns `403 Forbidden` while checking `DC_CHANNEL_ID`, setup continues with a warning; that usually means the bot has not been invited to the channel yet or lacks channel visibility.
+
+If Discord closes the Gateway with `4014 disallowed intents`, enable **Message Content Intent** in the app's **Bot** settings. If you cannot enable that privileged intent, launch with `DC_GATEWAY_INTENTS=4609`; in that mode, use DMs or mention the bot at the start of each server-channel message, for example `@OmegaClaw auth <secret>`.
+
 ---
 
 ## Documentation

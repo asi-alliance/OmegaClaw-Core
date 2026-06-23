@@ -71,6 +71,10 @@ Discord adapter using the Discord Gateway for inbound messages and the HTTP API 
 - If `DC_CHANNEL_ID` is empty, the adapter auto-binds to the first channel where auth succeeds.
 - Requires `DC_BOT_TOKEN`; receiving message text also requires Discord's Message Content privileged intent.
 - Outbound messages are chunked below Discord's 2000-character message limit and suppress automatic mentions.
+- Create a new Discord application in the developer portal https://discord.com/developers/applications (the Application ID is your bot's Client ID)
+- Create a bot token in the bot section for your application by checking "Send messages" and "Read Message History" in the Bot Permissions, enabling "Message Content Intent" and clicking "Reset token" to generate the DC_BOT_TOKEN
+- You can use this link to authorize the bot to a Discord server you are allowed to manage: https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot&permissions=68608
+- Adding the bot to private Discord channels requires to go into Edit Channel > Permissions and click "Add Members or Roles" and add the Bot as a member (after authorizing the bot to the Discord server)
 
 ## `channels/websearch.py`
 

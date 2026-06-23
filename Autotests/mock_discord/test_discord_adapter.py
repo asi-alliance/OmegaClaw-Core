@@ -132,3 +132,45 @@ def test_resume_payload_uses_session_and_sequence(monkeypatch):
 
     assert sent["op"] == 6
     assert sent["d"] == {"token": "tok", "session_id": "sess-123", "seq": 42}
+
+
+def test_identify_uses_discord_connection_property_keys(monkeypatch):
+    _reset_adapter()
+    discord._bot_token = "tok"
+    discord._gateway_intents = 123
+    sent = {}
+    monkeypatch.setattr(discord, "_send_gateway_payload", lambda ws, payload: sent.update(payload))
+
+    discord._identify(ws=object())
+
+    assert sent["op"] == 2
+    assert sent["d"]["token"] == "tok"
+    assert sent["d"]["intents"] == 123
+    assert sent["d"]["properties"] == {
+        "$os": "linux",
+        "$browser": "omegaclaw",
+        "$device": "omegaclaw",
+    }
+
+
+def test_decode_close_frame():
+    code, reason = discord._decode_close_frame(b"\x0f\xaeintent blocked")
+
+    assert code == 4014
+    assert reason == "intent blocked"
+
+
+def test_gateway_closed_exception_keeps_close_code():
+    exc = discord._DiscordGatewayClosed(4014, "code=4014 (disallowed intents)")
+
+    assert exc.code == 4014
+    assert str(exc) == "code=4014 (disallowed intents)"
+
+
+def test_strip_bot_mention_prefix():
+    _reset_adapter()
+    discord._bot_user_id = "bot-user"
+
+    assert discord._strip_bot_mention("<@bot-user> auth secret") == "auth secret"
+    assert discord._strip_bot_mention("<@!bot-user> hello") == "hello"
+    assert discord._strip_bot_mention("plain text") == "plain text"

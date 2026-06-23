@@ -40,6 +40,29 @@ _MAX_MESSAGE_LEN = 1900
 # re-IDENTIFY with normal backoff, so a flapping connection can't thrash.
 _MAX_RESUME_ATTEMPTS = 3
 
+_GATEWAY_CLOSE_REASONS = {
+    4000: "unknown error",
+    4001: "unknown opcode",
+    4002: "decode error",
+    4003: "not authenticated",
+    4004: "authentication failed",
+    4005: "already authenticated",
+    4007: "invalid sequence",
+    4008: "rate limited",
+    4009: "session timed out",
+    4010: "invalid shard",
+    4011: "sharding required",
+    4012: "invalid API version",
+    4013: "invalid intents",
+    4014: "disallowed intents",
+}
+
+
+class _DiscordGatewayClosed(Exception):
+    def __init__(self, code, details):
+        super().__init__(details)
+        self.code = code
+
 
 def _set_last(msg):
     global _last_message
@@ -87,6 +110,19 @@ def _display_name(author, member):
         return username
 
     return str(author.get("id", "") or "discord_user")
+
+
+def _strip_bot_mention(text):
+    with _state_lock:
+        bot_user_id = _bot_user_id
+    if not bot_user_id:
+        return text
+
+    text = text.strip()
+    for mention in (f"<@{bot_user_id}>", f"<@!{bot_user_id}>"):
+        if text.startswith(mention):
+            return text[len(mention):].strip()
+    return text
 
 
 def _parse_retry_after(value, default=5):
@@ -231,9 +267,9 @@ def _identify(ws):
                 "token": _bot_token,
                 "intents": _gateway_intents,
                 "properties": {
-                    "os": "linux",
-                    "browser": "omegaclaw",
-                    "device": "omegaclaw",
+                    "$os": "linux",
+                    "$browser": "omegaclaw",
+                    "$device": "omegaclaw",
                 },
             },
         },
@@ -257,11 +293,42 @@ def _resume(ws):
     )
 
 
+def _decode_close_frame(data):
+    if data is None:
+        return None, ""
+    if isinstance(data, str):
+        data = data.encode("utf-8", errors="ignore")
+    if not isinstance(data, (bytes, bytearray)) or len(data) < 2:
+        return None, str(data or "")
+
+    code = int.from_bytes(data[:2], "big")
+    reason = data[2:].decode("utf-8", errors="ignore")
+    return code, reason
+
+
+def _recv_gateway_message(ws):
+    opcode, frame = ws.recv_data_frame(control_frame=True)
+    if opcode == websocket.ABNF.OPCODE_CLOSE:
+        code, reason = _decode_close_frame(getattr(frame, "data", None))
+        description = _GATEWAY_CLOSE_REASONS.get(code, "unknown close code")
+        details = f"code={code} ({description})"
+        if reason:
+            details = f"{details}: {reason}"
+        raise _DiscordGatewayClosed(code, details)
+    if opcode in (websocket.ABNF.OPCODE_PING, websocket.ABNF.OPCODE_PONG):
+        return None
+
+    data = getattr(frame, "data", None)
+    if isinstance(data, bytes):
+        return data.decode("utf-8", errors="ignore")
+    return data
+
+
 def _handle_message_create(message):
     global _message_content_warning_logged
 
     channel_id = str(message.get("channel_id", "") or "").strip()
-    content = str(message.get("content", "") or "").strip()
+    content = _strip_bot_mention(str(message.get("content", "") or "").strip())
     author = message.get("author") or {}
     user_id = str(author.get("id", "") or "").strip()
 
@@ -333,7 +400,7 @@ def _gateway_loop():
 
             while _running:
                 try:
-                    raw = ws.recv()
+                    raw = _recv_gateway_message(ws)
                 except websocket.WebSocketTimeoutException:
                     continue
 
@@ -425,7 +492,20 @@ def _gateway_loop():
                 print("[DISCORD] Gateway closed before identify")
         except Exception as exc:
             _connected = False
-            print(f"[DISCORD] Gateway error: {exc}")
+            if isinstance(exc, _DiscordGatewayClosed):
+                print(f"[DISCORD] Gateway closed: {exc}")
+                if exc.code == 4014:
+                    print(
+                        "[DISCORD] Enable Message Content Intent for this app in "
+                        "Discord Developer Portal -> Bot -> Privileged Gateway Intents, "
+                        "or start with DC_GATEWAY_INTENTS=4609 and interact only via DMs "
+                        "or messages that mention the bot."
+                    )
+                    break
+                if exc.code in (4004, 4013):
+                    break
+            else:
+                print(f"[DISCORD] Gateway error: {exc}")
             # An unexpected drop after a live session can be resumed.
             with _state_lock:
                 if _session_id and _last_sequence is not None:

@@ -1,20 +1,59 @@
+from __future__ import annotations
+
 import yaml
-from py_landlock import Landlock, AccessFs
 from pathlib import Path
 import enum
 import os
 
+class _LandlockUnavailableError(RuntimeError):
+    pass
+
+try:
+    from py_landlock import Landlock, AccessFs
+    _LANDLOCK_IMPORT_ERROR = None
+except Exception as e:
+    Landlock = None
+    _LANDLOCK_IMPORT_ERROR = e
+
+    class AccessFs(enum.IntFlag):
+        EXECUTE = 1 << 0
+        READ_FILE = 1 << 1
+        READ_DIR = 1 << 2
+        WRITE_FILE = 1 << 3
+        TRUNCATE = 1 << 4
+        MAKE_REG = 1 << 5
+        MAKE_DIR = 1 << 6
+        MAKE_SYM = 1 << 7
+        REMOVE_FILE = 1 << 8
+        REMOVE_DIR = 1 << 9
+        MAKE_FIFO = 1 << 10
+        MAKE_SOCK = 1 << 11
+
+
+def _is_landlock_unavailable(exc):
+    name = exc.__class__.__name__
+    message = str(exc)
+    return (
+        name in ("LandlockNotAvailableError", "LandlockUnavailableError", "_LandlockUnavailableError")
+        or "Landlock syscalls not available" in message
+        or "No module named 'py_landlock'" in message
+    )
+
+
 def apply_security_policy(path):
-    try:
-        if path:
-            policy = FileSystemPolicy()
+    if path:
+        policy = FileSystemPolicy()
+        try:
             policy.load_file(path)
             policy.apply()
-        else:
-            print("[policy.apply_security_policy]: securityPolicyPath is not set")
-    except Exception as e:
-        print(f"[policy.apply_security_policy]: Unexpected exception: {e}")
-        raise
+        except Exception as e:
+            if policy.is_best_effort() and _is_landlock_unavailable(e):
+                print(f"[policy.apply_security_policy]: Landlock unavailable, continuing without filesystem sandbox: {e}")
+                return
+            print(f"[policy.apply_security_policy]: Unexpected exception: {e}")
+            raise
+    else:
+        print("[policy.apply_security_policy]: securityPolicyPath is not set")
 
 class LandLockCompatibility(enum.Enum):
     BEST_EFFORT = 0
@@ -37,6 +76,9 @@ class FileSystemPolicy:
         self._compatibility = LandLockCompatibility.BEST_EFFORT
         self._read_only = []
         self._read_write = []
+
+    def is_best_effort(self):
+        return self._compatibility == LandLockCompatibility.BEST_EFFORT
 
     def load_file(self, path: str|Path):
         print(f"[FileSystemPolicy.load_file] loading policy from file {path}")
@@ -77,6 +119,9 @@ class FileSystemPolicy:
         self._read_write = [Path(f'{p}') for p in rw]
 
     def apply(self):
+        if Landlock is None:
+            raise _LandlockUnavailableError(_LANDLOCK_IMPORT_ERROR)
+
         rod = list(filter(lambda p: p.is_dir(), self._read_only))
         rof = list(filter(lambda p: not p.is_dir(), self._read_only))
         rwd = list(filter(lambda p: p.is_dir(), self._read_write))

@@ -14,6 +14,7 @@ chmod 0600 "$tmp_py_file"
 cat >"$tmp_py_file" <<'PY'
 import getpass
 import json
+import os
 import secrets
 import shlex
 import shutil
@@ -214,28 +215,52 @@ def _choose_channel():
                 }
 
         if c == "4":
-            while True:
-                token = getpass.getpass("Please paste your Discord bot token and press ENTER or 'q' to exit: ").strip()
-                if token.lower() == "q":
-                    sys.exit(1)
-                if not token:
-                    print("Discord bot token is required.", file=sys.stderr)
-                    continue
+            token = os.environ.get("DC_BOT_TOKEN", "").strip()
+            if token:
+                print("Using Discord bot token from DC_BOT_TOKEN.")
 
-                channel_id = input("Optional Discord channel ID. Leave empty for auto-bind, or 'q' to exit: ").strip()
+            while True:
+                if not token:
+                    token = getpass.getpass("Please paste your Discord bot token and press ENTER or 'q' to exit: ").strip()
+                    if token.lower() == "q":
+                        sys.exit(1)
+                    if not token:
+                        print("Discord bot token is required.", file=sys.stderr)
+                        continue
+
+                default_channel_id = os.environ.get("DC_CHANNEL_ID", "").strip()
+                if default_channel_id:
+                    channel_prompt = f"Optional Discord channel ID (default: {default_channel_id}). Leave empty for default, or 'q' to exit: "
+                else:
+                    channel_prompt = "Optional Discord channel ID. Leave empty for auto-bind, or 'q' to exit: "
+                channel_id = input(channel_prompt).strip()
                 if channel_id.lower() == "q":
                     sys.exit(1)
+                if not channel_id:
+                    channel_id = default_channel_id
 
                 try:
                     me = _discord_api_call(token, "GET", "/users/@me", timeout=15)
                     username = str(me.get("username", "")).strip()
-                    channel_name = ""
-                    if channel_id:
-                        channel = _discord_api_call(token, "GET", f"/channels/{channel_id}", timeout=15)
-                        channel_name = str(channel.get("name", "") or "").strip()
                 except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
                     print(f"Discord validation failed: {exc}", file=sys.stderr)
+                    token = ""
                     continue
+
+                channel_name = ""
+                if channel_id:
+                    try:
+                        channel = _discord_api_call(token, "GET", f"/channels/{channel_id}", timeout=15)
+                        channel_name = str(channel.get("name", "") or "").strip()
+                    except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
+                        print(
+                            f"Warning: could not validate Discord channel {channel_id}: {exc}",
+                            file=sys.stderr,
+                        )
+                        print(
+                            "Continuing anyway. Make sure the bot is invited and can view/send messages in that channel.",
+                            file=sys.stderr,
+                        )
 
                 print("Discord bot token validated.")
                 if username:
@@ -547,6 +572,7 @@ options() {
     DC_GATEWAY_INTENTS="${DC_GATEWAY_INTENTS:-37377}"
     DC_API_BASE="${DC_API_BASE:-}"
     DC_GATEWAY_URL="${DC_GATEWAY_URL:-}"
+    security_policy_path="${OMEGACLAW_SECURITY_POLICY_PATH-/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml}"
 
     if [[ "$#" -eq 0 ]]; then
         help
@@ -640,7 +666,7 @@ start() {
             "commchannel=${commchannel}"
             "provider=${provider}"
             "embeddingprovider=${embeddingprovider}"
-            "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
+            "securityPolicyPath=${security_policy_path}"
     )
 
     if [ "${commchannel}" = "irc" ]; then

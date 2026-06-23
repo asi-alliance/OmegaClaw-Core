@@ -22,6 +22,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `maxOutputToken` | 6000 | Output cap passed to the provider. |
 | `reasoningMode` | `medium` | Reasoning-effort hint passed to the provider. |
 | `wakeupInterval` | 600 (seconds) | How long idle before the next scheduled wake-up. |
+| `securityPolicyPath` | `./repos/OmegaClaw-Core/profile/policy.yaml` | Filesystem policy path. Empty disables Landlock restrictions. The Docker launcher default can be overridden with `OMEGACLAW_SECURITY_POLICY_PATH`; set it to an empty value on kernels without Landlock support. |
 
 ## Memory (`src/memory.metta`, `initMemory`)
 
@@ -83,5 +84,9 @@ Docker launch wrapper example:
 ```bash
 DC_BOT_TOKEN=... DC_CHANNEL_ID=123456789012345678 scripts/omegaclaw start -t discord
 ```
+
+Interactive setup reuses `DC_BOT_TOKEN` and `DC_CHANNEL_ID` when they are already exported. Discord channel lookup is advisory: a `403 Forbidden` during setup does not invalidate the token, but the bot must be invited and able to view/send messages before runtime communication works.
+
+If the Gateway closes with `4014 disallowed intents`, the app is not allowed to request the configured intents. For the default `37377`, enable Message Content Intent in Discord Developer Portal. As a limited fallback, set `DC_GATEWAY_INTENTS=4609`; then channel messages must mention the bot so Discord includes message content.
 
 The `argk` helper parses `key=value` pairs from `argv`.
