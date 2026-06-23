@@ -7,8 +7,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-import websocket
 import auth
+
+try:
+    import websocket
+except ModuleNotFoundError:
+    websocket = None
 
 _running = False
 _last_message = ""
@@ -62,6 +66,11 @@ class _DiscordGatewayClosed(Exception):
     def __init__(self, code, details):
         super().__init__(details)
         self.code = code
+
+
+def _require_websocket():
+    if websocket is None:
+        raise RuntimeError("websocket-client is required for the Discord adapter")
 
 
 def _set_last(msg):
@@ -307,6 +316,7 @@ def _decode_close_frame(data):
 
 
 def _recv_gateway_message(ws):
+    _require_websocket()
     opcode, frame = ws.recv_data_frame(control_frame=True)
     if opcode == websocket.ABNF.OPCODE_CLOSE:
         code, reason = _decode_close_frame(getattr(frame, "data", None))
@@ -537,6 +547,8 @@ def start_discord(channel_id="", gateway_intents=""):
     global _gateway_intents, _connected, _authenticated_user_id
     global _message_content_warning_logged
     global _session_id, _resume_gateway_url, _last_sequence, _heartbeat_acked
+
+    _require_websocket()
 
     _bot_token = os.environ.get("DC_BOT_TOKEN", "").strip()
     if not _bot_token:

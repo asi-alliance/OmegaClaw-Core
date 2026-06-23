@@ -174,3 +174,14 @@ def test_strip_bot_mention_prefix():
     assert discord._strip_bot_mention("<@bot-user> auth secret") == "auth secret"
     assert discord._strip_bot_mention("<@!bot-user> hello") == "hello"
     assert discord._strip_bot_mention("plain text") == "plain text"
+
+
+def test_start_discord_requires_websocket(monkeypatch):
+    monkeypatch.setattr(discord, "websocket", None)
+
+    try:
+        discord.start_discord()
+    except RuntimeError as exc:
+        assert "websocket-client is required" in str(exc)
+    else:
+        raise AssertionError("start_discord should fail when websocket-client is missing")
