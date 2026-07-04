@@ -140,9 +140,15 @@ def balance_parentheses(s):
     lines = _merge_send_continuations(lines)
     for line in lines:
         if line.startswith("(-"):
-            line = "(pin -" + line[2:]
+            payload = line[2:].strip()
+            if payload.endswith(")"):
+                payload = payload[:-1].rstrip()
+            sexprs.append(f'(pin {json.dumps(payload, ensure_ascii=False)})')
+            continue
         elif line.startswith("-"):
-            line = "pin " + line
+            payload = line[1:].strip()
+            sexprs.append(f'(pin {json.dumps(payload, ensure_ascii=False)})')
+            continue
         # remove one outer (...) if present
         line = _strip_outer_parens(line)
         parts = line.split(maxsplit=1)
@@ -229,6 +235,8 @@ def test_balance_parenthesis():
     assert balance_parentheses('') == '()'
     assert balance_parentheses('   ') == '()'
     assert balance_parentheses('()\nsend hello') == '((send "hello"))'
+    assert balance_parentheses('- Found a bug') == '((pin "Found a bug"))'
+    assert balance_parentheses('(- Found a bug)') == '((pin "Found a bug"))'
 
 
 if __name__ == "__main__":
