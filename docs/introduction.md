@@ -284,7 +284,7 @@ The set of callable operations available to the agent at each turn — plain MeT
 
 ### Channels
 
-Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC, Telegram, Slack, or Mattermost). See [reference-channels.md](./reference-channels.md).
+Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC, Telegram, Slack, Mattermost, or WebSocket). See [reference-channels.md](./reference-channels.md).
 
 ### Orchestration
 

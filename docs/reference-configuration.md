@@ -37,7 +37,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `commchannel` | `irc` | Active channel — `irc`, `telegram`, `slack`, or `mattermost`. |
+| `commchannel` | `irc` | Active channel — `irc`, `telegram`, `slack`, `mattermost`, or `websocket`. |
 | `IRC_channel` | `##omegaclaw` | IRC channel to join. |
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname. |
 | `IRC_port` | 6667 | IRC port. |
@@ -48,6 +48,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `SL_POLL_INTERVAL` | 60 | Slack poll interval in seconds (minimum effective value is 60). |
 | `MM_URL` | `https://chat.singularitynet.io` | Mattermost base URL. |
 | `MM_CHANNEL_ID` | `8fjrmabjx7gupy7e5kjznpt5qh` | Target channel ID. |
+| `WS_URL` | *(empty — set at runtime)* | WebSocket endpoint URL (`ws://` or `wss://`). Required when `commchannel=websocket`. |
+| `WS_TOKEN` | *(empty — optional)* | Bearer token sent as `Authorization: Bearer <token>`. Leave empty for an unauthenticated endpoint. |
 
 | Environment variable | Meaning |
 |---|---|
@@ -67,6 +69,12 @@ Slack example:
 
 ```bash
 SL_BOT_TOKEN=xoxb-... metta run.metta commchannel=slack SL_CHANNEL_ID=C0123456789
+```
+
+WebSocket example:
+
+```bash
+metta run.metta commchannel=websocket WS_URL=wss://chat.example.com/agent WS_TOKEN=...
 ```
 
 The `argk` helper parses `key=value` pairs from `argv`.

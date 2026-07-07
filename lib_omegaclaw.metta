@@ -8,6 +8,7 @@
 !(import! &self (library OmegaClaw-Core ./src/utils))
 !(import! &self (library OmegaClaw-Core ./src/helper.py))
 !(import! &self (library OmegaClaw-Core ./src/agentverse.py))
+!(import! &self (library OmegaClaw-Core ./channels/wschat.py))
 !(import! &self (library OmegaClaw-Core ./channels/irc.py))
 !(import! &self (library OmegaClaw-Core ./channels/mattermost.py))
 !(import! &self (library OmegaClaw-Core ./channels/telegram.py))

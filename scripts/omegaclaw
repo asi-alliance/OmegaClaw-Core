@@ -93,8 +93,8 @@ def _slack_api_call(bot_token, method, params=None, timeout=20):
 def _choose_channel():
     while True:
         print("Please select your communication channel.")
-        print("1) IRC (QuakeNet) 2) Telegram Bot 3) Slack Bot")
-        c = input("Enter 1-3 or 'q' to exit (default: 1): ").strip()
+        print("1) IRC (QuakeNet) 2) Telegram Bot 3) Slack Bot 4) WebSocket Chat")
+        c = input("Enter 1-4 or 'q' to exit (default: 1): ").strip()
 
         if c.lower() == "q":
             sys.exit(1)
@@ -190,7 +190,30 @@ def _choose_channel():
                     "SL_CHANNEL_NAME": channel_name,
                 }
 
-        print("Please enter 1, 2, 3, or 'q'.", file=sys.stderr)
+        if c == "4":
+            while True:
+                print("Please enter your WebSocket chat server URL. Example: wss://chat.example.com/agent")
+                url = input("Enter WebSocket URL or 'q' to exit: ").strip()
+                if url.lower() == "q":
+                    sys.exit(1)
+                if not url:
+                    print("WebSocket URL is required.", file=sys.stderr)
+                    continue
+                if not (url.startswith("ws://") or url.startswith("wss://")):
+                    print("WebSocket URL must start with ws:// or wss://.", file=sys.stderr)
+                    continue
+
+                token = getpass.getpass("Optional bearer token (press ENTER to skip) or 'q' to exit: ").strip()
+                if token.lower() == "q":
+                    sys.exit(1)
+
+                return {
+                    "commchannel": "websocket",
+                    "WS_URL": url,
+                    "WS_TOKEN": token,
+                }
+
+        print("Please enter 1, 2, 3, 4, or 'q'.", file=sys.stderr)
 
 
 def _choose_provider():
@@ -323,7 +346,27 @@ Examine log file in case of problem:
 
 EOF
 
-if [ "${commchannel}" = "irc" ]; then
+if [ "${commchannel}" = "websocket" ]; then
+cat <<EOF
+
+============================================
+ WEBSOCKET CHAT ENABLED
+============================================
+
+This instance is configured to connect to a WebSocket chat server.
+Interact with the agent through the connected frontend.
+
+WebSocket URL:
+  ${WS_URL:-<not set>}
+
+EOF
+elif [ "${commchannel}" = "irc" ]; then
+cat <<EOF
+
+Auth secret (required once on first message in supported channels):
+  $OMEGACLAW_AUTH_SECRET
+
+EOF
 cat <<EOF
 
 ============================================
@@ -342,6 +385,12 @@ Authentication step (required):
 
 EOF
 elif [ "${commchannel}" = "telegram" ]; then
+cat <<EOF
+
+Auth secret (required once on first message in supported channels):
+  $OMEGACLAW_AUTH_SECRET
+
+EOF
 cat <<EOF
 
 ============================================
@@ -423,7 +472,7 @@ help() {
     echo -e "\t              Pass API token via environment variable."
     echo -e "\t-u <LLM API url> set LLM API URL for the local models (Ollama-local)"
     echo -e "\t-c <IRC channel> set IRC channel"
-    echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|mattermost|test"
+    echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket|mattermost|test"
     echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
 }
 
@@ -432,13 +481,15 @@ options() {
     provider=ASICloud
     llm_server_local_url="http://localhost:11434"
     image=singularitynet/omegaclaw:latest
-    commchannel=irc
     IRC_channel="${IRC_channel:-##omegaclaw}"
     TG_BOT_TOKEN="${TG_BOT_TOKEN:-}"
     TG_POLL_TIMEOUT="${TG_POLL_TIMEOUT:-20}"
     SL_BOT_TOKEN="${SL_BOT_TOKEN:-}"
     SL_CHANNEL_ID="${SL_CHANNEL_ID:-}"
     SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
+    WS_URL="${WS_URL:-}"
+    WS_TOKEN="${WS_TOKEN:-}"
+    commchannel=irc
 
     if [[ "$#" -eq 0 ]]; then
         help
@@ -539,6 +590,9 @@ start() {
     elif [ "${commchannel}" = "slack" ]; then
       docker_cmd+=("SL_CHANNEL_ID=${SL_CHANNEL_ID}")
       docker_cmd+=("SL_POLL_INTERVAL=${SL_POLL_INTERVAL}")
+    elif [ "${commchannel}" = "websocket" ]; then
+      docker_cmd+=("WS_URL=${WS_URL}")
+      docker_cmd+=("WS_TOKEN=${WS_TOKEN}")
     elif [ "${commchannel}" = "test" ]; then
       docker_cmd+=("TEST_SERVER_IP=${TEST_SERVER_IP}")
     else
