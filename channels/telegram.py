@@ -240,9 +240,14 @@ def send_message(text):
         target_chat = _chat_id
 
     if not _connected or not target_chat:
+        logger.warning(
+            f"[SEND_SKIP] connected={_connected} bound={bool(target_chat)} chars={len(text)}"
+        )
         return
 
     max_len = 3900
+    total = (len(text) + max_len - 1) // max_len
+    ok = fails = 0
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
         if not chunk:
@@ -254,9 +259,23 @@ def send_message(text):
                 timeout=15,
                 use_post=True,
             )
+            ok += 1
         except Exception as exc:
-            logger.exception(f"Send failed: {exc}")
-            return
+            # A failed chunk no longer aborts the remaining chunks: partial
+            # delivery with a diagnosable log beats silently dropping the rest
+            # of a multi-chunk message.
+            fails += 1
+            logger.exception(f"[SEND_FAIL] chunk={i // max_len + 1}/{total} err={exc}")
+            if i + max_len < len(text):
+                # the most likely chunk failure is a rate limit; give the API
+                # a beat before the remaining chunks instead of hammering it
+                time.sleep(1)
+    if fails == 0:
+        logger.info(f"[SEND_OK] chunks={ok} chars={len(text)}")
+    elif ok == 0:
+        logger.error(f"[SEND_FAIL] ok=0 fail={fails} chars={len(text)}")
+    else:
+        logger.warning(f"[SEND_PARTIAL] ok={ok} fail={fails} chars={len(text)}")
 
 class TelegramChannel(channels.CommChannel):
 
