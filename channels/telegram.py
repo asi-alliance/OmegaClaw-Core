@@ -4,6 +4,8 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from collections import deque
+
 import auth
 from src.logger import get_logger
 import channels
@@ -15,6 +17,7 @@ _running = False
 _last_message = ""
 _msg_lock = threading.Lock()
 _state_lock = threading.Lock()
+_flush_lock = threading.Lock()
 
 _bot_token = ""
 _api_base = ""
@@ -22,6 +25,9 @@ _chat_id = ""
 _poll_timeout = 20
 _offset = None
 _connected = False
+
+_PENDING_MAX = 50
+_pending = deque()  # sends issued before the adapter was ready (see send_message)
 
 _authenticated_user_id = None
 
@@ -184,7 +190,16 @@ def _poll_loop():
                 if state == "allow":
                     _set_last(f"{display_name}: {text}")
                 elif state == "auth_bound":
-                    send_message(f"Authentication successful for {display_name}.")
+                    # Enqueue instead of send_message so the poll thread never
+                    # blocks on _flush_lock; the flush below delivers it.
+                    _enqueue_pending(f"Authentication successful for {display_name}.")
+
+            # After update processing so a chat bound in THIS iteration
+            # (auto-bind/auth) flushes immediately, not one poll cycle later.
+            # Unlocked emptiness read: worst case a no-op flush or a
+            # one-cycle delay; _flush_pending re-checks under _state_lock.
+            if _pending:
+                _flush_pending(blocking=False)
         except Exception as exc:
             _connected = False
             logger.warning(f"Poll error: {exc}")
@@ -231,17 +246,48 @@ def stop_telegram():
     _running = False
 
 
-def send_message(text):
-    text = str(text).replace("\\n", "\n").replace("\r", "")
-    if not text:
-        return
-
+def _enqueue_pending(text):
     with _state_lock:
-        target_chat = _chat_id
+        dropped = len(_pending) >= _PENDING_MAX
+        if dropped:
+            _pending.popleft()
+        _pending.append(text)
+        queued = len(_pending)
+    if dropped:
+        logger.warning(f"[SEND_QUEUE] full ({_PENDING_MAX}): dropped oldest queued message")
+    logger.info(f"[SEND_QUEUE] queued chars={len(text)} ({queued} pending)")
 
-    if not _connected or not target_chat:
+
+def _flush_pending(blocking=True):
+    # _flush_lock serializes concurrent flushers so queued messages leave in
+    # order; _state_lock is never held across the network call. The poll
+    # thread passes blocking=False and skips a contended flush (another
+    # thread is already draining) instead of stalling getUpdates behind it.
+    if not _flush_lock.acquire(blocking=blocking):
         return
+    try:
+        while True:
+            with _state_lock:
+                if not _pending or not _connected or not _chat_id:
+                    return
+                text = _pending.popleft()
+                target_chat = _chat_id
+                remaining = len(_pending)
+            logger.info(f"[SEND_FLUSH] delivering queued message ({remaining} left)")
+            if not _deliver(text, target_chat):
+                # Stop the drain: the failed message is dropped (matching
+                # direct-send semantics), the rest stays queued and retries
+                # on the next poll-cycle flush — so a rate-limit burst cannot
+                # burn the whole queue in one failing drain.
+                logger.warning(
+                    f"[SEND_FLUSH] delivery failed, stopping drain ({remaining} still queued)"
+                )
+                return
+    finally:
+        _flush_lock.release()
 
+
+def _deliver(text, target_chat):
     max_len = 3900
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
@@ -256,7 +302,34 @@ def send_message(text):
             )
         except Exception as exc:
             logger.exception(f"Send failed: {exc}")
-            return
+            return False
+    return True
+
+
+def send_message(text):
+    text = str(text).replace("\\n", "\n").replace("\r", "")
+    if not text:
+        return
+
+    with _state_lock:
+        target_chat = _chat_id
+
+    if not _connected or not target_chat:
+        # Sends issued before polling is up (or before a chat is bound) used
+        # to be dropped silently — most visibly the agent's first message
+        # right after launch, which races the adapter's first getUpdates.
+        _enqueue_pending(text)
+        return
+
+    _flush_pending()
+    with _state_lock:
+        drain_incomplete = bool(_pending)
+    if drain_incomplete:
+        # A failed drain left older messages queued — join the queue instead
+        # of overtaking them, so delivery order stays chronological.
+        _enqueue_pending(text)
+        return
+    _deliver(text, target_chat)
 
 class TelegramChannel(channels.CommChannel):
 
