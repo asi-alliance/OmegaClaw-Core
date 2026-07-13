@@ -76,7 +76,7 @@ jobs:
 
       - name: Autotests - Checkout
         if: inputs.run_tests
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Autotests - Set up
         if: inputs.run_tests
