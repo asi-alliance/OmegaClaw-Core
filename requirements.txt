@@ -2,7 +2,7 @@ torch==2.12.1
 chromadb==1.5.9
 openai==2.38.0
 uagents==0.25.1
-transformers==5.8.0
+transformers==5.13.1
 sentence-transformers==5.5.1
 import-kb==0.1.8
 py-landlock==0.1.1
