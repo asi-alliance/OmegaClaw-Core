@@ -142,6 +142,11 @@ def _merge_send_continuations(lines):
     return merged
 
 
+def _quote_arg(text):
+    # escape backslash before quote so a trailing one can't escape the closing quote
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
@@ -180,18 +185,17 @@ def balance_parentheses(s):
                     filename = rest[:end+1]
                     content = rest[end+1:].strip()
                 else:
-                    filename = '"' + rest[1:].replace('"', '\\"') + '"'
+                    filename = _quote_arg(rest[1:])
                     content = ""
             else:
                 split_rest = rest.split(maxsplit=1)
-                filename = '"' + split_rest[0].replace('"', '\\"') + '"'
+                filename = _quote_arg(split_rest[0])
                 content = split_rest[1].strip() if len(split_rest) > 1 else ""
             if content:
                 if content.startswith('"') and content.endswith('"'):
                     sexprs.append(f"({cmd} {filename} {content})")
                 else:
-                    content = content.replace('"', '\\"')
-                    sexprs.append(f'({cmd} {filename} "{content}")')
+                    sexprs.append(f"({cmd} {filename} {_quote_arg(content)})")
             else:
                 sexprs.append(f"({cmd} {filename})")
             continue
@@ -199,8 +203,7 @@ def balance_parentheses(s):
             if rest.startswith('"') and rest.endswith('"'):
                 sexprs.append(f"({cmd} {rest})")
             else:
-                rest = rest.replace('"', '\\"')
-                sexprs.append(f'({cmd} "{rest}")')
+                sexprs.append(f"({cmd} {_quote_arg(rest)})")
         else:
             sexprs.append(f"({cmd})")
     ret = " ".join(sexprs)
@@ -235,6 +238,11 @@ def test_balance_parenthesis():
     assert balance_parentheses('send "Plain text version:"\n**Mars** - red planet\nNote: Pluto is a dwarf planet') == '((send "Plain text version:\\n**Mars** - red planet\\nNote: Pluto is a dwarf planet"))'
     assert balance_parentheses('(send Here are the planets:\n1. Mercury\n2. Venus)') == '((send "Here are the planets:\\n1. Mercury\\n2. Venus"))'
     assert balance_parentheses('send "hello" world') == '((send "\\"hello\\" world"))'
+    # a trailing backslash must not escape the closing quote and break the command
+    assert balance_parentheses('send C:\\Users\\bob') == '((send "C:\\\\Users\\\\bob"))'
+    assert balance_parentheses('send finish with a backslash \\') == '((send "finish with a backslash \\\\"))'
+    assert balance_parentheses('write-file log.txt C:\\tmp\\a') == '((write-file "log.txt" "C:\\\\tmp\\\\a"))'
+    assert balance_parentheses('send match \\d+\\.') == '((send "match \\\\d+\\\\."))'
     # bare "()" lines yield no tokens after _strip_outer_parens and must be skipped, not crash
     assert balance_parentheses('()') == '()'
     assert balance_parentheses('') == '()'
