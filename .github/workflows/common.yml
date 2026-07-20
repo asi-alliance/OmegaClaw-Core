@@ -103,6 +103,10 @@ jobs:
           TEST_SERVER_IP: 'host.docker.internal'
           IMPORT_KB_ON_START: '0' # TODO: this is turned off because Python dependencies are not installed to the workflow environment
 
+      - name: Unit tests
+        if: inputs.run_tests
+        run: docker exec -e PETTA_PATH=/PeTTa omegaclaw sh /PeTTa/repos/OmegaClaw-Core/tests/mettatest.sh
+
       - name: Autotests - Phase 1 (Blocking Checks)
         if: inputs.run_tests
         working-directory: Autotests
