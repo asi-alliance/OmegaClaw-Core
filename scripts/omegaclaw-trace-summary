@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Aggregate an OmegaClaw reasoning-trace JSONL file into actionable metrics (Issue #7).
+
+Reads a JSONL trace (as written by src/tracing.py) and reports: iterations, events by phase,
+parse errors, policy denials, invalid actions, actions-by-type, average LLM latency, and the
+share of iterations with FULL linkage (input -> llm -> parse -> result all sharing a trace_id).
+
+Usage:
+  scripts/omegaclaw-trace-summary [TRACE.jsonl] [--json]
+
+With no path it uses OMEGACLAW_TRACE_PATH or the dated default (<repo>/memory/traces/YYYYMMDD.jsonl).
+Stdlib only.
+"""
+
+import argparse
+import json
+import os
+import sys
+from collections import Counter, defaultdict
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _default_path():
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
+    try:
+        import tracing
+        return tracing.trace_path()
+    except Exception:  # noqa: BLE001
+        return os.path.join(_REPO_ROOT, "memory", "traces")
+
+
+def load_events(path):
+    """Return (events, malformed_line_count). Skips blank/malformed lines robustly."""
+    events, malformed = [], 0
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                events.append(json.loads(line))
+            except ValueError:
+                malformed += 1
+    return events, malformed
+
+
+def summarize(events, malformed=0):
+    by_phase = Counter(e.get("phase") for e in events)
+    by_trace = defaultdict(list)
+    for e in events:
+        by_trace[e.get("trace_id")].append(e)
+
+    iterations = by_phase.get("iteration_start", 0) or len([t for t in by_trace if t])
+    parse_errors = sum(1 for e in events if e.get("phase") == "action_parse" and e.get("error_codes"))
+    invalid_actions = sum(1 for e in events if e.get("phase") == "action_parse" and e.get("ok") is False)
+    policy_denials = sum(1 for e in events if e.get("phase") == "policy_decision" and e.get("allowed") is False)
+
+    # Structured error recovery events (Issue #10): count phase=="error" events by
+    # their machine-readable category (error_type), falling back to code for events
+    # written before error_type was emitted.
+    errors_by_type = Counter((e.get("error_type") or e.get("code"))
+                             for e in events if e.get("phase") == "error")
+    error_events = sum(errors_by_type.values())
+
+    actions_by_type = Counter()
+    for e in events:
+        if e.get("phase") == "action_parse":
+            for t in (e.get("tools") or []):
+                actions_by_type[t] += 1
+
+    latencies = [e["latency_ms"] for e in events if e.get("phase") == "llm_call" and isinstance(e.get("latency_ms"), (int, float))]
+    avg_latency_ms = round(sum(latencies) / len(latencies), 2) if latencies else None
+
+    # full linkage: a trace_id whose events include iteration_start + llm_call + action_parse
+    # + (iteration_end or iteration_result) — i.e. input->llm->parse->result all linked.
+    linked = 0
+    for tid, evs in by_trace.items():
+        if not tid:
+            continue
+        phases = {e.get("phase") for e in evs}
+        if {"iteration_start", "llm_call", "action_parse"} <= phases and phases & {"iteration_end", "iteration_result"}:
+            linked += 1
+    linkage_rate = round(linked / iterations, 4) if iterations else 0.0
+
+    return {
+        "events": len(events),
+        "malformed_lines": malformed,
+        "iterations": iterations,
+        "events_by_phase": dict(by_phase),
+        "parse_errors": parse_errors,
+        "invalid_actions": invalid_actions,
+        "policy_denials": policy_denials,
+        "error_events": error_events,
+        "errors_by_type": dict(errors_by_type),
+        "actions_by_type": dict(actions_by_type),
+        "avg_llm_latency_ms": avg_latency_ms,
+        "fully_linked_iterations": linked,
+        "linkage_rate": linkage_rate,
+    }
+
+
+def render(summary, path):
+    lines = [
+        f"OmegaClaw reasoning-trace summary: {path}",
+        f"  events                 : {summary['events']} ({summary['malformed_lines']} malformed lines skipped)",
+        f"  iterations             : {summary['iterations']}",
+        f"  fully-linked iterations: {summary['fully_linked_iterations']} ({summary['linkage_rate']:.0%})",
+        f"  parse errors           : {summary['parse_errors']}",
+        f"  invalid actions        : {summary['invalid_actions']}",
+        f"  policy denials         : {summary['policy_denials']}",
+        f"  structured errors      : {summary['error_events']}",
+        "  errors by type         : " + (", ".join(f"{k}={v}" for k, v in sorted(summary["errors_by_type"].items())) or "(none)"),
+        f"  avg LLM latency (ms)   : {summary['avg_llm_latency_ms']}",
+        "  events by phase        : " + ", ".join(f"{k}={v}" for k, v in sorted(summary["events_by_phase"].items())),
+        "  actions by type        : " + (", ".join(f"{k}={v}" for k, v in sorted(summary["actions_by_type"].items())) or "(none)"),
+    ]
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Summarize an OmegaClaw reasoning-trace JSONL file.")
+    ap.add_argument("path", nargs="?", default=None, help="trace .jsonl (default: OMEGACLAW_TRACE_PATH or dated default)")
+    ap.add_argument("--json", action="store_true", help="emit the summary as JSON")
+    args = ap.parse_args(argv)
+
+    path = args.path or _default_path()
+    if not os.path.isfile(path):
+        print(f"trace file not found: {path}", file=sys.stderr)
+        return 2
+
+    events, malformed = load_events(path)
+    summary = summarize(events, malformed)
+    print(json.dumps(summary, indent=2) if args.json else render(summary, path))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

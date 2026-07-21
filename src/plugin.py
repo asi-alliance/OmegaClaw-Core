@@ -141,4 +141,20 @@ def llmProviderConfig(provider, config):
 def llmProviderChat(prompt, max_tokens, reasoning_mode):
     """Chat via selected LLM provider"""
     global _llmprovider
-    return _llmprovider.chat(prompt, max_tokens, reasoning_mode)
+    import time
+    t0 = time.monotonic()
+    response = _llmprovider.chat(prompt, max_tokens, reasoning_mode)
+    # Reasoning trace (Issue #7): emit an llm_call trace under the current iteration's trace_id.
+    # Best-effort — a trace failure never breaks the chat path.
+    try:
+        try:
+            import tracing
+        except ImportError:  # pragma: no cover - package-style import path
+            from src import tracing
+        provider_name = getattr(_llmprovider, "_name", "")
+        model = getattr(getattr(_llmprovider, "delegate", None), "_model_name", "")
+        tracing.trace_llm(provider_name, model, prompt, response,
+                          latency_ms=int((time.monotonic() - t0) * 1000))
+    except Exception:
+        pass
+    return response

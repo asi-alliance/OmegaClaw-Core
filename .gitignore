@@ -27,3 +27,6 @@ Autotests/logs/
 # logs
 logs/*.log
 logs/*.log.*
+
+# reasoning traces
+memory/traces/
