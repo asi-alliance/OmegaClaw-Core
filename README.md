@@ -182,6 +182,8 @@ If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START
 | `TG_BOT_TOKEN` | Telegram bot token. |
 | `MM_BOT_TOKEN` | Mattermost bot token. |
 | `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
+| `OMEGACLAW_DEBUG_LLM_RAW` | `1`/`true` to log raw model responses (for debugging). Default off — raw bodies are **not** logged; only metadata (provider, model, timestamp, char count, trace id). When enabled, common secret/token formats are best-effort redacted (not a guarantee). |
+| `OMEGACLAW_LLM_LOG_PATH` | Optional path to append per-response JSONL log records (metadata always; redacted raw only when `OMEGACLAW_DEBUG_LLM_RAW` is set). |
 
 ---
 

@@ -1,16 +1,55 @@
 import os, hashlib
+import json
+import time
+import uuid
 import openai
 from typing import Optional, Tuple, Dict, Any
 
 PROMPT_DELIMITER = ":-:-:-:"
 
 from src.logger import get_logger
+# Shared redactor (Issue #3) — kept dependency-light so logging never leaks secrets/PII.
+try:
+    from src.redaction import redact_secrets
+except ImportError:  # pragma: no cover - flat import path
+    from redaction import redact_secrets
 
 
 logger = get_logger(__name__)
 
+
+def _raw_logging_enabled() -> bool:
+    return (os.environ.get("OMEGACLAW_DEBUG_LLM_RAW") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _log_raw(provider: str, model: str, raw: str) -> None:
-    logger.debug(f"[LLM_RAW] provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
+    """Redacted, gated raw-response logging (Issue #3, ported onto the plugin providers package).
+
+    Metadata only by default; the raw body is emitted (redacted via
+    ``src.redaction.redact_secrets``) ONLY when ``OMEGACLAW_DEBUG_LLM_RAW`` is set. Optional JSONL
+    sink via ``OMEGACLAW_LLM_LOG_PATH``. This replaces upstream's ``raw={raw!r}`` debug line, which
+    would emit unredacted model output to the logs (a privacy regression for this fork)."""
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    raw = raw or ""
+    chars = len(raw)
+    trace = uuid.uuid4().hex[:8]
+    debug = _raw_logging_enabled()
+
+    body = repr(redact_secrets(raw)) if debug else "<redacted; set OMEGACLAW_DEBUG_LLM_RAW=1>"
+    # Issue #3 contract: the metadata line is ALWAYS observable (never gated behind a log level),
+    # so it uses print rather than logger.debug (which config/logging.conf suppresses at INFO).
+    print(f"[LLM_RAW] ts={ts} trace={trace} provider={provider} model={model} chars={chars} raw={body}")
+
+    log_path = os.environ.get("OMEGACLAW_LLM_LOG_PATH")
+    if log_path:
+        record = {"ts": ts, "trace": trace, "provider": provider, "model": model, "chars": chars}
+        if debug:
+            record["raw"] = redact_secrets(raw)
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError as exc:  # best-effort; never break the chat path
+            print(f"[LLM_RAW] WARNING could not write OMEGACLAW_LLM_LOG_PATH ({log_path}): {exc}")
 
 def _split_system_user(content: str) -> Tuple[str, str]:
     """
@@ -157,5 +196,3 @@ def useLocalEmbedding(atom):
         atom,
         normalize_embeddings=True
     ).tolist()
-
-
