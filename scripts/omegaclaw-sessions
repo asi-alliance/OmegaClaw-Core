@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""OmegaClaw session browser (Issue #16).
+
+Browse, search, resume and export past agent sessions from the SQLite session store.
+
+  sessions list                     list recent sessions
+  sessions search "<query>"         full-text search across sessions/messages/tool outcomes
+  sessions show <id>                full transcript of a session
+  sessions resume <id>              reconstruct enough state to continue an interrupted session
+  sessions export <id>              full JSON export
+  sessions ingest <trace.jsonl>     backfill sessions from a reasoning-trace JSONL
+
+DB path: OMEGACLAW_SESSION_DB (default <repo>/memory/sessions.db).
+"""
+
+import argparse
+import json
+import os
+import sys
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
+
+import session_store as ss  # noqa: E402
+
+
+def _out(args, obj, text):
+    if getattr(args, "json", False):
+        print(json.dumps(obj, indent=2, default=str))
+    else:
+        print(text)
+    return 0 if obj.get("ok", True) else 1
+
+
+def cmd_list(args):
+    items = ss.list_sessions(args.limit)
+    lines = ["sessions ({}):".format(len(items))]
+    for s in items:
+        lines.append("  {}  [{}] turns={} {} — {}".format(
+            s["id"], s["status"], s["turns"], s.get("channel") or "", (s.get("task") or "")[:60]))
+    return _out(args, {"ok": True, "sessions": items}, "\n".join(lines))
+
+
+def cmd_search(args):
+    hits = ss.search(args.query, args.limit)
+    lines = ["search '{}' ({} hit(s)):".format(args.query, len(hits))]
+    for h in hits:
+        lines.append("  {}  {} — {}".format(h["session_id"], (h.get("task") or "")[:50], h["snippet"][:80]))
+    return _out(args, {"ok": True, "query": args.query, "hits": hits}, "\n".join(lines))
+
+
+def cmd_show(args):
+    r = ss.show(args.id)
+    if not r.get("ok"):
+        return _out(args, r, "error: {}".format(r.get("error")))
+    s = r["session"]
+    lines = ["session {} [{}] task={}".format(s["id"], s["status"], s.get("task"))]
+    for m in r["messages"]:
+        lines.append("  t{} {}: {}".format(m["turn"], m["role"], (m["text"] or "")[:100]))
+    for t in r["tool_calls"]:
+        lines.append("  t{} tool[{}] {} -> {}".format(
+            t["turn"], "ok" if t["ok"] else "ERR", t["tool"], (t["result"] or "")[:60]))
+    return _out(args, r, "\n".join(lines))
+
+
+def cmd_resume(args):
+    r = ss.resume(args.id)
+    if not r.get("ok"):
+        return _out(args, r, "error: {}".format(r.get("error")))
+    lines = ["resume {} (task={}, status={}, from turn {}):".format(
+        r["session_id"], r["task"], r["status"], r["resume_turn"])]
+    if r["latest_snapshot"]:
+        lines.append("  snapshot: {}".format(json.dumps(r["latest_snapshot"])[:200]))
+    for m in r["recent_messages"]:
+        lines.append("  t{} {}: {}".format(m["turn"], m["role"], (m["text"] or "")[:100]))
+    return _out(args, r, "\n".join(lines))
+
+
+def cmd_export(args):
+    r = ss.export(args.id)
+    return _out(args, r, json.dumps(r, indent=2, default=str) if r.get("ok") else "error: {}".format(r.get("error")))
+
+
+def cmd_ingest(args):
+    r = ss.ingest_trace(args.path)
+    return _out(args, r, "ingested {} session(s), {} event(s)".format(r.get("sessions"), r.get("events"))
+                if r.get("ok") else "error: {}".format(r.get("error")))
+
+
+def build_parser():
+    jsn = argparse.ArgumentParser(add_help=False)
+    jsn.add_argument("--json", action="store_true", help="emit result as JSON")
+    p = argparse.ArgumentParser(prog="omegaclaw-sessions", description="OmegaClaw session browser")
+    sub = p.add_subparsers(dest="command")
+
+    ls = sub.add_parser("list", parents=[jsn], help="list recent sessions")
+    ls.add_argument("--limit", type=int, default=50)
+    ls.set_defaults(func=cmd_list)
+
+    se = sub.add_parser("search", parents=[jsn], help="full-text search across sessions")
+    se.add_argument("query")
+    se.add_argument("--limit", type=int, default=5)
+    se.set_defaults(func=cmd_search)
+
+    for name, fn, helptext in (("show", cmd_show, "full transcript"),
+                               ("resume", cmd_resume, "reconstruct state to continue"),
+                               ("export", cmd_export, "full JSON export")):
+        sp = sub.add_parser(name, parents=[jsn], help=helptext)
+        sp.add_argument("id")
+        sp.set_defaults(func=fn)
+
+    ing = sub.add_parser("ingest", parents=[jsn], help="backfill from a reasoning-trace JSONL")
+    ing.add_argument("path")
+    ing.set_defaults(func=cmd_ingest)
+    return p
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    if not getattr(args, "func", None):
+        build_parser().print_help()
+        return 2
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
