@@ -63,5 +63,15 @@
 (= (query $str)
    (py-call (lib_chromadb.query (embed $str) (maxRecallItems))))
 
+;Provenance-aware memory (Issue #5). remember/query above are unchanged.
+;remember-claim records a provenance-tagged claim; emitted by the agent it is an
+;`llm` source (confidence 0.55). query-claims recalls claims with inline provenance.
+(= (remember-claim $claim)
+   (progn (py-call (memory_schema.remember_claim_llm $claim (embed $claim)))
+          REMEMBER-CLAIM-SUCCESS))
+
+(= (query-claims $str)
+   (py-call (memory_schema.query_claims_text (embed $str) (maxRecallItems))))
+
 (= (episodes $time)
    (py-call (helper.around_time $time (maxEpisodeRecallLines))))
