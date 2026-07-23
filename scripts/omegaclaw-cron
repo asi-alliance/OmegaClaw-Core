@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""OmegaClaw scheduler CLI — cron / interval / one-shot jobs + webhook subscriptions (Issue #17).
+
+  cron create <id> --kind once|interval|cron --spec <spec> [--prompt ..] [--on-empty silent|alert]
+  cron list | show <id> | pause <id> | resume <id> | remove <id>
+  cron run <id>                          force-run a job now
+  cron tick                              fire everything currently due (scheduler heartbeat)
+  cron webhook subscribe <id> --secret S [--prompt ..]
+  cron webhook list | remove <id>
+  cron webhook event <id> --payload '{...}' [--signature HEX]
+
+DB path: OMEGACLAW_JOBS_DB (default memory/jobs.db). Durable — survives restart.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
+
+import scheduler as sch  # noqa: E402
+
+
+def _out(args, obj, text):
+    if getattr(args, "json", False):
+        print(json.dumps(obj, indent=2, default=str))
+    else:
+        print(text)
+    return 0 if obj.get("ok", True) else 1
+
+
+def cmd_create(args):
+    r = sch.create_job(args.id, args.kind, args.spec, prompt=args.prompt or "",
+                       on_empty=args.on_empty, chain_from=args.chain_from or "")
+    return _out(args, r, "created {} ({}, next_run={})".format(args.id, args.kind, r.get("next_run"))
+                if r.get("ok") else "error: {}".format(r.get("error")))
+
+
+def cmd_list(args):
+    jobs = sch.list_jobs()
+    lines = ["jobs ({}):".format(len(jobs))]
+    for j in jobs:
+        lines.append("  {}  [{}] kind={} spec={} next_run={} last={} fires={}".format(
+            j["id"], "on" if j["enabled"] else "off", j["kind"], j["spec"],
+            j["next_run"], j["last_status"], j["fires"]))
+    return _out(args, {"ok": True, "jobs": jobs}, "\n".join(lines))
+
+
+def cmd_show(args):
+    j = sch.get_job(args.id)
+    if not j:
+        return _out(args, {"ok": False, "error": "no such job"}, "no such job: {}".format(args.id))
+    return _out(args, {"ok": True, "job": j}, json.dumps(j, indent=2, default=str))
+
+
+def cmd_pause(args):
+    return _out(args, sch.pause(args.id), "paused {}".format(args.id))
+
+
+def cmd_resume(args):
+    return _out(args, sch.resume(args.id), "resumed {}".format(args.id))
+
+
+def cmd_remove(args):
+    r = sch.remove(args.id)
+    return _out(args, r, "removed {}".format(args.id) if r.get("ok") else "no such job")
+
+
+def cmd_run(args):
+    r = sch.run_now(args.id)
+    return _out(args, r, "ran {} -> {}".format(args.id, (r.get("fired") or {}).get("status"))
+                if r.get("ok") else "error: {}".format(r.get("error")))
+
+
+def cmd_tick(args):
+    r = sch.run_due()
+    lines = ["fired {} due job(s):".format(r["count"])]
+    for f in r["fired"]:
+        lines.append("  {} -> {}{}".format(f["id"], f["status"], " (alerted)" if f["alerted"] else ""))
+    return _out(args, r, "\n".join(lines))
+
+
+def cmd_webhook(args):
+    action = args.webhook_action
+    if action == "subscribe":
+        r = sch.webhook_subscribe(args.id, args.secret or "", {"prompt": args.prompt or ""})
+        return _out(args, r, "subscribed {}".format(args.id) if r.get("ok") else r.get("error"))
+    if action == "list":
+        subs = sch.webhook_list()
+        return _out(args, {"ok": True, "subscriptions": subs},
+                    "webhooks:\n" + "\n".join("  {} secret={}".format(s["id"], s["has_secret"]) for s in subs))
+    if action == "remove":
+        return _out(args, sch.webhook_remove(args.id), "removed {}".format(args.id))
+    if action == "event":
+        payload = json.loads(args.payload) if args.payload else {}
+        r = sch.webhook_event(args.id, payload, args.signature)
+        return _out(args, r, "event {}: {}".format(args.id, "ran" if r.get("ok")
+                    else ("REJECTED" if r.get("rejected") else "error: " + str(r.get("error")))))
+    return _out(args, {"ok": False, "error": "unknown webhook action"}, "unknown webhook action")
+
+
+def build_parser():
+    jsn = argparse.ArgumentParser(add_help=False)
+    jsn.add_argument("--json", action="store_true")
+    p = argparse.ArgumentParser(prog="omegaclaw-cron", description="OmegaClaw scheduler CLI")
+    sub = p.add_subparsers(dest="command")
+
+    c = sub.add_parser("create", parents=[jsn])
+    c.add_argument("id")
+    c.add_argument("--kind", required=True, choices=["once", "interval", "cron"])
+    c.add_argument("--spec", required=True, help="epoch (once) | seconds (interval) | 5-field cron")
+    c.add_argument("--prompt", default="")
+    c.add_argument("--on-empty", dest="on_empty", default="silent", choices=["silent", "alert"])
+    c.add_argument("--chain-from", dest="chain_from", default="")
+    c.set_defaults(func=cmd_create)
+
+    for name, fn in (("list", cmd_list), ("tick", cmd_tick)):
+        sp = sub.add_parser(name, parents=[jsn])
+        sp.set_defaults(func=fn)
+    for name, fn in (("show", cmd_show), ("pause", cmd_pause), ("resume", cmd_resume),
+                     ("remove", cmd_remove), ("run", cmd_run)):
+        sp = sub.add_parser(name, parents=[jsn])
+        sp.add_argument("id")
+        sp.set_defaults(func=fn)
+
+    wh = sub.add_parser("webhook", parents=[jsn])
+    wha = wh.add_subparsers(dest="webhook_action")
+    ws = wha.add_parser("subscribe", parents=[jsn])
+    ws.add_argument("id")
+    ws.add_argument("--secret", default="")
+    ws.add_argument("--prompt", default="")
+    wha.add_parser("list", parents=[jsn])
+    wr = wha.add_parser("remove", parents=[jsn])
+    wr.add_argument("id")
+    we = wha.add_parser("event", parents=[jsn])
+    we.add_argument("id")
+    we.add_argument("--payload", default="{}")
+    we.add_argument("--signature", default=None)
+    wh.set_defaults(func=cmd_webhook)
+    return p
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    if not getattr(args, "func", None):
+        build_parser().print_help()
+        return 2
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
