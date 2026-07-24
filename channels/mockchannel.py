@@ -1,6 +1,6 @@
 import os
 import Autotests.mock.comm as comm
-import pluginapi as plugin
+import channels
 
 _client = None
 
@@ -17,7 +17,7 @@ def send_message(text):
     global _client
     return _client.send_message(text)
 
-class MockChannel(plugin.CommChannel):
+class MockChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -32,4 +32,4 @@ class MockChannel(plugin.CommChannel):
         send_message(message)
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("test", MockChannel())
+    channels.registerCommChannel("test", MockChannel())

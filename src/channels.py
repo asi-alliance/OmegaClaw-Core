@@ -1,13 +1,8 @@
-"""
-OmegaClaw API which should be used to implement extensions.
-"""
-
 import logging
 
 logger = logging.getLogger(__name__)
 
 _commChannelRegistry = {}
-_llmProviderRegistry = {}
 
 class CommChannel:
     """Communication channel implementation"""
@@ -31,22 +26,23 @@ def registerCommChannel(id: str, channel: CommChannel) -> None:
     logger.info(f"registerCommChannel: registering communication channel {id}")
     _commChannelRegistry[id] = channel
 
+_commchannel: CommChannel = None
 
-class LLMProvider:
-    """LLM provider implementation"""
+def commChannelConfig(commchannel, config):
+    """Select and configure one of the communication channels registered by
+    plugins"""
+    global _commchannel
+    _commchannel = _commChannelRegistry.get(commchannel, None)
+    if _commchannel is None:
+        _error("commChannelConfig", f"Communication channel plugin {commchannel} is not registered")
+    _commchannel.config(config)
 
-    def config(self, config: dict) -> None:
-        """Configure LLM provider. Receives the subset of the command line
-        parameters or configuration file keys which are started by "<id>_"
-        prefix"""
-        raise NotImplementedError()
+def commChannelReceive():
+    """Receive message from selected communication channel"""
+    global _commchannel
+    return _commchannel.receive()
 
-    def chat(self, prompt: str, max_tokens: int = 6000, reasoning_mode: str = "medium") -> str:
-        """Chat with LLM provider"""
-        raise NotImplementedError()
-
-def registerLLMProvider(id: str, provider: LLMProvider) -> None:
-    """Register LLM provider in the registry"""
-    global _llmProviderRegistry
-    logger.info(f"registerLLMProvider: registering LLM provider {id}")
-    _llmProviderRegistry[id] = provider
+def commChannelSend(message):
+    """Send message via selected communication channel"""
+    global _commchannel
+    _commchannel.send(message)

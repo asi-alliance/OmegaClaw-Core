@@ -7,6 +7,15 @@
           (configure commchannel irc)
           (commChannelConfig (commchannel))))
 
+(= (commChannelConfig $commchannel)
+   (py-call (channels.commChannelConfig $commchannel (py-call (plugin.commandLineToDict (command-line))))))
+
+(= (commChannelReceive)
+   (py-call (channels.commChannelReceive)))
+
+(= (commChannelSend $message)
+   (py-call (channels.commChannelSend $message)))
+
 ;Receive the latest user message considering all communication channels:
 (= (receive)
    (commChannelReceive))

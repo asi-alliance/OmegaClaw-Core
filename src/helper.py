@@ -2,6 +2,7 @@ from collections import deque
 import json
 import re
 from datetime import datetime
+import os
 
 try:
     from src.logger import get_logger
@@ -216,6 +217,11 @@ def normalize_string(x):
         logger.debug(f"Could not normalize value, using its plain string form: {e}")
         return str(x)
 
+def joinPath(parts):
+    return os.path.join(*parts)
+
+def projectRootDirectory():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def test_balance_parenthesis():
     assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
@@ -240,7 +246,6 @@ def test_balance_parenthesis():
     assert balance_parentheses('') == '()'
     assert balance_parentheses('   ') == '()'
     assert balance_parentheses('()\nsend hello') == '((send "hello"))'
-
 
 if __name__ == "__main__":
     test_balance_parenthesis()

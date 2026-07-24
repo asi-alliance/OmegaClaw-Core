@@ -7,7 +7,7 @@ import requests
 import websocket
 import auth
 from src.logger import get_logger
-import pluginapi as plugin
+import channels
 
 logger = get_logger(__name__)
 
@@ -174,7 +174,7 @@ def send_message(text):
         json={"channel_id": CHANNEL_ID, "message": text}
     )
 
-class MattermostChannel(plugin.CommChannel):
+class MattermostChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -192,4 +192,4 @@ class MattermostChannel(plugin.CommChannel):
         send_message(message)
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("mattermost", MattermostChannel())
+    channels.registerCommChannel("mattermost", MattermostChannel())

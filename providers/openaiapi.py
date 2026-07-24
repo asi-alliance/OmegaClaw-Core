@@ -1,8 +1,8 @@
 import os
 import lib_llm_ext as llm
-import pluginapi as plugin
+import providers
 
-class OpenAIAPI(plugin.LLMProvider):
+class OpenAIAPI(providers.LLMProvider):
 
     def __init__(self, name):
         super().__init__()
@@ -43,6 +43,6 @@ class OpenAIAPIPreconfigured(OpenAIAPI):
         return self._base_url
 
 def loadOmegaClawPlugin():
-    plugin.registerLLMProvider("OpenAIAPI", OpenAIAPI("OpenAIAPI"))
-    plugin.registerLLMProvider("ASICloud", OpenAIAPIPreconfigured("ASICloud", "ASI_API_KEY", "minimax/minimax-m3", "https://inference.asicloud.cudos.org/v1"))
-    plugin.registerLLMProvider("Anthropic", OpenAIAPIPreconfigured("Anthropic", "ANTHROPIC_API_KEY", "claude-opus-4-8", "https://api.anthropic.com/v1/"))
+    providers.registerLLMProvider("OpenAIAPI", OpenAIAPI("OpenAIAPI"))
+    providers.registerLLMProvider("ASICloud", OpenAIAPIPreconfigured("ASICloud", "ASI_API_KEY", "minimax/minimax-m3", "https://inference.asicloud.cudos.org/v1"))
+    providers.registerLLMProvider("Anthropic", OpenAIAPIPreconfigured("Anthropic", "ANTHROPIC_API_KEY", "claude-opus-4-8", "https://api.anthropic.com/v1/"))

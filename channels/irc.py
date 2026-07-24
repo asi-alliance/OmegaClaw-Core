@@ -6,7 +6,7 @@ import time
 import textwrap
 import auth
 from src.logger import get_logger
-import pluginapi as plugin
+import channels
 
 logger = get_logger(__name__)
 
@@ -168,7 +168,7 @@ def send_message(text):
         except Exception as e:
             logger.exception(f"Error in send_message on channel {_channel}: {e}")
 
-class IRCChannel(plugin.CommChannel):
+class IRCChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -187,4 +187,4 @@ class IRCChannel(plugin.CommChannel):
         send_message(message)
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("irc", IRCChannel())
+    channels.registerCommChannel("irc", IRCChannel())

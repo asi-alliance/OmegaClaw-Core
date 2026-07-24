@@ -70,9 +70,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from src.logger import get_logger
 try:
-    import pluginapi as plugin
+    import channels
 except ModuleNotFoundError:
-    import src.pluginapi as plugin
+    import src.channels as channels
 
 logger = get_logger(__name__)
 
@@ -336,7 +336,7 @@ def send_message(text):
             _outbox.append(payload)
 
 
-class WSChannel(plugin.CommChannel):
+class WSChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -352,4 +352,4 @@ class WSChannel(plugin.CommChannel):
 
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("websocket", WSChannel())
+    channels.registerCommChannel("websocket", WSChannel())

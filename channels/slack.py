@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import auth
 from src.logger import get_logger
-import pluginapi as plugin
+import channels
 
 logger = get_logger(__name__)
 
@@ -481,7 +481,7 @@ def send_message(text):
             logger.exception(f"Send failed: {exc}")
             return
 
-class SlackChannel(plugin.CommChannel):
+class SlackChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -498,4 +498,4 @@ class SlackChannel(plugin.CommChannel):
         send_message(message)
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("slack", SlackChannel())
+    channels.registerCommChannel("slack", SlackChannel())

@@ -1,10 +1,10 @@
 import lib_llm_ext as llm
-import pluginapi as plugin
+import providers
 from src.logger import get_logger
 
 logger = get_logger(__name__)
 
-class ASIOneProvider(plugin.LLMProvider):
+class ASIOneProvider(providers.LLMProvider):
 
     def __init__(self):
         super().__init__()
@@ -18,7 +18,7 @@ class ASIOneProvider(plugin.LLMProvider):
         return self.delegate.chat(prompt, max_tokens, reasoning_mode)
 
 def loadOmegaClawPlugin():
-    plugin.registerLLMProvider("ASIOne", ASIOneProvider())
+    providers.registerLLMProvider("ASIOne", ASIOneProvider())
 
 class ASIOneProviderImpl(llm.AIProvider):
     """Lazy AI provider with on-demand initialization."""

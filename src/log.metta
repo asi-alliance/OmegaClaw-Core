@@ -1,5 +1,12 @@
 !(import_prolog_function swrite)
 
+(= (logConfigPath) (empty))
+
+(= (initLogger)
+   (progn
+     (configure logConfigPath "")
+     (py-call (logger.setup_logging (logConfigPath)))))
+
 (= (log $type $module $msg)
    (let $str (swrite $msg)
      (case $type 

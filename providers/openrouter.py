@@ -2,12 +2,12 @@ import os
 import openai
 from typing import Optional, Dict, Any
 import lib_llm_ext as llm
-import pluginapi as plugin
+import providers
 from src.logger import get_logger
 
 logger = get_logger(__name__)
 
-class OpenRouterProvider(plugin.LLMProvider):
+class OpenRouterProvider(providers.LLMProvider):
 
     def __init__(self):
         super().__init__()
@@ -21,7 +21,7 @@ class OpenRouterProvider(plugin.LLMProvider):
         return self.delegate.chat(prompt, max_tokens, reasoning_mode)
 
 def loadOmegaClawPlugin():
-    plugin.registerLLMProvider("OpenRouter", OpenRouterProvider())
+    providers.registerLLMProvider("OpenRouter", OpenRouterProvider())
 
 class OpenRouterProviderImpl(llm.AIProvider):
     """OpenRouter provider with reasoning mode enabled (reasoning tokens excluded from the response)."""

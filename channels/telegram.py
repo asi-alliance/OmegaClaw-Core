@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.request
 import auth
 from src.logger import get_logger
-import pluginapi as plugin
+import channels
 
 logger = get_logger(__name__)
 
@@ -257,7 +257,7 @@ def send_message(text):
             logger.exception(f"Send failed: {exc}")
             return
 
-class TelegramChannel(plugin.CommChannel):
+class TelegramChannel(channels.CommChannel):
 
     def __init__(self):
         super().__init__()
@@ -274,4 +274,4 @@ class TelegramChannel(plugin.CommChannel):
         send_message(message)
 
 def loadOmegaClawPlugin():
-    plugin.registerCommChannel("telegram", TelegramChannel())
+    channels.registerCommChannel("telegram", TelegramChannel())

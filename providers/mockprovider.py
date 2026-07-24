@@ -1,8 +1,8 @@
 import os
 import lib_llm_ext as llm
-import pluginapi as plugin
+import providers
 
-class MockProvider(plugin.LLMProvider):
+class MockProvider(providers.LLMProvider):
 
     def __init__(self):
         super().__init__()
@@ -14,7 +14,7 @@ class MockProvider(plugin.LLMProvider):
         return self.delegate.chat(prompt, max_tokens, reasoning_mode)
 
 def loadOmegaClawPlugin():
-    plugin.registerLLMProvider("Test", MockProvider())
+    providers.registerLLMProvider("Test", MockProvider())
 
 class MockProviderImpl(llm.AbstractAIProvider):
     """Test provider for mocking LLM output"""

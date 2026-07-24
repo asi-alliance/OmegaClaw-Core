@@ -1,7 +1,6 @@
 # plugins.yaml lists all plugins available to the agent.  Agent reads this file
 # on start and loads all listed plugins by calling `loadOmegaClawPlugin`
-# function. Please see `pluginapi.metta` and `pluginapi.py` to understand which
-# API is available to plugins.
+# function.
 #
 # Plugin can be implemented as a MeTTa module, a single Python file or
 # a Python module. The plugin record has the following fields:
@@ -55,3 +54,7 @@
 - name: mockprovider
   loader: python
   location: "{REPO}/providers"
+
+- name: workflow
+  loader: metta
+  location: "{REPO}/plugins/workflow"
