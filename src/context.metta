@@ -120,6 +120,7 @@
    (RootFrame
       (id (get-state &cfv2-root-id))
       (current-frame-id (cfv2-root-current-frame-id))
+      (last-admitted-frame-id (get-state &cfv2-last-admitted-frame-id))
       (active-framespace &cfv2-active-framespace)
       (completed-framespace &cfv2-completed-framespace)
       (frame-indexspace &cfv2-frame-indexspace)
