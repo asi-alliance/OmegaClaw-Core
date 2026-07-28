@@ -8,8 +8,6 @@
 (= (wakeupInterval) (empty))
 (= (spamShield) (empty))
 
-(= (useFrames) (empty))
-
 (= (initLoop)
    (progn (println! "=== OmegaClaw Configuration ===")
           (configure maxNewInputLoops 50)
@@ -24,7 +22,6 @@
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))
-          (configure useFrames True)
           ))
 
 
@@ -44,22 +41,6 @@
           "LAST_SKILL_USE_RESULTS: " (get-state &lastresults) (newline)
           "TIME: " (get_time_as_string)))))
 
-(= (getLegacyContext)
-   (string-safe
-      (py-str
-         ("PROMPT: " (getPrompt) (newline)
-          "SKILL_SET: " (getSkills) (newline)
-          "OUTPUT_FORMAT: Up to 5 skill command lines, do not wrap quotes around args, do not use variables:" (newline)
-          "toolName1 arg1" (newline)
-          "toolName2 arg2" (newline)
-          "toolName3 arg3" (newline)
-          "toolName4 arg4" (newline)
-          "toolName5 arg5" (newline)
-          "LAST_SKILL_USE_RESULTS: " (get-state &lastresults) (newline)
-          "TIME: " (get_time_as_string)))))
-
-
-
 (= (HandleError $msg $cmd $sexpr)
    (case $sexpr (((Error $a $b) (let $new (append (get-state &error) (($msg $cmd)))
                                           (change-state! &error $new)))
@@ -78,7 +59,7 @@
              (initLoop)
              (initMemory)
              (initChannels)
-             (if (== (useFrames) True) (initContextFrame) _))
+             (initContextFrame))
           (change-state! &loops (- (get-state &loops) 1)))
 
       (println! (---------iteration $k))
@@ -93,14 +74,14 @@
                        _)))
              ($msg (get-state &prevmsg))
 
-             ($hadActiveFrame (if (and $msgnew (== (useFrames) True)) (cfv2-has-current-frame) False))
+             ($hadActiveFrame (if $msgnew (cfv2-has-current-frame) False))
 
              ; New input becomes frame state before prompting.
-             ($_ (if (and $msgnew (== (useFrames) True))
+             ($_ (if $msgnew
                      (ctx-ingest-user-message $msg)
                     _))
               
-            ($_ (if (and (== (useFrames) True) (not (ctx-has-active-goals)))
+            ($_ (if (not (ctx-has-active-goals))
                      (ctx-maintain-frame) _))
 
              ($_ (if (and (> $k 1) $msgnew)
@@ -108,23 +89,21 @@
                     _))
 
              ; Prompt is now frame-based.
-             ($prompt (if (== (useFrames) True) (getContext) (getLegacyContext))))
+             ($prompt (getContext)))
 
          (if (> (get-state &loops) 0)
              (let* (($lastmessage
-                       (if (== (useFrames) True)
-                           (if $msgnew
-                               ; Case 1: new input, a frame was already active — may need to switch.
-                               ; Case 2: new input, no prior active frame — clean start.
-                               (if $hadActiveFrame
-                                   "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME. Continue current frame or switch-frame to a higher-priority admitted frame if appropriate."
-                                   "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME.")
-                               ; Case 3: no new input, current frame is loaded — continue it.
-                               ; Case 4: no new input, no current frame — idle.
-                               (if (cfv2-has-current-frame)
-                                   "NO_NEW_INPUT. Continue only if the context frame contains an active useful goal or select relevant frame from the active space. DO NOT RE-SEND OR SPAM!"
-                                   "NO_NEW_INPUT. No active frame. Consider switching your mode to pursue frames registered with mode = Slow or create a new autonomous goal. DO NOT RE-SEND OR SPAM!"))
-                           "DO NOT RE-SEND OR SPAM!"))
+                       (if $msgnew
+                           ; Case 1: new input, a frame was already active — may need to switch.
+                           ; Case 2: new input, no prior active frame — clean start.
+                           (if $hadActiveFrame
+                               "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME. Continue current frame or switch-frame to a higher-priority admitted frame if appropriate."
+                               "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME.")
+                           ; Case 3: no new input, current frame is loaded — continue it.
+                           ; Case 4: no new input, no current frame — idle.
+                           (if (cfv2-has-current-frame)
+                               "NO_NEW_INPUT. Continue only if the context frame contains an active useful goal or select relevant frame from the active space. DO NOT RE-SEND OR SPAM!"
+                               "NO_NEW_INPUT. No active frame. Consider switching your mode to pursue frames registered with mode = Slow or create a new autonomous goal. DO NOT RE-SEND OR SPAM!")))
                     ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
                     ($_ (println! $lastmessage))
                     ($send (py-str ($prompt :-:-:-: $lastmessage)))
@@ -169,11 +148,8 @@
                        (addToHistory $msg $response $sexpr $msgnew)
                        _)
                    ; Frame-native audit log.
-                   (if (== (useFrames) True)
-                     (progn
-                        (ctx-record-command-batch $sexpr $results)
-                        (ctx-maintain-frame))
-                     _)
+                   (ctx-record-command-batch $sexpr $results)
+                   (ctx-maintain-frame)
                    ; Compatibility state.
                    (change-state! &lastresults
                      (string-safe (py-call (helper.compact_plain (repr $results) 1200))))))
