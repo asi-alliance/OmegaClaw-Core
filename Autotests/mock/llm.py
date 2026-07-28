@@ -24,50 +24,25 @@ class LlmMockAgent:
         self._rpc.stop(timeout)
 
     def chat(self, content):
-        # The agent escapes punctuation that would confuse its s-exp
-        # parser ('->_apostrophe_, "->_quote_, \n->_newline_).
-        def normalize(text):
-            return (text
-                    .replace("_apostrophe_", "'")
-                    .replace("_quote_", '"')
-                    .replace("_newline_", "\n"))
-
-        # Frame-native loop versions do not duplicate the human message after
-        # the :-:-:-: delimiter. Resolve deterministic answers from the
-        # authoritative current-frame projection instead.
-        normalized_content = normalize(content)
-        frame_marker = "CURRENT_CONTEXT_FRAME_S_EXPR:"
-        skills_marker = "\nSKILLS:"
-        frame_projection = ""
-        if frame_marker in normalized_content:
-            frame_projection = normalized_content.split(frame_marker, 1)[1]
-            frame_projection = frame_projection.split(skills_marker, 1)[0]
-
-        with self._lock:
-            answer = next(
-                (
-                    response
-                    for request, response in reversed(tuple(self._answers.items()))
-                    if request and request in frame_projection
-                ),
-                None,
-            )
-        if answer:
-            print(f"[LlmMockAgent] Mock answers: {answer}")
-            return answer
-
-        # Backward-compatible fallback for older loops and isolated mock tests
-        # that still put ['HUMAN-MSG', '<channel>: <request>'] after the
-        # delimiter.
         user = content.rsplit(":-:-:-:", 1)
         if len(user) < 2:
             return ""
 
         try:
             body = eval(user[1])[1]
-        except (SyntaxError, NameError, TypeError, IndexError):
-            print("[LlmMockAgent] Mock doesn't have an answer in the current frame")
+        except SyntaxError:
             return ""
+
+        # The agent escapes punctuation that would confuse its s-exp
+        # parser ('->_apostrophe_, "->_quote_, \n->_newline_) before
+        # the text reaches chat(). set_answer stores the literal
+        # prompt key, so try the raw body first, then the normalized
+        # form so prompts with quotes/apostrophes/newlines still match.
+        def normalize(text):
+            return (text
+                    .replace("_apostrophe_", "'")
+                    .replace("_quote_", '"')
+                    .replace("_newline_", "\n"))
 
         with self._lock:
             answer = self._answers.get(body) or self._answers.get(normalize(body))
@@ -100,18 +75,6 @@ class LlmMockAgent:
         with self._lock:
             request = args['request']
             response = args['response']
-            # Deterministic command responses represent a complete mock turn.
-            # Keep the frame lifecycle explicit so the normal scheduler, and
-            # its existing Slow/Fast transitions, can focus the next frame.
-            if (
-                response.lstrip().startswith("(")
-                and "complete-goals-stm" not in response
-                and "complete-goals-ltm" not in response
-            ):
-                response = (
-                    f'{response}\n'
-                    '(complete-goals-stm "Completed deterministic mock turn.")'
-                )
             print(f'[LlmMockAgent] Mock request: "{request}" with response "{response}"')
             self._answers[request] = response
             return True

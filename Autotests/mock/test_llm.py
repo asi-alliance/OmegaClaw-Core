@@ -38,35 +38,6 @@ class TestLlmMock:
         assert controller.set_answer("hello", "world")
         assert agent.chat(":-:-:-:['HUMAN-MSG', 'test: hello']") == "world"
 
-    def test_response_from_current_frame(self, agent, controller):
-        request = "[REQ-123] What time is it?"
-        assert controller.set_answer(request, "frame answer")
-        content = (
-            "PROMPT: test_newline_"
-            "CURRENT_CONTEXT_FRAME_S_EXPR: "
-            "(ContextProjection (CurrentFrame "
-            f"(Frame (deliverables ({request})))))"
-            "_newline_SKILLS: []"
-            ":-:-:-:NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME."
-        )
-        assert agent.chat(content) == "frame answer"
-
-    def test_command_response_completes_mock_frame(self, agent, controller):
-        assert controller.set_answer("hello", '(send "world")')
-        assert agent.chat(":-:-:-:['HUMAN-MSG', 'test: hello']") == (
-            '(send "world")\n'
-            '(complete-goals-stm "Completed deterministic mock turn.")'
-        )
-
-    def test_no_arg_command_keeps_completion_on_separate_line(
-        self, agent, controller
-    ):
-        assert controller.set_answer("hello", "(get-io-policy)")
-        assert agent.chat(":-:-:-:['HUMAN-MSG', 'test: hello']") == (
-            "(get-io-policy)\n"
-            '(complete-goals-stm "Completed deterministic mock turn.")'
-        )
-
     def test_test_restart(self, agent):
         controller = LlmMockController(TEST_ADDRESS)
         assert controller.set_answer("hello", "world")
