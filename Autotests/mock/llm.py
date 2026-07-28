@@ -109,7 +109,7 @@ class LlmMockAgent:
                 and "complete-goals-ltm" not in response
             ):
                 response = (
-                    f'{response} '
+                    f'{response}\n'
                     '(complete-goals-stm "Completed deterministic mock turn.")'
                 )
             print(f'[LlmMockAgent] Mock request: "{request}" with response "{response}"')

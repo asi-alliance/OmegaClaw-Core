@@ -54,7 +54,16 @@ class TestLlmMock:
     def test_command_response_completes_mock_frame(self, agent, controller):
         assert controller.set_answer("hello", '(send "world")')
         assert agent.chat(":-:-:-:['HUMAN-MSG', 'test: hello']") == (
-            '(send "world") '
+            '(send "world")\n'
+            '(complete-goals-stm "Completed deterministic mock turn.")'
+        )
+
+    def test_no_arg_command_keeps_completion_on_separate_line(
+        self, agent, controller
+    ):
+        assert controller.set_answer("hello", "(get-io-policy)")
+        assert agent.chat(":-:-:-:['HUMAN-MSG', 'test: hello']") == (
+            "(get-io-policy)\n"
             '(complete-goals-stm "Completed deterministic mock turn.")'
         )
 
