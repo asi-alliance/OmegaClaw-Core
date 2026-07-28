@@ -32,9 +32,14 @@ of approximately 200 lines of code.
 
 ## Installation
 
-Prerequisites: Git, Python3, Pip and [venv](https://docs.python.org/3/library/venv.html) library
+Prerequisites: Git, Python 3.10 or later including dev headers, Pip and [venv](https://docs.python.org/3/library/venv.html) library, C compiler (for building [janus-swi](https://pypi.org/project/janus-swi/) library)
 
-Get [SWI-Prolog 9.1.12 or later](https://www.swi-prolog.org/).
+Under Ubuntu one can use the following command to install prerequisites:
+```
+sudo apt-get install git python3 python3-dev python3-pip python3-venv build-essential
+```
+
+Get [SWI-Prolog 10.0.2 or later](https://www.swi-prolog.org/).
 
 Install OmegaClaw:
 ```
@@ -61,6 +66,36 @@ Install Python dependencies:
 ```
 python3 -m pip install -r ./repos/OmegaClaw-Core/requirements.txt
 ```
+---
+
+## Run OmegaClaw in Docker
+
+Ensure that you have [Docker installed](https://docs.docker.com/engine/install/)
+
+Run OmegaClaw using the next command:
+```
+curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:latest
+```
+
+To run a specific version of OmegaClaw set version in `TAG` environment variable and run the following command:
+```
+export TAG=v0.1.17; curl -fsSL  https://github.com/asi-alliance/OmegaClaw-Core/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
+```
+
+To stop the OmegaClaw Docker container:
+```
+docker stop omegaclaw
+```
+
+To restart the OmegaClaw Docker container:
+```
+docker start omegaclaw
+```
+
+To reset OmegaClaw's memory:
+```
+docker volume rm omegaclaw-memory
+```
 
 ---
 
@@ -73,7 +108,7 @@ Before running the system you need to choose your LLM API provider and export th
 | `OpenAI` | `OPENAI_API_KEY` | GPT models. Also reused by the OpenAI embedding provider below. |
 | `ASICloud` | `ASI_API_KEY` |  MiniMax models via ASI Alliance inference endpoint (`inference.asicloud.cudos.org`). |
 | `ASIOne` | `ASIONE_API_KEY` |  ASI1 Ultra model via ASI:One inference endpoint (`https://api.asi1.ai/v1`). |
-| `Ollama-local` | `OLLAMA_API_KEY` |  Ollama model via local inference endpoint. API endpoint is set via `LLM_SERVER_LOCAL_URL` environment variables. |
+| `OpenAIAPI` | `OPENAIAPI_API_KEY` |  Use OpenAI API with any endpoint and model. API endpoint and model are set via `openaiapi_url` and `model` command line parameters. |
 | `OpenRouter` | `OPENROUTER_API_KEY` |  GLM model via OpenRouter inference endpoint. |
 
 Run the system via the following command which ensures the system is started from the root folder of PeTTa:
@@ -82,49 +117,50 @@ OMEGACLAW_AUTH_SECRET=<channel-secret> sh run.sh run.metta IRC_channel="<irc-cha
 ```
 After start go to https://webchat.quakenet.org/ to communicate with the agent. Join `<irc-channel>` and after agent is joined send `auth <channel-secret>` message to authenticate yourself as an agent owner. Please replace `<irc-channel>` and `<channel-secret>` by your own values.
 
-## Reference — Configuration Options
+### Import Knowledge
 
-### General
+If you are running OmegaClaw without Docker and would like to load it with preset knowledge, follow these steps:
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `maxNewInputLoops` | 50 | Turns the agent keeps running after a new human message before idling (seconds) |
-| `maxWakeLoops` | 1 | Extra turns granted on each scheduled wake-up |
-| `sleepInterval` | 1 | Delay between loop iterations (seconds) |
-| `wakeupInterval` | 600 | How long idle before the next scheduled wake-up (seconds) |
-| `LLM` | `gpt-5.4` | Model identifier passed to the provider (used with OpenAI provider only) |
-| `provider` | `Anthropic` | LLM provider, see the table of the providers above |
-| `maxOutputToken` | 6000 | Output cap passed to the provider |
-| `reasoningMode` | `medium` | Reasoning-effort hint passed to the provider (OpenAI only) |
+1. Set EMBEDDING_PROVIDER in your environment. It can be set to either OpenAI or Local. OpenAI embeddings also require OPENAI_API_KEY to be set in your environment.
 
-### Memory (`src/memory.metta`)
+2. Run:
+```
+  sh ./import_knowledge.sh
+```
+After the script finishes, your OmegaClaw bot will have the preset knowledge stored in its long-term memory (LTM).
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `maxFeedback` | 50000 | Ceiling on `LAST_SKILL_USE_RESULTS` text fed back into the prompt (chars) |
-| `maxRecallItems` | 20 | Items returned by `query` |
-| `maxEpisodeRecallLines` | 20 | Lines returned by `episodes` |
-| `maxHistory` | 30000 | Tail of `memory/history.metta` included in the prompt (chars) |
-| `embeddingprovider` | `Local` | `Local` (Python-side model) or `OpenAI` (requires `OPENAI_API_KEY`) |
+If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START=0`
 
-### Channels (`src/channels.metta`)
+## Configuration Options
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `commchannel` | `irc` | Type of the communication channel for agent to use - `irc`, `telegram`, `mattermost` or `slack` |
-| `IRC_channel` | `##omegaclaw` | IRC channel to join |
-| `IRC_server` | `irc.quakenet.org` | IRC server hostname |
-| `IRC_port` | 6667 | IRC port |
-| `IRC_user` | `omegaclaw` | IRC nickname |
-| `TG_BOT_TOKEN` |  | Telegram bot token. |
-| `TG_CHAT_ID` |  | Optional Telegram chat ID. If empty, OmegaClaw auto-binds after first valid inbound auth/message. |
-| `TG_POLL_TIMEOUT` | 20 | Telegram polling timeout in seconds. |
-| `SL_BOT_TOKEN` |  | Slack bot token (`xoxb-...`). |
-| `SL_CHANNEL_ID` |  | Optional Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message. |
-| `SL_POLL_INTERVAL` | 60 | Slack polling interval in seconds (minimum effective value is 60). |
-| `MM_URL` | `https://chat.singularitynet.io` | Mattermost base URL. |
-| `MM_CHANNEL_ID` | `8fjrmabjx7gupy7e5kjznpt5qh` | Mattermost channel ID. |
-| `MM_BOT_TOKEN` |  | Mattermost bot token. |
+These are the following sources of the configuration parameters for the
+OmegaClaw agent:
+- command line parameters
+- environment variables
+- configuration file
+
+OmegaClaw looks for parameters in each of the locations. Command line
+parameters override environment variables which in turn override configuration
+file values. Environment variables should be named `OMEGACLAW_<parameter>` in
+order to separate them from other variables. For example to override the
+default LLM model one can set an `OMEGACLAW_model` environment variable. The full
+list of parameters with descriptions and default values can be found in
+[default configuration file](/config/config.yaml).
+
+The configuration file location can be specified manually using `config` option:
+```sh
+sh run.sh run.metta config=<config.yaml path>
+```
+
+The LLM API keys (see [table above](#usage)) and communication channel tokens
+from the table below are passed via environment variables (without `OMEGACLAW_`
+prefix) to prevent agent accessing them.
+
+| Environment variable | Meaning |
+|---|---|
+| `TG_BOT_TOKEN` | Telegram bot token. |
+| `MM_BOT_TOKEN` | Mattermost bot token. |
+| `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
 
 ---
 

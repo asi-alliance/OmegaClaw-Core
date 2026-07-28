@@ -1,0 +1,140 @@
+# General
+
+# Turns the agent keeps running after a new human message before idling (seconds) 
+maxNewInputLoops: 50
+# Extra turns granted on each scheduled wake-up
+maxWakeLoops: 1
+# (deprecated)
+spamShield: False
+# Delay between loop iterations (seconds)
+sleepInterval: 1
+# LLM model to load overrides *_model parameters see below
+#model: 
+# LLM provider, see the list below in the Providers section
+provider: Anthropic
+# Output cap passed to the provider
+maxOutputToken: 6000
+# Reasoning-effort hint passed to the provider
+reasoningMode: medium
+# How long idle before the next scheduled wake-up (seconds)
+wakeupInterval: 600
+# Path to the logger configuration file
+# See https://docs.python.org/3/library/logging.config.html#configuration-file-format
+logConfigPath: ""
+# (internal) Path to the memory directory
+#memoryDirectory: "./"
+
+# Memory
+
+# Ceiling on `LAST_SKILL_USE_RESULTS` text fed back into the prompt (chars)
+maxFeedback: 50000
+# Items returned by `query`
+maxRecallItems: 20
+# Lines returned by `episodes`
+maxEpisodeRecallLines: 20
+# Tail of `memory/history.metta` included in the prompt (chars)
+maxHistory: 30000
+# `Local` (Python-side model) or `OpenAI` (requires `OPENAI_API_KEY`)
+embeddingprovider: Local
+
+# Policy
+
+# Path to the security profile written using [OpenShell YAML](https://docs.nvidia.com/openshell/reference/policy-schema#filesystem-policy). See [./profile/policy.yaml](./profile/policy.yaml) as an example. Empty value disables restrictions.
+securityPolicyPath: "./repos/OmegaClaw-Core/profile/policy.yaml"
+# (internal) URL to the Nginx proxy isolating API keys from agent
+#GATEWAY_URL:
+
+# Channels
+
+# Type of the communication channel for agent to use
+# see the list below
+commchannel: irc
+
+# IRC
+# IRC channel to join 
+IRC_channel: "##omegaclaw"
+# IRC server hostname
+IRC_server: "irc.quakenet.org"
+# IRC port
+IRC_port: 6667
+# IRC nickname
+IRC_user: "omegaclaw"
+
+# Mattermost
+# Mattermost base URL.
+MM_URL: "https://chat.singularitynet.io"
+# Mattermost channel ID.
+MM_CHANNEL_ID: "8fjrmabjx7gupy7e5kjznpt5qh"
+
+# Slack
+# Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message.
+SL_CHANNEL_ID: ""
+# Slack polling interval in seconds (minimum effective value is 60).
+SL_POLL_INTERVAL: 60
+
+# Telegram
+# Telegram chat ID. If empty, OmegaClaw auto-binds after first valid inbound auth/message.
+TG_CHAT_ID: ""
+# Telegram polling timeout in seconds.
+TG_POLL_TIMEOUT: 20
+
+# WSchat
+# WebSocket endpoint URL (`ws://` or `wss://`). Required when `commchannel=websocket`.
+WS_URL: ""
+# Optional bearer token sent as `Authorization: Bearer <token>`.
+WS_TOKEN: ""
+
+# Providers
+
+# OpenAIAPI
+# Name of the API key variable to read
+api_token_var: "OPENAIAPI_API_KEY"
+# LLM endpoint URL.
+openaiapi_url: "http://localhost:11434/v1/"
+# Default model
+openaiapi_model: "qwen3.5:9b"
+
+# ASICloud
+# Default model
+asicloud_model: "minimax/minimax-m3"
+
+# Anthropic
+# Default model
+anthropic_model: "claude-opus-4-8"
+
+# OpenRouter
+# Default model
+openrouter_model: "z-ai/glm-5.2"
+# Overrides session id
+#OPENROUTER_SESSION_ID:
+# Cache TTL
+OPENROUTER_CACHE_TTL: 5m
+
+# OpenAI
+# Default model
+openai_model: "gpt-5.5"
+# Overrides prompt cache key
+#OPENAI_PROMPT_CACHE_KEY:
+
+# ASIOne
+# Default model
+asione_model: "asi1-ultra"
+
+# Skills
+
+# agentverse
+# AgentVerse address of the Technical analysis agent
+TECHNICAL_ANALYSIS_AGENT_ADDRESS: "agent1q085746wlr3u2uh4fmwqplude8e0w6fhrmqgsnlp49weawef3ahlutypvu6"
+# AgentVerse address of the Tavily search agent
+TAVILY_SEARCH_AGENT_ADDRESS: "agent1qt5uffgp0l3h9mqed8zh8vy5vs374jl2f8y0mjjvqm44axqseejqzmzx9v8"
+
+# Plugins
+
+# Workflow
+# Path to the directory which contains available workflows. Default value is
+# <project_root>/plugins/workflow/instructions. See plugins/workflow/README.md
+# for details.
+#pluginWorkflowInstructionsDir: ./plugins/workflow/instructions
+# Path to the directory to keep workflow working files when workflow is active.
+# Default value is <memoryDirectory>/workflow_space
+#pluginWorkflowMemoryDir: ./memory/workflow_space

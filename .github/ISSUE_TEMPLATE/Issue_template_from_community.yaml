@@ -1,0 +1,92 @@
+name: Issue report from Community testing
+description: Create a report to help us improve
+labels: ["Issue"]
+body:
+
+# --- Issue Description ---
+- type: textarea
+  id: issue-description
+  attributes:
+    label: Describe the Issue
+    description: Describe what you observed. No need to diagnose it — just tell us what happened.
+    placeholder: "A clear and concise description of what the bug is.."
+  validations:
+    required: true
+
+# --- Reproducibility ---
+- type: textarea
+  id: steps
+  attributes:
+    label: Steps to reproduce (if you have them)
+    description: A rough sequence is fine. Include any relevant prompts, tool calls, or context.
+    placeholder: "1. Asked the agent to...\n2. It called...\n3. Then..."
+  validations:
+    required: false
+
+- type: dropdown
+  id: reproducible
+  attributes:
+    label: Did it happen more than once?
+    options:
+      - Yes, reliably
+      - Sometimes
+      - Only once so far
+      - Not sure
+  validations:
+    required: false
+
+# --- Behavior ---
+
+- type: textarea
+  id: expected-behavior
+  attributes:
+    label: Expected behavior
+    description: A clear and concise description of what you expected to happen.
+    placeholder: "I expected it to..."
+  validations:
+    required: true
+
+- type: textarea
+  id: actual-behavior
+  attributes:
+    label: What did the agent do?
+    description: A clear and concise description of what happens.
+    placeholder: "The agent was supposed to X, but instead it Y..."
+  validations:
+    required: true
+
+# --- Additional context ---
+
+- type: input
+  id: model
+  attributes:
+    label: Model provider
+    description: What is your Model provider?
+    placeholder: e.g. Anthropic
+  validations:
+    required: false
+
+- type: input
+  id: commchannel
+  attributes:
+    label: Communication channel
+    description: Wich Communication channel you used?
+    placeholder: e.g. IRC
+  validations:
+    required: false
+
+- type: upload
+  id: file
+  attributes:
+    label: Upload file
+    description: If applicable, add logs or screenshots to help explain your problem.
+  validations:
+    required: false
+
+- type: textarea
+  id: context
+  attributes:
+    label: Anything else?
+    description: Any other information that feels relevant.
+  validations:
+    required: false

@@ -4,6 +4,12 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import auth
+from src.logger import get_logger
+import channels
+from config import config_get_by_key
+
+logger = get_logger(__name__)
 
 _running = False
 _last_message = ""
@@ -17,9 +23,7 @@ _poll_timeout = 20
 _offset = None
 _connected = False
 
-_auth_secret = ""
 _authenticated_user_id = None
-_authenticated_chat_id = None
 
 
 def _set_last(msg):
@@ -37,16 +41,6 @@ def getLastMessage():
         tmp = _last_message
         _last_message = ""
         return tmp
-
-
-def _set_auth_secret(secret=None):
-    global _auth_secret, _authenticated_user_id, _authenticated_chat_id
-    if secret is None:
-        secret = os.environ.get("OMEGACLAW_AUTH_SECRET", "")
-    with _state_lock:
-        _auth_secret = (secret or "").strip()
-        _authenticated_user_id = None
-        _authenticated_chat_id = None
 
 
 def _parse_auth_candidate(msg):
@@ -106,7 +100,7 @@ def _initialize_offset():
     try:
         updates = _api_call("getUpdates", {"timeout": 0}, timeout=10) or []
     except Exception as exc:
-        print(f"[TELEGRAM] Could not read initial offset: {exc}")
+        logger.warning(f"Could not read initial offset: {exc}")
         return
 
     max_update = -1
@@ -120,35 +114,38 @@ def _initialize_offset():
             _offset = max_update + 1
 
 
+def _is_auth_command(msg):
+    lower = msg.strip().lower()
+    return lower.startswith("auth ") or lower.startswith("/auth ")
+
+
 def _is_allowed_message(chat_id, user_id, msg):
-    global _chat_id, _authenticated_user_id, _authenticated_chat_id
-    candidate = _parse_auth_candidate(msg)
+    global _chat_id, _authenticated_user_id
 
     with _state_lock:
         if _chat_id and chat_id != _chat_id:
             return "ignore"
-
-        if not _auth_secret:
+        if not auth.is_auth_enabled():
             if not _chat_id:
                 _chat_id = chat_id
             return "allow"
-
-        if _authenticated_user_id is None:
-            if candidate == _auth_secret:
-                _authenticated_user_id = user_id
-                _authenticated_chat_id = chat_id
-                _chat_id = chat_id
-                return "auth_bound"
+        if _authenticated_user_id is not None:
+            if chat_id != _chat_id:
+                return "ignore"
+            return "allow" if user_id == _authenticated_user_id else "ignore"
+        candidate = _parse_auth_candidate(msg)
+        user_id_check = auth.authenticate_channel_user('TELEGRAM', user_id, candidate)
+        if user_id_check in ["auth_bound", "allow"]:
+            _authenticated_user_id = user_id
+            _chat_id = chat_id
+            return user_id_check
+        else:
             return "ignore"
-
-        if chat_id != _authenticated_chat_id:
-            return "ignore"
-        return "allow" if user_id == _authenticated_user_id else "ignore"
 
 
 def _poll_loop():
     global _connected, _offset
-    print("[TELEGRAM] Polling started")
+    logger.info("Polling started")
 
     while _running:
         try:
@@ -190,33 +187,38 @@ def _poll_loop():
                     send_message(f"Authentication successful for {display_name}.")
         except Exception as exc:
             _connected = False
-            print(f"[TELEGRAM] Poll error: {exc}")
+            logger.warning(f"Poll error: {exc}")
             time.sleep(2)
 
     _connected = False
-    print("[TELEGRAM] Polling stopped")
+    logger.info("Polling stopped")
 
 
-def start_telegram(bot_token, chat_id="", poll_timeout=20, auth_secret=None):
+def start_telegram(chat_id="", poll_timeout=20):
     global _running, _bot_token, _api_base, _chat_id, _poll_timeout, _offset, _connected
 
-    _bot_token = str(bot_token).strip()
-    if not _bot_token:
-        raise ValueError("TG_BOT_TOKEN is required")
+    proxy = auth.get_proxy_url()
+    if proxy:
+        _bot_token = "proxy"
+        _api_base = f"{proxy}/telegram"
+    else:
+        _bot_token = os.environ.get("TG_BOT_TOKEN", "").strip()
+        if not _bot_token:
+            raise ValueError("TG_BOT_TOKEN is required")
+        _api_base = f"https://api.telegram.org/bot{_bot_token}"
 
-    _api_base = f"https://api.telegram.org/bot{_bot_token}"
     _chat_id = str(chat_id).strip()
 
     try:
         _poll_timeout = max(1, int(poll_timeout))
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Invalid poll_timeout {poll_timeout!r}, falling back to 20: {e}")
         _poll_timeout = 20
 
     _offset = None
     _running = True
     _connected = False
-    _set_auth_secret(auth_secret)
-    print(f"[TELEGRAM] Starting adapter with chat target: {_chat_id or 'auto-bind'}")
+    logger.info(f"Starting adapter with chat target: {_chat_id or 'auto-bind'}")
     _initialize_offset()
 
     t = threading.Thread(target=_poll_loop, daemon=True)
@@ -253,5 +255,27 @@ def send_message(text):
                 use_post=True,
             )
         except Exception as exc:
-            print(f"[TELEGRAM] Send failed: {exc}")
+            logger.exception(f"Send failed: {exc}")
             return
+
+class TelegramChannel(channels.CommChannel):
+
+    def __init__(self):
+        super().__init__()
+
+    def start(self) -> None:
+        chat_id = config_get_by_key("TG_CHAT_ID", "")
+        poll_timeout = int(config_get_by_key("TG_POLL_TIMEOUT", 20))
+        start_telegram(chat_id, poll_timeout)
+
+    def stop(self) -> None:
+        stop_telegram()
+
+    def receive(self) -> str:
+        return getLastMessage()
+
+    def send(self, message: str) -> None:
+        send_message(message)
+
+def loadOmegaClawPlugin():
+    channels.registerCommChannel("telegram", TelegramChannel())

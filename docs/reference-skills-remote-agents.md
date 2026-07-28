@@ -30,7 +30,7 @@ A compact string of web search results: a few links with short snippets.
 
 ### Notes / Limits
 - Output quality depends on the remote agent, not on OmegaClaw itself.
-- For a lighter-weight, direct-backend search, see `search` in [reference-skills-communication.md](./reference-skills-communication.md).
+- For a lighter-weight, direct-backend search, see `websearch` in [reference-skills-communication.md](./reference-skills-communication.md).
 
 ---
 

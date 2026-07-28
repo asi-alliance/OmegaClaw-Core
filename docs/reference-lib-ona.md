@@ -21,7 +21,7 @@ If ONA were installed, the following shapes would route to it:
 | **Event sequences, cause/effect from experience** | **ONA** |
 | Real-time sensorimotor loops | **ONA** |
 
-Today, with ONA absent, the current practical fallback for temporal questions is NAL plus external temporal grounding — have the agent fetch timestamps or event ordering through `(shell ...)` or `(search ...)` and atomize them into NAL premises. This is not equivalent to what ONA would provide, and the docs do not pretend otherwise.
+Today, with ONA absent, the current practical fallback for temporal questions is NAL plus external temporal grounding — have the agent fetch timestamps or event ordering through `(shell ...)` or `(websearch ...)` and atomize them into NAL premises. This is not equivalent to what ONA would provide, and the docs do not pretend otherwise.
 
 ## Invocation surface
 

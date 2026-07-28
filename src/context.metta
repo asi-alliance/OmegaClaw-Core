@@ -98,7 +98,7 @@
       (ModuleProfile
          (kind SkillSet)
          (capabilities
-            (send remember query episodes pin read-file write-file append-file search tavily-search technical-analysis
+            (send remember query episodes pin read-file write-file append-file websearch tavily-search technical-analysis
                metta new-frame new-autonomous-frame switch-frame switch-mode show-root-frame show-current-frame show-frame-index
                show-active-framespace show-completed-framespace cfv2-get-relation complete-goals-stm complete-goals-ltm clear-frame-junk))
          (rating 1.0)))))

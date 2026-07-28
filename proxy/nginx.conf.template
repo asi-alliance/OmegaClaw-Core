@@ -1,0 +1,157 @@
+worker_processes 1;
+error_log /dev/stderr warn;
+pid       /tmp/nginx.pid;
+
+events {
+    worker_connections 128;
+}
+
+http {
+    client_body_temp_path /tmp/client_body;
+    proxy_temp_path       /tmp/proxy;
+    fastcgi_temp_path     /tmp/fastcgi;
+    uwsgi_temp_path       /tmp/uwsgi;
+    scgi_temp_path        /tmp/scgi;
+
+    access_log /dev/stdout;
+
+    client_max_body_size 16m;
+
+    proxy_connect_timeout 30s;
+    proxy_send_timeout    120s;
+    proxy_read_timeout    120s;
+
+    server {
+        listen 8080;
+
+        # Uses Anthropic's OpenAI-compatible endpoint (/v1/chat/completions),
+        # which accepts Bearer auth like OpenAI. The native /v1/messages API
+        # uses x-api-key, but the openai Python client targets the compat endpoint.
+        location /anthropic/ {
+            proxy_pass https://api.anthropic.com/v1/;
+            proxy_set_header Authorization "Bearer ${ANTHROPIC_API_KEY}";
+            proxy_set_header Host api.anthropic.com;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /asicloud/ {
+            proxy_pass https://inference.asicloud.cudos.org/v1/;
+            proxy_set_header Authorization "Bearer ${ASI_API_KEY}";
+            proxy_set_header Host inference.asicloud.cudos.org;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /openai/ {
+            proxy_pass https://api.openai.com/v1/;
+            proxy_set_header Authorization "Bearer ${OPENAI_API_KEY}";
+            proxy_set_header Host api.openai.com;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /asione/ {
+            proxy_pass https://api.asi1.ai/v1/;
+            proxy_set_header Authorization "Bearer ${ASIONE_API_KEY}";
+            proxy_set_header Host api.asi1.ai;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /openaiapi/ {
+            proxy_pass ${OPENAIAPI_URL};
+            proxy_set_header Authorization "Bearer ${OPENAIAPI_API_KEY}";
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        location /openrouter/ {
+            proxy_pass https://openrouter.ai/api/v1/;
+            proxy_set_header Authorization "Bearer ${OPENROUTER_API_KEY}";
+            proxy_set_header Host openrouter.ai;
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        # Telegram: rewrite URL to inject bot token in path.
+        # Agent calls /telegram/getUpdates → proxy rewrites to
+        # /bot<TOKEN>/getUpdates and forwards to Telegram.
+        location /telegram/ {
+            rewrite ^/telegram/(.*)$ /bot${TG_BOT_TOKEN}/$1 break;
+            proxy_pass https://api.telegram.org;
+            proxy_set_header Host api.telegram.org;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        # Mattermost: inject Bearer token header (HTTP + WebSocket).
+        # Origin is rewritten to the upstream URL so Mattermost's CORS check
+        # on the WebSocket upgrade matches its SiteURL / AllowCorsFrom — the
+        # agent's auto-derived Origin (http://gateway:8080) is not trusted.
+        location /mattermost/ {
+            proxy_pass ${MM_URL};
+            proxy_set_header Authorization "Bearer ${MM_BOT_TOKEN}";
+            proxy_set_header Host $proxy_host;
+            proxy_set_header Origin "${MM_UPSTREAM_URL}";
+            proxy_set_header Content-Type $content_type;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 300s;
+        }
+
+        location /slack/ {
+            proxy_pass https://slack.com/;
+            proxy_set_header Authorization "Bearer ${SL_BOT_TOKEN}";
+            proxy_set_header Host slack.com;
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
+        # Auth secret verification — agent sends candidate token, proxy compares.
+        # After envsubst, ${OMEGACLAW_AUTH_SECRET} becomes the literal secret.
+        set $auth_secret_value "${OMEGACLAW_AUTH_SECRET}";
+
+        location = /auth/status {
+            default_type application/json;
+            if ($auth_secret_value = "") {
+                return 200 '{"enabled":false}';
+            }
+            return 200 '{"enabled":true}';
+        }
+
+        location = /auth/verify {
+            default_type application/json;
+            if ($auth_secret_value = "") {
+                return 200 '{"match":true}';
+            }
+            if ($http_x_auth_token = "${OMEGACLAW_AUTH_SECRET}") {
+                return 200 '{"match":true}';
+            }
+            return 200 '{"match":false}';
+        }
+
+        location /health {
+            return 200 "ok\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}
+

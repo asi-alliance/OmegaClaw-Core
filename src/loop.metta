@@ -1,49 +1,63 @@
 (= (maxNewInputLoops) (empty))
 (= (maxWakeLoops) (empty))
 (= (sleepInterval) (empty))
-(= (LLM) (empty))
 (= (provider) (empty))
 (= (maxOutputToken) (empty))
 (= (reasoningMode) (empty))
 (= (wakeupInterval) (empty))
-(= (spamShield) (empty))
+(= (memoryDirectory) (empty))
+(= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
 
 (= (initLoop)
-   (progn (println! "=== OmegaClaw Configuration ===")
-          (configure maxNewInputLoops 50)
+   (progn (configure maxNewInputLoops 50)
           (configure maxWakeLoops 1)
-          (configure spamShield True)
-          (configure sleepInterval 1)
-          (configure LLM gpt-5.4)
-          (configure provider OpenAI) ;Anthropic or OpenAI or ASICloud or ASIOne
+          (configure spamShield False)
+          (configure sleepInterval 1) ;10
+          (configure provider Anthropic)
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
+          (configure memoryDirectory ./)
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))
           ))
 
+(= (initKnowledge)
+   (progn (log INFO "loop" "Initializing knowledge base")
+          (if (== (embeddingprovider) OpenAI)
+               (log INFO "loop" (py-call (rag.init_knowledge "OpenAI")))
+               (log INFO "loop" (py-call (rag.init_knowledge "Local"))))))
 
 (= (getContext)
    (string-safe
       (py-str
-         ("PROMPT: " (getPrompt) (newline)
+         ("PROMPT: " (getPrompt (provider)) (newline)
           "CURRENT_CONTEXT_FRAME_S_EXPR: " (contextFrameForPrompt) (newline)
-          "SKILL_SET: " (getSkills) (newline)
+          "SKILLS: " (getSkills) (newline)
           "CONTEXT_FRAME_SKILLS: " (contextFramesSkills) (newline)
-          "OUTPUT_FORMAT: Up to 5 skill command lines, do not wrap quotes around args, do not use variables:" (newline)
+          (getPromptExtensions) (newline)
+          "OUTPUT_FORMAT: Up to 5 lines, do not wrap quotes around args, do not use variables:" (newline)
           "toolName1 arg1" (newline)
           "toolName2 arg2" (newline)
           "toolName3 arg3" (newline)
           "toolName4 arg4" (newline)
           "toolName5 arg5" (newline)
-          "LAST_SKILL_USE_RESULTS: " (get-state &lastresults) (newline)
+          "SAVE_PERMANENT_FILES_DIR: " (memoryDirectory) (newline)
+          "LAST_SKILL_USE_RESULTS: you must rectify ALERT_FAILED skill use cases "
+             (last_chars (get-state &lastresults) (maxFeedback)) (newline)
+          "HISTORY: " (getHistory) (newline)
           "TIME: " (get_time_as_string)))))
+
+(= (getPromptExtensions)
+   (join (newline) (collapse (prompt-extension $_))))
+
+; Dynamic prompt extension placeholder to eliminate errors when no extension is added.
+(= (prompt-extension placeholder) (empty))
 
 (= (HandleError $msg $cmd $sexpr)
    (case $sexpr (((Error $a $b) (let $new (append (get-state &error) (($msg $cmd)))
-                                          (change-state! &error $new)))
+                                          (progn (change-state! &error $new) (ALERT_FAILED $a $b))))
                  ($else $sexpr))))
 
 (= (metta $str)
@@ -56,13 +70,19 @@
    (progn
       (if (== $k 1)
           (progn
+             (initConfig)
              (initLoop)
+             (initLogger)
+             (applySecurityPolicy)
              (initMemory)
+             (initKnowledge)
+             (initPlugins)
              (initChannels)
-             (initContextFrame))
+             (initContextFrame)
+             (llmProviderStart (provider)))
           (change-state! &loops (- (get-state &loops) 1)))
 
-      (println! (---------iteration $k))
+      (log INFO "loop" (---------iteration $k))
 
       (let* (($msgrcv (string-safe (repr (receive))))
              ($msgnew
@@ -105,42 +125,36 @@
                                "NO_NEW_INPUT. Continue only if the context frame contains an active useful goal or select relevant frame from the active space. DO NOT RE-SEND OR SPAM!"
                                "NO_NEW_INPUT. No active frame. Consider switching your mode to pursue frames registered with mode = Slow or create a new autonomous goal. DO NOT RE-SEND OR SPAM!")))
                     ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
-                    ($_ (println! $lastmessage))
+                    ($_ (log INFO "loop" $lastmessage))
                     ($send (py-str ($prompt :-:-:-: $lastmessage)))
-                    ($_ (println! (CHARS_SENT: (string_length $send) $send)))
+                    ($_ (log INFO "loop" (CHARS_SENT: (string_length $send) $send)))
 
-                    ($respi (py-call (lib_llm_ext.callProvider (provider) $send (maxOutputToken) (reasoningMode))))
+                    ($respi (llmProviderChat $send (maxOutputToken) (reasoningMode)))
 
                     ($resp (py-call (helper.balance_parentheses $respi)))
                     ($response
                        (if (== "(" (first_char $resp))
                            $resp
                            (progn
-                              (println! $resp)
+                              (log INFO "loop" $resp)
                               (repr
                                  (REMEMBER:OUTPUT_NOTHING_ELSE_THAN:
                                     ((skill arg) ...))))))
 
                     ($sexpr (catch (sread $response)))
                     ($_ (change-state! &error ()))
-                    ($_ (HandleError
-                           MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY
-                           $response
-                           $sexpr))
-                    ($_ (println! (RESPONSE: $sexpr)))
+                    ($mcerr
+                       (HandleError
+                          MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY
+                          $response
+                          $sexpr))
+                    ($_ (log INFO "loop" (RESPONSE: $sexpr)))
 
-                    ($results
-                       (RESULTS:
-                          (collapse
-                             (let $s (superpose $sexpr)
-                                (COMMAND_RETURN:
-                                   ($s
-                                    (HandleError
-                                       SINGLE_COMMAND_FORMAT_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY
-                                       $s
-                                       (catch (let $R (eval $s) (py-call (helper.normalize_string $R)))))))))))
+                    ($results (if (== $mcerr $sexpr)
+                                  (RESULTS: (collapse (let $s (superpose $sexpr) (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (let $R (eval $s) (py-call (helper.normalize_string $R))))))))))
+                                  (RESULTS: $mcerr)))
 
-                    ($_ (println! $results)))
+                    ($_ (log INFO "loop" (RESPONSE: $results))))
 
                 (progn
                    ; Legacy audit log remains optional.
@@ -152,7 +166,7 @@
                    (ctx-maintain-frame)
                    ; Compatibility state.
                    (change-state! &lastresults
-                     (string-safe (py-call (helper.compact_plain (repr $results) 1200))))))
+                     (string-safe (repr $results)))))
 
              (if (> (get_time) (get-state &nextWakeAt))
                  (change-state! &loops (+ 1 (maxWakeLoops)))

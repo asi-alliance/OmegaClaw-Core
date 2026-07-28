@@ -1,10 +1,39 @@
 from collections import deque
+import json
 import re
 import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+import os
+
+try:
+    from src.logger import get_logger
+except ModuleNotFoundError:  # running this file directly as a script
+    from logger import get_logger
+
+logger = get_logger(__name__)
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
+LLM_COMMANDS = {
+    "append-file",
+    "episodes",
+    "metta",
+    "pin",
+    "query",
+    "read-file",
+    "remember",
+    "search",
+    "send",
+    "shell",
+    "tavily-search",
+    "technical-analysis",
+    "write-file",
+    "get-io-policy"
+}
+TWO_ARG_COMMANDS = {
+    "write-file",
+    "append-file"
+}
 
 def compact_plain(value, limit=1200):
     """
@@ -26,13 +55,15 @@ def make_id(prefix="id"):
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
     return f"{prefix}-{stamp}"
 
+
 def extract_timestamp(line):
     m = TS_RE.search(line)
     if not m:
         return None
     try:
         return datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
-    except ValueError:
+    except ValueError as e:
+        logger.error(f"Line does not carry a parsable timestamp: {e}")
         return None
 
 def around_time(needle_time_str, k):
@@ -65,25 +96,63 @@ def around_time(needle_time_str, k):
         ret += f"{lineno}:{line}"
     return ret
 
+def quote_arg(x):
+    if x.startswith('"') and x.endswith('"') and "\n" not in x:
+        return x
+    else:
+        return json.dumps(x, ensure_ascii=False)
+
+def starts_command_line(line):
+    s = line.lstrip()
+    if not s:
+        return False
+    # allow "(send ...)" as command start too
+    if s.startswith("("):
+        s = s[1:].lstrip()
+    if not s:
+        return False
+    first = s.split(maxsplit=1)[0].rstrip(")")
+    return first in LLM_COMMANDS
+
+def split_command_blocks(s):
+    blocks = []
+    cur = []
+    for raw in s.splitlines():
+        if not raw.strip():
+            if cur:
+                cur.append(raw)
+            continue
+        if starts_command_line(raw) and cur:
+            blocks.append("\n".join(cur).strip())
+            cur = [raw]
+        else:
+            cur.append(raw)
+    if cur:
+        blocks.append("\n".join(cur).strip())
+    return blocks
+
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
-    special_two_arg_cmds = {"write-file", "append-file"}
-    for line in s.splitlines():
+    for line in split_command_blocks(s):
         line = line.strip()
         if not line:
             continue
         if line.startswith("(-"):
-            line = "(pin -" + line[2:]
+            line = "(pin " + line[2:]
         elif line.startswith("-"):
-            line = "pin " + line
+            line = "pin " + line[1:]
         # remove one outer (...) if present
         if line.startswith("(") and line.endswith(")"):
             line = line[1:-1].strip()
+        elif line.startswith("("):
+            line = line[1:].strip()
         parts = line.split(maxsplit=1)
+        if not parts:
+            continue
         cmd = parts[0]
         rest = parts[1].strip() if len(parts) > 1 else ""
-        if cmd in special_two_arg_cmds:
+        if cmd in TWO_ARG_COMMANDS:
             if not rest:
                 sexprs.append(f"({cmd})")
                 continue
@@ -103,27 +172,19 @@ def balance_parentheses(s):
                     filename = rest[:end+1]
                     content = rest[end+1:].strip()
                 else:
-                    filename = '"' + rest[1:].replace('"', '\\"') + '"'
+                    filename = quote_arg(rest[1:])
                     content = ""
             else:
                 split_rest = rest.split(maxsplit=1)
-                filename = '"' + split_rest[0].replace('"', '\\"') + '"'
+                filename = quote_arg(split_rest[0])
                 content = split_rest[1].strip() if len(split_rest) > 1 else ""
             if content:
-                if content.startswith('"') and content.endswith('"'):
-                    sexprs.append(f"({cmd} {filename} {content})")
-                else:
-                    content = content.replace('"', '\\"')
-                    sexprs.append(f'({cmd} {filename} "{content}")')
+                sexprs.append(f"({cmd} {filename} {quote_arg(content)})")
             else:
                 sexprs.append(f"({cmd} {filename})")
             continue
         if rest:
-            if rest.startswith('"') and rest.endswith('"'):
-                sexprs.append(f"({cmd} {rest})")
-            else:
-                rest = rest.replace('"', '\\"')
-                sexprs.append(f'({cmd} "{rest}")')
+            sexprs.append(f"({cmd} {quote_arg(rest)})")
         else:
             sexprs.append(f"({cmd})")
     ret = " ".join(sexprs)
@@ -134,8 +195,15 @@ def normalize_string(x):
         if isinstance(x, bytes):
             return x.decode("utf-8", errors="ignore")
         return str(x).encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Could not normalize value, using its plain string form: {e}")
         return str(x)
+
+def joinPath(parts):
+    return os.path.join(*parts)
+
+def projectRootDirectory():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ---- HyperClaw Context Frames V2 helper additions ----
 
@@ -263,7 +331,7 @@ def cfv2_refs_completed_after(index_repr, date_prefix) -> str:
             refs.append(ref)
     return "(" + " ".join(refs) + ")"
 
-## TODO: Replace this using metta functions
+
 def cfv2_select_next_frame_id(index_repr, root_mode="Fast") -> str:
     """Select highest-priority active frame matching root mode from FrameRef space.
 
@@ -294,18 +362,34 @@ def cfv2_select_next_frame_id(index_repr, root_mode="Fast") -> str:
     return best_id
 
 def test_balance_parenthesis():
-	assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('(append-file test.txt hello world)') == '((append-file "test.txt" "hello world"))'
-	assert balance_parentheses('(write-file "test.txt" hello world)') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('(write-file "test.txt" "hello world")') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('(write-file test.txt "hello world")') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('(send test.xt hello world)') == '((send "test.xt hello world"))'
-	assert balance_parentheses('write-file test.txt hello world') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('append-file test.txt hello world') == '((append-file "test.txt" "hello world"))'
-	assert balance_parentheses('write-file "test.txt" hello world') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('write-file "test.txt" "hello world"') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('write-file test.txt "hello world"') == '((write-file "test.txt" "hello world"))'
-	assert balance_parentheses('send test.xt hello world') == '((send "test.xt hello world"))'
+    assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('(append-file test.txt hello world)') == '((append-file "test.txt" "hello world"))'
+    assert balance_parentheses('(write-file "test.txt" hello world)') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('(write-file "test.txt" "hello world")') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('(write-file test.txt "hello world")') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('(send test.xt hello world)') == '((send "test.xt hello world"))'
+    assert balance_parentheses('write-file test.txt hello world') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('append-file test.txt hello world') == '((append-file "test.txt" "hello world"))'
+    assert balance_parentheses('write-file "test.txt" hello world') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('write-file "test.txt" "hello world"') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('write-file test.txt "hello world"') == '((write-file "test.txt" "hello world"))'
+    assert balance_parentheses('send test.xt hello world') == '((send "test.xt hello world"))'
+    assert balance_parentheses('send Here are the planets:\n1. Mercury\n2. Venus') == '((send "Here are the planets:\\n1. Mercury\\n2. Venus"))'
+    assert balance_parentheses('send Here are the options:\n- MacBook Air\n- ThinkPad X1\npin done') == '((send "Here are the options:\\n- MacBook Air\\n- ThinkPad X1") (pin "done"))'
+    assert balance_parentheses('send "Plain text version:"\n**Mars** - red planet\nNote: Pluto is a dwarf planet') == '((send "\\\"Plain text version:\\\"\\n**Mars** - red planet\\nNote: Pluto is a dwarf planet"))'
+    assert balance_parentheses('(send Here are the planets:\n1. Mercury\n2. Venus)') == '((send "Here are the planets:\\n1. Mercury\\n2. Venus"))'
+    assert balance_parentheses('send "hello" world') == '((send "\\"hello\\" world"))'
+    assert balance_parentheses('send "Hello"\nHow are you?') == '((send "\\"Hello\\"\\nHow are you?"))'
+    # bare "()" lines yield no tokens after _strip_outer_parens and must be skipped, not crash
+    assert balance_parentheses('()') == '()'
+    assert balance_parentheses('') == '()'
+    assert balance_parentheses('   ') == '()'
+    assert balance_parentheses('()\nsend hello') == '((send "hello"))'
+    assert balance_parentheses('write-file "test.txt" hello\nworld') == '((write-file "test.txt" "hello\\nworld"))'
+    assert balance_parentheses('- Found a bug') == '((pin "Found a bug"))'
+    assert balance_parentheses('(- Found a bug)') == '((pin "Found a bug"))'
+    assert balance_parentheses('- Found\na\nbug') == '((pin "Found\\na\\nbug"))'
+    assert balance_parentheses('(- Found a bug') == '((pin "Found a bug"))'
 
 if __name__ == "__main__":
     test_balance_parenthesis()

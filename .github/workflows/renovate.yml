@@ -1,0 +1,28 @@
+name: Renovate
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "10 3 * * 1"
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get token
+        id: get_token
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
+          client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
+          owner: ${{ github.repository_owner }}
+          repositories: "asi-alliance/OmegaClaw-Core"
+
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@v46.1.19
+        env:
+          LOG_LEVEL: debug
+        with:
+          configurationFile: .github/renovate-config.js
+          token: "${{ steps.get_token.outputs.token }}"

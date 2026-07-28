@@ -48,7 +48,7 @@ def test_run_create_dirs_mock(llm, comm):
             prompt,
             f'(write-file "{SCRIPT_PATH}" "#!/bin/bash\\nmkdir -p {mkdir_args}\\n") '
             f'(shell "chmod +x {SCRIPT_PATH}") '
-            f'(shell "{SCRIPT_PATH}")',
+            f'(shell "sh {SCRIPT_PATH}")',
         )
         if not comm.send_message(prompt):
             c.fail("comm", "could not deliver prompt within 60s")

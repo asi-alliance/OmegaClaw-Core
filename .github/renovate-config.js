@@ -1,0 +1,30 @@
+module.exports = {
+  branchPrefix: "renovate/",
+  branchPrefixOld: "main",
+  username: "renovate-asi[bot]",
+  gitAuthor: "Renovate Bot <bot@renovateapp.com>",
+  onboarding: false,
+  requireConfig: false,
+  platform: "github",
+  forkProcessing: "disable",
+  repositories: ["asi-alliance/OmegaClaw-Core"],
+  extends: ["config:recommended"],
+  dependencyDashboardAutoclose: true,
+  prCreation: "approval",
+  prConcurrentLimit: 0,
+  reviewers: ["anseliv", "vsbogd"],
+  packageRules: [
+    {
+      description: "lockFileMaintenance",
+      matchUpdateTypes: [
+        "pin",
+        "digest",
+        "patch",
+        "minor",
+        "major",
+        "lockFileMaintenance",
+      ],
+      minimumReleaseAge: "3",
+    },
+  ],
+};

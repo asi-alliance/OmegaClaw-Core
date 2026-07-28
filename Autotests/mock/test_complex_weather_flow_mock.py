@@ -61,7 +61,7 @@ def test_complex_weather_flow_mock(llm, comm):
             f'(write-file "{SCRIPT_SH}" '
             f'"#!/bin/bash\\ngrep -oE \'[0-9]+\' {WEATHER_TXT} | head -1 > {TEMP_ONLY}\\n") '
             f'(shell "chmod +x {SCRIPT_SH}") '
-            f'(shell "{SCRIPT_SH}")',
+            f'(shell "sh {SCRIPT_SH}")',
         )
         if not comm.send_message(prompt):
             c.fail("comm", "could not deliver prompt within 60s")

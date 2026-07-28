@@ -46,7 +46,7 @@ Step 3: atomize with source-anchored confidence
    Miss or stale?        → fetch fresh.
 
 2. Fetch from a verified source.
-   (search "netflix 10-K content spend")
+   (websearch "netflix 10-K content spend")
    (shell "curl ... SEC EDGAR ...")
    (tavily-search "netflix content spend 2024 10-K")
 

@@ -2,6 +2,63 @@
 
 MeTTa handles reasoning and control flow; bridges handle everything that needs a library ecosystem.
 
+## `src/logger.py`
+
+Centralized logging setup. Called once at startup from `loop.metta`; all Python modules obtain a logger through `get_logger` rather than calling `logging.getLogger` directly.
+
+| Function | Purpose |
+|---|---|
+| `setup_logging()` | Configures the root logger using the configuration script passed as a parameter. Idempotent — safe to import from multiple modules. Falls back to stdout-only if the configuration script is not found. |
+| `get_logger(name)` | Returns `logging.getLogger(name)`. Use this instead of calling `logging.getLogger` directly so the relationship to the shared setup is explicit. |
+| `log_debug(msg, module)` | MeTTa bridge — write a DEBUG entry under logger `module`. |
+| `log_info(msg, module)` | MeTTa bridge — write an INFO entry under logger `module`. |
+| `log_warning(msg, module)` | MeTTa bridge — write a WARNING entry under logger `module`. |
+| `log_error(msg, module)` | MeTTa bridge — write an ERROR entry under logger `module`. |
+
+The MeTTa bridge functions are invoked by calling `log` helper function defined in `src/log.metta`, passing the source filename as `module` so log lines are attributed correctly:
+
+```metta
+(log INFO "memory" "Initializing memory")
+```
+
+**Logging configuration** 
+
+By default, logging is configured from:
+
+```text
+config/logging.conf
+```
+
+The default configuration writes logs to stderr using the format:
+
+```text
+YYYY-MM-DD HH:MM:SS | LEVEL    | module | message
+```
+
+Docker container stdout/stderr is captured automatically and can be viewed with:
+
+```bash
+docker logs -f omegaclaw
+```
+
+**Custom logging configuration**
+
+Users can provide their own Python logging config file to control log levels, handlers, formatters, output destinations, and per-module logging behavior.
+
+When starting OmegaClaw through the launcher script, pass:
+
+```bash
+scripts/omegaclaw start -l /path/to/logging.conf
+```
+
+For standalone runs without Docker, pass the config path to the MeTTa runtime:
+
+```bash
+sh run.sh run.metta logConfigPath=/path/to/logging.conf
+```
+
+If no custom config is provided, OmegaClaw uses `config/logging.conf`. If the configured file is missing, OmegaClaw falls back to basic stderr logging.
+
 ## `lib_llm_ext.py`
 
 LLM and embedding bridges.
@@ -45,6 +102,15 @@ Prolog helpers imported via `import_prolog_functions_from_file`.
 |---|---|
 | `shell/2` | Run a shell command and capture stdout. Rejects apostrophes. |
 | `first_char/2` | Return the first character of a string — used by the loop to detect whether the LLM produced a valid s-expression. |
+
+## `src/websearch.py`
+
+A python helper for using ddgs to expose websearch to the agent.
+
+| Function | Purpose |
+|---|---|
+| `search_(query, max_results=10)` | Performs a DuckDuckGo text search using `DDGS` and returns a list of result dictionaries containing `title`, `url`, and `snippet`.                                             |
+| `search(query, max_results=10)`  | Wraps `search_` and formats the search results into a MeTTa-like parenthesized string containing each result’s title and snippet. Returns an empty string if the search fails. |
 
 ## Calling conventions
 

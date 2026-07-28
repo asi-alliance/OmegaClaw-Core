@@ -65,7 +65,7 @@ source venv/bin/activate
 pytest -s -v mock/test_*_mock.py
 ```
 
-The `LlmMockController` and `CommMockServer` are provided by session-scoped fixtures in `mock/conftest.py`, so both are started once per pytest session. Expected output: `33 passed` (or `32 passed, 1 skipped` if `OMEGACLAW_GIT_TOKEN` is not set).
+The `LlmMockController` and `CommMockServer` are provided by session-scoped fixtures in `mock/conftest.py`, so both are started once per pytest session. Expected output: `34 passed` (or `33 passed, 1 skipped` if `OMEGACLAW_GIT_TOKEN` is not set).
 
 ## 6. Tear down
 
@@ -77,7 +77,7 @@ This removes the `omegaclaw` container and the `omegaclaw-memory` volume created
 
 # Tests description
 
-All 33 tests follow the same pattern: the test registers a fixed mock-LLM answer for the prompt via `llm.set_answer(prompt, response)`, delivers the prompt to the agent over the test channel via `comm.send_message(prompt)`, then verifies the resulting skill calls and side effects (filesystem, `history.metta`, ChromaDB, docker logs). Because the LLM is deterministic, no `try_with_clarification` retries are needed; every test either passes on the first attempt or fails outright.
+All 34 tests follow the same pattern: the test registers a fixed mock-LLM answer for the prompt via `llm.set_answer(prompt, response)`, delivers the prompt to the agent over the test channel via `comm.send_message(prompt)`, then verifies the resulting skill calls and side effects (filesystem, `history.metta`, ChromaDB, docker logs). Because the LLM is deterministic, no `try_with_clarification` retries are needed; every test either passes on the first attempt or fails outright.
 
 ## Creating files
 
@@ -335,3 +335,12 @@ Explicit working-memory to long-term-memory transition.
 - Turn 1 mock answer: `(pin "<checklist>")` into working memory.
 - Turn 2 mock answer: `(remember "<checklist>")`, committing the pin to long-term memory.
 - Checks: both skill calls landed; ChromaDB vector count grew by exactly one (the working-memory item was promoted to the persistent embedding store).
+
+## Security
+
+### 34. test_credentials_scrubbed_mock.py
+
+Verifies that provider keys, channel tokens, and the auth secret are scrubbed from the agent process environment after startup. The agent runs as `nobody` under an entrypoint that rebuilds the environment from a fixed allowlist, so secrets passed into the container reach the proxy/entrypoint but never the agent process itself.
+
+- Mock answer: `(shell "env > /tmp/omega38_agentenv.txt")` — the agent dumps its own environment (only the process owner can read it).
+- Checks: `PATH` is present (positive control that the environment was captured); none of the forbidden secret variable names are present in the agent environment (`OMEGACLAW_AUTH_SECRET`, the provider API keys `ANTHROPIC_API_KEY` / `ASI_API_KEY` / `ASIONE_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `OPENAIAPI_API_KEY`, and the channel tokens `TG_BOT_TOKEN` / `SL_BOT_TOKEN` / `MM_BOT_TOKEN`). A leak fails with `leaked into agent env: [...]`. The check is by variable name, so it is independent of the secret values.

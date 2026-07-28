@@ -101,7 +101,7 @@ Complex questions usually cannot fit in one cycle because the LLM must emit all 
 
 | Cycle | Purpose |
 |---|---|
-| 1 | Gather information — `query` memory, `search` web, read files, fetch external data. |
+| 1 | Gather information — `query` memory, `websearch` web, read files, fetch external data. |
 | 2 | Atomize the relevant knowledge; run the first NAL or PLN step. |
 | 3 | Revision with independent evidence; follow-up inference. |
 | 4 | Threshold check; decide whether to `send` an answer. |
