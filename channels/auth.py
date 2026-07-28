@@ -21,7 +21,8 @@ _user_ID_processed = False
 def get_proxy_url():
     global _proxy_url
     if _proxy_url is None:
-        _proxy_url = config_get_by_key("GATEWAY_URL", "").rstrip("/")
+        configured_url = config_get_by_key("GATEWAY_URL", "")
+        _proxy_url = str(configured_url or "").strip().rstrip("/")
     return _proxy_url
 
 

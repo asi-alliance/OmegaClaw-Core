@@ -16,15 +16,32 @@ logger = get_logger(__name__)
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
 LLM_COMMANDS = {
     "append-file",
+    "clear-frame-junk",
+    "compact-frame",
+    "complete-goals-ltm",
+    "complete-goals-stm",
+    "ctx-add-hypothesis",
+    "ctx-add-result",
     "episodes",
     "metta",
+    "new-autonomous-frame",
+    "new-frame",
     "pin",
     "query",
     "read-file",
     "remember",
-    "search",
+    "websearch",
     "send",
+    "send_probe",
     "shell",
+    "show-active-framespace",
+    "show-completed-framespace",
+    "show-current-frame",
+    "show-frame-index",
+    "show-frame-relation",
+    "show-root-frame",
+    "switch-frame",
+    "switch-mode",
     "tavily-search",
     "technical-analysis",
     "write-file",
@@ -32,7 +49,9 @@ LLM_COMMANDS = {
 }
 TWO_ARG_COMMANDS = {
     "write-file",
-    "append-file"
+    "append-file",
+    "ctx-add-hypothesis",
+    "ctx-add-result",
 }
 
 def compact_plain(value, limit=1200):

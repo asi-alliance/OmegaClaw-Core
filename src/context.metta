@@ -185,7 +185,7 @@
       (let* (((Frame $frameID $parentFrameID $source $priority $goalNamespace $status $frameMode $hypotheses $method $historySummary
                      $modules $budget $constraints $deliverables $subFrameNamespace $results $createdAt $updatedAt $completedTimestamp $completedSummary)
             (cfv2-current-frame))
-         ; ($_ (println! ("Current frame for prompt: " $frameID))) ;; enable for debug
+         ; ($_ (log DEBUG "context" ("Current frame for prompt: " $frameID))) ;; enable for debug
          )
       
          (Frame $frameID $parentFrameID $source $priority $goalNamespace 
@@ -198,13 +198,11 @@
     (let $currentFrameID (if (== () $frameID) (cfv2-root-current-frame-id) $frameID)
         (let*
             (
-               ; ($_ (println! $frame))
+               ; ($_ (log DEBUG "context" $frame))
                ((Frame $frameID' $parentFrameID $source $priority $goalNamespace (status $statusValue) $frameMode $hypotheses $method (history-summary $historySummary)
                      $modules $budget $constraints $deliverables $subFrameNamespace $results $createdAt $updatedAt $completedTimestamp $completedSummary)
                   (cfv2-get-frame $currentFrameID $space))
-
-               ($_ (println! ("Creating frame reference for frameID: " $currentFrameID " in space: " $space)))
-
+               ; ($_ (log DEBUG "context" ("Creating frame reference for frameID: " $currentFrameID " in space: " $space)))
             )
             (FrameRef
                 (frameID $currentFrameID) $parentFrameID (space (if (== $space &cfv2-completed-framespace) Completed Active)) $source
@@ -414,12 +412,12 @@
 
 (= (cfv2-add-deliverable $description)
    (progn
-      ; (println! (get-state &cfv2-current-deliverables))
+      ; (log DEBUG "context" (get-state &cfv2-current-deliverables))
       (change-state! &cfv2-current-deliverables
          (append
             (get-state &cfv2-current-deliverables)
             ((cfv2-make-deliverable $description))))
-      ; (println! ("changed state"))
+      ; (log DEBUG "context" "Changed current deliverables state")
       (cfv2-record-frame-note DeliverableAdded $description)
       ))
 
@@ -470,9 +468,9 @@
       
       (progn
          (cfv2-snapshot-current-frame Active $frame)
-         ; (println! (CREATING-FRAME $frameID FROM $source WITH-MODE $mode))
+         ; (log DEBUG "context" (CREATING-FRAME $frameID FROM $source WITH-MODE $mode))
          (cfv2-index-current-frame $frameID Active)
-         ; (println! (CREATING-FRAME $frameID FROM $source WITH-MODE $mode))
+         ; (log DEBUG "context" (CREATING-FRAME $frameID FROM $source WITH-MODE $mode))
          (change-state! &cfv2-last-admitted-frame-id $frameID)
          (FRAME-CREATED-AND-STORED-IN-ACTIVE-FRAME-SPACE)
 
@@ -550,13 +548,13 @@
                     (completed-at ())
                     (completion-summary ()))))
           (progn
-            ; (println! ($goalspace))
+            ; (log DEBUG "context" $goalspace)
             (change-state! $goalSpace ())
             (change-state! $subFrameSpaceID ())
             (cfv2-add-goal $goal $goalSpace)
-            ; (println! ($goalSpace))
+            ; (log DEBUG "context" $goalSpace)
             (cfv2-add-sub-frame $subFrame $subFrameSpaceID)
-            ; (println! ($subFrameSpaceID))
+            ; (log DEBUG "context" $subFrameSpaceID)
             $subFrame)))
 
 (= (cfv2-complete-sub-frame $subFrameID $summary)
@@ -681,8 +679,9 @@
           (progn
              (cfv2-clear-current-frame-cache)
              (NO-ACTIVE-FRAME-FOR-ROOT-MODE))
-            (progn (println! (TYRING TO PRINT:  $nextID))
-          (cfv2-load-frame $nextID))
+            (progn
+               ; (log DEBUG "context" (SELECTING-NEXT-FRAME $nextID))
+               (cfv2-load-frame $nextID))
           )))
 
 (= (cfv2-check-ref-status (FrameRef $frameID $parentFrameID $space 
@@ -737,7 +736,9 @@
 
 (= (cfv2-complete-current-frame-to-stm $summary)
    (if (== (get-state &cfv2-current-frame-id) ())
-       (progn (NO-CURRENT-FRAME-TO-COMPLETE) (println! ("ROOT CURRENT: " (cfv2-root-current-frame-id))))
+       (progn
+         ;  (log WARNING "context" ("No current frame to complete; root current frame: " (cfv2-root-current-frame-id)))
+          (NO-CURRENT-FRAME-TO-COMPLETE))
        (let $memory (cfv2-completed-frame-memory STM $summary)
           (progn
              (pin $memory)

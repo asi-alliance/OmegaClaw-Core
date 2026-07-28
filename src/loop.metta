@@ -6,12 +6,10 @@
 (= (reasoningMode) (empty))
 (= (wakeupInterval) (empty))
 (= (memoryDirectory) (empty))
-(= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
 
 (= (initLoop)
    (progn (configure maxNewInputLoops 50)
           (configure maxWakeLoops 1)
-          (configure spamShield False)
           (configure sleepInterval 1) ;10
           (configure provider Anthropic)
           (configure maxOutputToken 6000)
@@ -46,7 +44,6 @@
           "SAVE_PERMANENT_FILES_DIR: " (memoryDirectory) (newline)
           "LAST_SKILL_USE_RESULTS: you must rectify ALERT_FAILED skill use cases "
              (last_chars (get-state &lastresults) (maxFeedback)) (newline)
-          "HISTORY: " (getHistory) (newline)
           "TIME: " (get_time_as_string)))))
 
 (= (getPromptExtensions)
@@ -67,107 +64,60 @@
 (= (omegaclaw)
    (omegaclaw 1))
 (= (omegaclaw $k)
-   (progn
-      (if (== $k 1)
-          (progn
-             (initConfig)
-             (initLoop)
-             (initLogger)
-             (applySecurityPolicy)
-             (initMemory)
-             (initKnowledge)
-             (initPlugins)
-             (initChannels)
-             (initContextFrame)
-             (llmProviderStart (provider)))
+   (progn (if (== $k 1) (progn (initConfig)
+                               (initLoop)
+                               (initLogger)
+                               (applySecurityPolicy)
+                               (initMemory)
+                               (initKnowledge)
+                               (initPlugins)
+                               (initChannels)
+                               (initContextFrame)
+                               (llmProviderStart (provider)))
           (change-state! &loops (- (get-state &loops) 1)))
 
       (log INFO "loop" (---------iteration $k))
 
       (let* (($msgrcv (string-safe (repr (receive))))
-             ($msgnew
-                (prog1
-                   (and (> (string_length $msgrcv) 0)
-                        (!= $msgrcv (get-state &prevmsg)))
-                   (if (> (string_length $msgrcv) 0)
-                       (change-state! &prevmsg $msgrcv)
-                       _)))
+             ($msgnew (prog1 (and (> (string_length $msgrcv) 0) (!= $msgrcv (get-state &prevmsg)))
+                             (if (> (string_length $msgrcv) 0) (change-state! &prevmsg $msgrcv) _)))
              ($msg (get-state &prevmsg))
-
              ($hadActiveFrame (if $msgnew (cfv2-has-current-frame) False))
-
              ; New input becomes frame state before prompting.
-             ($_ (if $msgnew
-                     (ctx-ingest-user-message $msg)
-                    _))
-              
-            ($_ (if (not (ctx-has-active-goals))
-                     (ctx-maintain-frame) _))
-
-             ($_ (if (and (> $k 1) $msgnew)
-                     (change-state! &loops (maxNewInputLoops)) ;; )
-                    _))
-
+             ($_ (if $msgnew (ctx-ingest-user-message $msg) _))
+             ($_ (if (not (ctx-has-active-goals)) (ctx-maintain-frame) _))
+             ($_ (if (and (> $k 1) $msgnew) (change-state! &loops (maxNewInputLoops)) _))
              ; Prompt is now frame-based.
              ($prompt (getContext)))
 
          (if (> (get-state &loops) 0)
-             (let* (($lastmessage
+             (let* (($loopSignal
                        (if $msgnew
-                           ; Case 1: new input, a frame was already active — may need to switch.
-                           ; Case 2: new input, no prior active frame — clean start.
                            (if $hadActiveFrame
                                "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME. Continue current frame or switch-frame to a higher-priority admitted frame if appropriate."
                                "NEW_INPUT_HAS_BEEN_ADMITTED_AS_ACTIVE_FRAME.")
-                           ; Case 3: no new input, current frame is loaded — continue it.
-                           ; Case 4: no new input, no current frame — idle.
                            (if (cfv2-has-current-frame)
-                               "NO_NEW_INPUT. Continue only if the context frame contains an active useful goal or select relevant frame from the active space. DO NOT RE-SEND OR SPAM!"
-                               "NO_NEW_INPUT. No active frame. Consider switching your mode to pursue frames registered with mode = Slow or create a new autonomous goal. DO NOT RE-SEND OR SPAM!")))
+                               "NO_NEW_INPUT. Continue only if the context frame contains an active useful goal or select relevant frame from the active space."
+                               "NO_NEW_INPUT. No active frame. Consider switching your mode to pursue frames registered with mode = Slow or create a new autonomous goal.")))
                     ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
-                    ($_ (log INFO "loop" $lastmessage))
-                    ($send (py-str ($prompt :-:-:-: $lastmessage)))
+                    ($_ (log INFO "loop" $loopSignal))
+                    ($send (py-str ($prompt :-:-:-: $loopSignal)))
                     ($_ (log INFO "loop" (CHARS_SENT: (string_length $send) $send)))
-
                     ($respi (llmProviderChat $send (maxOutputToken) (reasoningMode)))
-
                     ($resp (py-call (helper.balance_parentheses $respi)))
-                    ($response
-                       (if (== "(" (first_char $resp))
-                           $resp
-                           (progn
-                              (log INFO "loop" $resp)
-                              (repr
-                                 (REMEMBER:OUTPUT_NOTHING_ELSE_THAN:
-                                    ((skill arg) ...))))))
-
+                    ($response (if (== "(" (first_char $resp)) $resp (progn (log INFO "loop" $resp) (repr (REMEMBER:OUTPUT_NOTHING_ELSE_THAN: ((skill arg) ...))))))
                     ($sexpr (catch (sread $response)))
                     ($_ (change-state! &error ()))
-                    ($mcerr
-                       (HandleError
-                          MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY
-                          $response
-                          $sexpr))
+                    ($mcerr (HandleError MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY $response $sexpr))
                     ($_ (log INFO "loop" (RESPONSE: $sexpr)))
-
                     ($results (if (== $mcerr $sexpr)
                                   (RESULTS: (collapse (let $s (superpose $sexpr) (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (let $R (eval $s) (py-call (helper.normalize_string $R))))))))))
                                   (RESULTS: $mcerr)))
-
                     ($_ (log INFO "loop" (RESPONSE: $results))))
-
-                (progn
-                   ; Legacy audit log remains optional.
-                   (if (or $msgnew (not (== $sexpr ())))
-                       (addToHistory $msg $response $sexpr $msgnew)
-                       _)
-                   ; Frame-native audit log.
-                   (ctx-record-command-batch $sexpr $results)
-                   (ctx-maintain-frame)
-                   ; Compatibility state.
-                   (change-state! &lastresults
-                     (string-safe (repr $results)))))
-
+                  (progn (if (or $msgnew (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
+                         (ctx-record-command-batch $sexpr $results)
+                         (ctx-maintain-frame)
+                         (change-state! &lastresults (string-safe (repr $results)))))
              (if (> (get_time) (get-state &nextWakeAt))
                  (change-state! &loops (+ 1 (maxWakeLoops)))
                  (if (== (get-state &cfv2-root-mode) Fast) (switch-mode) _))))
