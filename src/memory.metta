@@ -26,6 +26,13 @@
                (read-file $default_prompt)
                "")))))
 
+(= (getContextFramePrompt)
+   (let $path
+         (library OmegaClaw-Core ./memory/prompt_context_frame.txt)
+      (if (exists-file $path)
+          (read-file $path)
+          "")))
+
 (= (getHistory)
    (let $history_file
          (library OmegaClaw-Core ./memory/history.metta)
