@@ -14,8 +14,9 @@
     ;SHELL AND FILE I/O:
     "- Execute shell command without apostrophe in string, it returns the command output to you: shell string"
     "- Read file to string: read-file filename"
-    "- Write string to file: write-file filename string"
-    "- Append line to file: append-file filename string"
+    "- Write string to file, the result is read back from disk (bytes, sha256, head/tail) - relay it, never claim a write succeeded without it: write-file filename string"
+    "- Write base64-encoded content to file as a single line, prefer it when the content contains quotes, backslashes or multiple lines: write-file-b64 filename base64string"
+    "- Append line to existing file, result read back from disk like write-file: append-file filename string"
     "- Get a list of allowed base paths for reading, writing, and updating files: get-io-policy"
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
@@ -100,14 +101,21 @@
           $content))
 
 (= (write-file $file $str)
-   (progn (translatePredicate (open $file write $Out))
-          (translatePredicate (write $Out $str))
-          (translatePredicate (close $Out))
-          WRITE-FILE-SUCCESS))
+   (py-call (fileio.write_file $file $str)))
+
+(= (write-file-b64 $file $b64)
+   (py-call (fileio.write_file_b64 $file $b64)))
 
 (= (append-file $file $str)
-   (progn (translatePredicate (exists_file $file))
-          (translatePredicate (open $file append $Out))
+   (py-call (fileio.append_file $file $str)))
+
+; Prolog-backed append used by the harness itself (memory.metta appendToHistory):
+; it receives a (library ...) file-spec term that only the Prolog open/4 path
+; resolves. Body is the previous append-file minus its exists_file guard:
+; open/4 in append mode creates a missing file, so the history file
+; self-heals instead of the append failing silently.
+(= (append-file-raw $file $str)
+   (progn (translatePredicate (open $file append $Out))
           (translatePredicate (write $Out $str))
           (translatePredicate (nl $Out)),
           (translatePredicate (close $Out))

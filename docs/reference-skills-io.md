@@ -1,6 +1,6 @@
 # Reference — I/O Skills
 
-Defined in `src/skills.metta`, with the `shell` primitive backed by `src/skills.pl`.
+Defined in `src/skills.metta`; the `shell` primitive is backed by `src/skills.pl`, the write skills by `src/fileio.py`.
 
 ---
 
@@ -74,7 +74,9 @@ Create or overwrite a file with the given contents.
 - `contents` — the exact bytes to write.
 
 ### Returns
-`True` on success.
+A verification string read back from disk after the write:
+`WRITE-VERIFIED file=<path> bytes=<size> sha256=<16 hex chars> head='<first 80 bytes>' tail='<last 80 bytes>'`
+— or `WRITE-FAILED file=<path>: <error>` on failure (the skill returns, never raises).
 
 ### Examples
 ```metta
@@ -83,7 +85,40 @@ Create or overwrite a file with the given contents.
 
 ### Notes / Limits
 - Overwrites unconditionally — there is no confirm step.
-- For incremental writes, use `append-file`.
+- Writes the exact bytes given — no implicit trailing newline.
+- For files up to 160 bytes the `tail` snippet is empty (`head` plus `sha256` already cover the content); for files over 2 MB the hash is reported as `sha256=skipped(large)`.
+- For incremental writes, use `append-file`. For content containing quotes, backslashes
+  or newlines, prefer `write-file-b64`.
+
+---
+
+## `write-file-b64`
+
+### Signature
+```metta
+(write-file-b64 "path" "base64content")
+```
+
+### Purpose
+Create or overwrite a file with base64-decoded content — byte-exact for content containing
+quotes, backslashes or newlines, which the plain-text argument path can mangle.
+
+### Parameters
+- `path` — target filesystem path.
+- `base64content` — base64 encoding of the exact bytes to write, as a single line
+  (whitespace inside the argument is tolerated).
+
+### Returns
+The same `WRITE-VERIFIED …` / `WRITE-FAILED …` string as `write-file`.
+
+### Examples
+```metta
+(write-file-b64 "/tmp/script.sh" "IyEvYmluL2Jhc2gKZWNobyAiYVwiYiIgJ2MnCg==")
+```
+
+### Notes / Limits
+- Invalid base64 fails without writing anything.
+- Binary-safe: the decoded bytes are written verbatim.
 
 ---
 
@@ -102,7 +137,8 @@ Append a line to an existing file, followed by a newline.
 - `line` — string to append.
 
 ### Returns
-`True` on success.
+`APPEND-VERIFIED file=<path> bytes=<file size after append> sha256=<16 hex chars> head='…' tail='…'`
+read back from disk — or `APPEND-FAILED file=<path>: <error>` (e.g. when the file does not exist).
 
 ### Examples
 ```metta
@@ -110,7 +146,8 @@ Append a line to an existing file, followed by a newline.
 ```
 
 ### Notes / Limits
-- Fails if the file does not exist (the call checks `exists_file` first). Create it with `write-file` first if needed.
+- Fails if the file does not exist (the skill checks existence first). Create it with `write-file` first if needed.
+- For files up to 160 bytes the `tail` snippet is empty (`head` plus `sha256` already cover the content); for files over 2 MB the hash is reported as `sha256=skipped(large)`.
 - A trailing newline is always added.
 
 ---

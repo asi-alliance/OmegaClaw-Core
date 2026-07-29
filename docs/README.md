@@ -49,7 +49,7 @@ Numbered in suggested reading order. Each tutorial is self-contained.
 User-facing MeTTa skills the agent invokes. Each page follows the template **Signature → Purpose → Parameters → Returns → Examples → Notes/Limits**.
 
 - [reference-skills-memory.md](./reference-skills-memory.md) — `remember`, `query`, `episodes`, `pin`
-- [reference-skills-io.md](./reference-skills-io.md) — `shell`, `read-file`, `write-file`, `append-file`
+- [reference-skills-io.md](./reference-skills-io.md) — `shell`, `read-file`, `write-file`, `write-file-b64`, `append-file`
 - [reference-skills-communication.md](./reference-skills-communication.md) — `send`, `receive`, `websearch`
 - [reference-skills-reasoning.md](./reference-skills-reasoning.md) — `metta` (NAL/PLN invocation surface)
 - [reference-skills-remote-agents.md](./reference-skills-remote-agents.md) — `tavily-search`, `technical-analysis`
