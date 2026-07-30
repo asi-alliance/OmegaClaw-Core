@@ -138,12 +138,6 @@
 (= (pin $x)
    PIN-SUCCESS)
 
-(= (complete-goals-stm $summary)
-   (ctx-complete-goals-to-stm $summary))
-
-(= (complete-goals-ltm $summary)
-   (ctx-complete-goals-to-ltm $summary))
-
 (= (compact-frame $summary)
    (progn
       (ctx-record-history FrameCompacted $summary)
@@ -154,14 +148,5 @@
                 " | Compact: "
                 $summary))
             (ctxHistorySummaryLimit)))
-      (ctx-rebuild-history)
-      (currentContextFrame)))
-
-(= (clear-frame-junk $summary)
-   (progn
-      (change-state! &ctx-hypotheses ())
-      (change-state! &ctx-results ())
-      (change-state! &ctx-deliverables ())
-      (ctx-record-history FrameJunkCleared $summary)
       (ctx-rebuild-history)
       (currentContextFrame)))

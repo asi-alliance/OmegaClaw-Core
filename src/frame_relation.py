@@ -39,7 +39,10 @@ def _get_collection(provider: str):
     if name not in _collections:
         if _chroma_client is None:
             _chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-        _collections[name] = _chroma_client.get_or_create_collection(name=name)
+        _collections[name] = _chroma_client.get_or_create_collection(
+            name=name,
+            embedding_function=None,
+        )
     return _collections[name]
 
 
@@ -352,6 +355,9 @@ def _search_top_k(query_frame: dict[str, Any], query_embedding: list[float], pro
         return []
 
     collection = _get_collection(provider)
+    if collection.count() <= 1:
+        return []
+
     result = collection.query(
         query_embeddings=[query_embedding],
         n_results=max(1, int(top_k) + 1),
