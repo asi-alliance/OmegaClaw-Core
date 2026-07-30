@@ -13,7 +13,7 @@ from config import config_get_by_key
 
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 FRAME_SKETCH_COLLECTION_BASE = os.environ.get("FRAME_SKETCH_COLLECTION", "cfv2_frame_sketches")
-FRAME_EMBED_MODEL = os.environ.get("FRAME_EMBED_MODEL", "text-embedding-3-small")
+FRAME_EMBED_MODEL = os.environ.get("FRAME_EMBED_MODEL", "text-embedding-3-large")
 
 _chroma_client = None
 _collections: dict[str, Any] = {}
