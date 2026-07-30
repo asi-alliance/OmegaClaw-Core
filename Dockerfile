@@ -127,5 +127,8 @@ RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
+# health/status endpoint; override the port with HEALTH_PORT
+EXPOSE 8081
+
 ENTRYPOINT ["/PeTTa/repos/OmegaClaw-Core/entrypoint.sh"]
 CMD []
