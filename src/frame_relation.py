@@ -1,4 +1,3 @@
-# helper_frame_composer_provider.py
 from __future__ import annotations
 
 import hashlib
@@ -9,11 +8,12 @@ from typing import Any
 
 import chromadb
 from openai import OpenAI
+import lib_llm_ext
+from config import config_get_by_key
 
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 FRAME_SKETCH_COLLECTION_BASE = os.environ.get("FRAME_SKETCH_COLLECTION", "cfv2_frame_sketches")
 FRAME_EMBED_MODEL = os.environ.get("FRAME_EMBED_MODEL", "text-embedding-3-small")
-FRAME_REL_MODEL = os.environ.get("FRAME_REL_MODEL", "gpt-5.4") # use GLM instead
 
 _chroma_client = None
 _collections: dict[str, Any] = {}
@@ -251,8 +251,6 @@ def _embed_texts_local(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    import lib_llm_ext
-
     if not _local_embedding_ready:
         try:
             lib_llm_ext.initLocalEmbedding()
@@ -391,8 +389,16 @@ def _parse_relation_classes(relation_classes_repr: str) -> list[str]:
     return list(dict.fromkeys(classes)) if classes else ["RelatedButSeparate", "Unrelated"]
 
 
+def _call_selected_llm(content: str, max_tokens: int, reasoning_mode: str) -> str:
+    import providers
+
+    chat = getattr(providers, "llmProviderChat", None)
+    if chat is None:
+        raise RuntimeError("OmegaClaw LLM provider registry is not loaded")
+    return str(chat(content, max_tokens, reasoning_mode) or "")
+
+
 def _call_classifier_llm(payload: dict[str, Any]) -> dict[str, Any]:
-    client = _get_openai_client()
     system_prompt = """
 You classify the relationship between one query frame and each candidate frame.
 The purpose is to compose these frames in order to create a more sound and coherent
@@ -424,25 +430,19 @@ Rules:
 """.strip()
 
     user_text = json.dumps(payload, ensure_ascii=False)
-
-    if hasattr(client, "responses"):
-        response = client.responses.create(
-            model=FRAME_REL_MODEL,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
-            ],
-        )
-        raw = response.output_text.strip()
-    else:
-        response = client.chat.completions.create(
-            model=FRAME_REL_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
-            ],
-        )
-        raw = response.choices[0].message.content.strip()
+    content = (
+        f"{system_prompt}"
+        f"{lib_llm_ext.PROMPT_DELIMITER}"
+        f"{user_text}"
+    )
+    max_tokens = max(
+        1,
+        int(config_get_by_key("maxOutputToken", 6000)),
+    )
+    reasoning_mode = str(
+        config_get_by_key("reasoningMode", "medium")
+    )
+    raw = _call_selected_llm(content, max_tokens, reasoning_mode).strip()
 
     try:
         return json.loads(raw)
