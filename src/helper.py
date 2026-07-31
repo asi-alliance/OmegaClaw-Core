@@ -135,6 +135,47 @@ def starts_command_line(line):
     first = s.split(maxsplit=1)[0].rstrip(")")
     return first in LLM_COMMANDS
 
+def split_toplevel_forms(line):
+    """Split a line holding several complete s-expressions into separate forms.
+
+    Parentheses inside string literals are ignored. A line that is not a plain
+    sequence of balanced top-level forms is returned unchanged, so single-form
+    answers and free text keep their previous handling.
+    """
+    forms = []
+    depth = 0
+    start = None
+    in_string = False
+    escaped = False
+    for i, ch in enumerate(line):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "(":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0 and start is not None:
+                forms.append(line[start:i + 1])
+                start = None
+            elif depth < 0:
+                return [line]
+        elif depth == 0 and not ch.isspace():
+            return [line]
+    if depth != 0 or len(forms) < 2:
+        return [line]
+    return forms
+
+
 def split_command_blocks(s):
     blocks = []
     cur = []
@@ -150,7 +191,10 @@ def split_command_blocks(s):
             cur.append(raw)
     if cur:
         blocks.append("\n".join(cur).strip())
-    return blocks
+    expanded = []
+    for block in blocks:
+        expanded.extend(split_toplevel_forms(block.strip()))
+    return expanded
 
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
