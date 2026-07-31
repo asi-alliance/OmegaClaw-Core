@@ -76,17 +76,22 @@ is a reliable signal to alert or restart.
 
 ## Configuration
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `HEALTH_PORT` | `8081` | TCP port the endpoint binds (`0.0.0.0`). |
-| `OMEGACLAW_VERSION` | — | Overrides the `version` field. |
+The plugin reads its settings through the agent's config system
+(`config_get_by_key`), so each is configurable — in priority order — via a
+command-line argument, an `OMEGACLAW_`-prefixed environment variable, or the
+config file:
+
+| Setting | Default | Command line | Environment | Config file |
+|---|---|---|---|---|
+| Port the endpoint binds (`0.0.0.0`) | `8081` | `HEALTH_PORT=9000` | `OMEGACLAW_HEALTH_PORT` | `HEALTH_PORT: 9000` |
+| Override the `version` field | — | `VERSION=v1.2.3` | `OMEGACLAW_VERSION` | `VERSION: v1.2.3` |
 
 The port is a non-privileged default because the agent runs as the
 unprivileged `nobody` user. The container exposes `8081` (`EXPOSE` in the
 `Dockerfile`); publish it when running, e.g. `docker run -p 8081:8081 ...`.
 
-Both variables are on the `entrypoint.sh` environment allowlist so they
-survive the startup environment scrub.
+The `OMEGACLAW_`-prefixed environment variables are on the `entrypoint.sh`
+allowlist so they survive the startup environment scrub.
 
 If the port cannot be bound (e.g. already in use), the failure is logged and
 swallowed — the agent keeps running without the endpoint rather than crashing.
@@ -95,7 +100,7 @@ swallowed — the agent keeps running without the endpoint rather than crashing.
 
 `version` is resolved in this order, falling back to `"unknown"`:
 
-1. The `OMEGACLAW_VERSION` environment variable.
+1. The `VERSION` setting (command line, `OMEGACLAW_VERSION` env, or config file).
 2. A `VERSION` (or `version.txt`) file at the repository root.
 
 This lets the field return real data once build-time version stamping lands,

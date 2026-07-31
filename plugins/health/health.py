@@ -31,6 +31,19 @@ DEFAULT_STALE_AFTER_SECONDS = 120
 DEFAULT_PORT = 8081  # unprivileged: the agent runs as `nobody`
 
 
+def _config_get(key, default=None):
+    """Read a setting through the agent's config system (command line,
+    OMEGACLAW_<key> environment variable or config file), like the channel
+    plugins do. Falls back to the OMEGACLAW_<key> environment variable when the
+    agent runtime is not loaded, so the standalone self-test still works."""
+    try:
+        from config import config_get_by_key
+    except ImportError:
+        env = os.environ.get(f"OMEGACLAW_{key}")
+        return env if env is not None else default
+    return config_get_by_key(key, default)
+
+
 def _iso(wall_time):
     if wall_time is None:
         return None
@@ -38,9 +51,9 @@ def _iso(wall_time):
 
 
 def _version():
-    env_version = os.environ.get("OMEGACLAW_VERSION")
-    if env_version and env_version.strip():
-        return env_version.strip()
+    configured = _config_get("VERSION")
+    if configured and str(configured).strip():
+        return str(configured).strip()
     try:
         # this file lives at <repo>/plugins/health/health.py, so the repo root
         # is two directories up.
@@ -148,7 +161,7 @@ def start(port=None, stale_after=DEFAULT_STALE_AFTER_SECONDS):
         if _server is not None:
             return "HEALTH-ALREADY-RUNNING"
         try:
-            resolved_port = int(port) if port else int(os.environ.get("HEALTH_PORT", DEFAULT_PORT))
+            resolved_port = int(port) if port else int(_config_get("HEALTH_PORT", DEFAULT_PORT))
         except (TypeError, ValueError):
             resolved_port = DEFAULT_PORT
         _state.stale_after = stale_after
