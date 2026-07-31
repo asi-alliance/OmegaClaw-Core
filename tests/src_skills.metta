@@ -22,3 +22,24 @@
          (remove-prompt-extension test-prompt)
          (contains-text (getPromptExtensions) "TEST PROMPT EXTENSION"))
        False)
+
+(= (on-heartbeat $iter)
+   (let $count (get-state &test_heartbeat_counter)
+     (change-state! &test_heartbeat_counter (+ $count $iter))))
+
+!(test (progn
+         (change-state! &test_heartbeat_counter 0)
+         (add-heartbeat-listener test-heartbeat (|-> ($iter) (on-heartbeat $iter)))
+         (heartbeat 1)
+         (heartbeat 2)
+         (remove-heartbeat-listener test-heartbeat)
+         (get-state &test_heartbeat_counter))
+       3)
+
+!(test (progn
+         (change-state! &test_heartbeat_counter 0)
+         (add-heartbeat-listener test-heartbeat (|-> ($iter) (on-heartbeat $iter)))
+         (remove-heartbeat-listener test-heartbeat)
+         (heartbeat 1)
+         (get-state &test_heartbeat_counter))
+       0)

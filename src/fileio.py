@@ -43,11 +43,25 @@ def _readback(path):
     return size, digest, _snippet(head), _snippet(tail)
 
 
+def _line_separator(path):
+    """Newline needed to start a new line at the end of path, empty when
+    the file is empty or already ends with one. Read as bytes so a
+    multi-byte character at the end is not decoded from its middle."""
+    try:
+        if os.path.getsize(path) == 0:
+            return b""
+        with open(path, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            return b"" if f.read(1) == b"\n" else b"\n"
+    except OSError:
+        return b""
+
+
 def _write(path, data, append):
     path = str(path)
     word = "APPEND" if append else "WRITE"
     if append:
-        data = data + b"\n"
+        data = _line_separator(path) + data + b"\n"
     try:
         with open(path, "ab" if append else "wb") as f:
             f.write(data)

@@ -151,6 +151,12 @@ def openai_embed_batch(texts):
         raise RuntimeError(f"Embedding request failed: {e}") from e
     return [item.embedding for item in resp.data]
 
+
+def openai_embed(text):
+    """Embed one runtime memory string via the configured OpenAI route."""
+    return openai_embed_batch([text])[0]
+
+
 def local_embed_batch(texts):
     """Embed a list of texts via lib_llm_ext local embeddings."""
     if isinstance(texts, str):

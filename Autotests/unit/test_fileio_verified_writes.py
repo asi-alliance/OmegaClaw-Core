@@ -120,6 +120,43 @@ def test_append_adds_newline_and_verifies_whole_file(fileio, tmp_path):
     assert f"sha256={_sha16(expected)}" in result
 
 
+def test_append_inserts_separator_when_file_has_no_trailing_newline(fileio, tmp_path):
+    # OMEGA-263: without the separator the two lines run together.
+    target = tmp_path / "shopping.txt"
+    target.write_bytes(b"milk, bread, eggs")  # no trailing newline
+
+    result = fileio.append_file(str(target), "cheese, apples")
+
+    expected = b"milk, bread, eggs\ncheese, apples\n"
+    assert target.read_bytes() == expected
+    assert result.startswith("APPEND-VERIFIED")
+    assert f"bytes={len(expected)}" in result
+    assert f"sha256={_sha16(expected)}" in result
+
+
+def test_append_to_empty_file_adds_no_leading_newline(fileio, tmp_path):
+    target = tmp_path / "empty.txt"
+    target.write_bytes(b"")
+
+    result = fileio.append_file(str(target), "first")
+
+    expected = b"first\n"
+    assert target.read_bytes() == expected
+    assert result.startswith("APPEND-VERIFIED")
+
+
+def test_append_after_multibyte_tail_does_not_decode_partial_char(fileio, tmp_path):
+    target = tmp_path / "unicode.txt"
+    target.write_bytes("café".encode("utf-8"))  # last byte 0xa9, no trailing newline
+
+    result = fileio.append_file(str(target), "next")
+
+    expected = "café\nnext\n".encode("utf-8")
+    assert target.read_bytes() == expected
+    assert result.startswith("APPEND-VERIFIED")
+    assert f"sha256={_sha16(expected)}" in result
+
+
 def test_append_to_missing_file_fails_without_creating_it(fileio, tmp_path):
     target = tmp_path / "absent.txt"
 

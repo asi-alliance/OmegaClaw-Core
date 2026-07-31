@@ -41,16 +41,25 @@ on:
         required: false
       DOCKERHUB_TOKEN:
         required: false
+      CICD_GITHUB_PAT:
+        required: false
 
 jobs:
+  autotests:
+    if: inputs.run_tests
+    uses: ./.github/workflows/autotests.yml
+    with:
+      platforms: ${{ inputs.platforms }}
+      no_build_cache: ${{ inputs.no_build_cache }}
+    secrets: inherit
+
   common:
+    needs: autotests
+    if: always() && (needs.autotests.result == 'success' || needs.autotests.result == 'skipped')
     runs-on: ubuntu-latest
-    env:
-      AUTOTESTS_OMEGACLAW_CONTAINER: omegaclaw
-      AUTOTESTS_OMEGACLAW_TAG: 'cicd-${{ github.run_id }}'
     steps:
       - name: Login to Docker Hub
-        if: ${{ inputs.publish_docker }}
+        if: inputs.publish_docker
         uses: docker/login-action@v4
         with:
           registry: docker.io
@@ -63,76 +72,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build image (no push)
-        uses: docker/build-push-action@v7
-        with:
-          platforms: linux/amd64
-          load: ${{ inputs.run_tests }}
-          push: false
-          tags: singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
-          no-cache: ${{ inputs.no_build_cache }}
-
-      - name: Autotests - Checkout
-        if: inputs.run_tests
-        uses: actions/checkout@v4
-
-      - name: Autotests - Set up
-        if: inputs.run_tests
-        run: |
-          chmod +x ./scripts/omegaclaw
-          ./scripts/omegaclaw start -p Test -t test -d singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }}
-          pip install pytest
-          echo "Waiting for agent to become ready..."
-          ready=
-          for i in $(seq 1 90); do
-            if docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; then
-              echo "Agent ready after ${i}s"
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ -z "$ready" ]; then
-            echo "::error::Agent did not become ready in 90s"
-            docker logs omegaclaw 2>&1 | tail -100
-            exit 1
-          fi
-        env:
-          TEST_SERVER_IP: 'host.docker.internal'
-          IMPORT_KB_ON_START: '0' # TODO: this is turned off because Python dependencies are not installed to the workflow environment
-
-      - name: MeTTa and Python unit tests
-        if: inputs.run_tests
-        env:
-          PETTA_PATH: '/PeTTa'
-          PROJECT_ROOT: '/PeTTa/repos/OmegaClaw-Core'
-        run: |
-          docker exec -e PETTA_PATH=${PETTA_PATH} omegaclaw ${PROJECT_ROOT}/tests/mettatest.sh
-          ./tests/pytest.sh
-
-      - name: Autotests - Phase 1 (Blocking Checks)
-        if: inputs.run_tests
-        working-directory: Autotests
-        run: |
-          python ../src/helper.py
-          pytest -s -v @run_mandatory
-        env:
-          OMEGACLAW_CONTAINER: ${{ env.AUTOTESTS_OMEGACLAW_CONTAINER }}
-
-      - name: Autotests - Phase 2 (Non-Blocking Checks)
-        if: inputs.run_tests
-        continue-on-error: true
-        working-directory: Autotests
-        run: pytest -s -v @run_optional
-        env:
-          OMEGACLAW_CONTAINER: ${{ env.AUTOTESTS_OMEGACLAW_CONTAINER }}
-          OMEGACLAW_GIT_TOKEN: ${{ secrets.CICD_GITHUB_PAT }}
-
       - name: Build and push (release)
         id: push
-        if: success() && inputs.publish_docker
         continue-on-error: true
         uses: docker/build-push-action@v7
         with:

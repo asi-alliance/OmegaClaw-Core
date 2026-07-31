@@ -68,8 +68,8 @@ def _is_allowed_message(nick, msg):
             return "allow"
         if _authenticated_nick is not None:
             return "allow" if norm_nick == _authenticated_nick else "ignore"
-        candidate = _parse_auth_candidate(msg)
-        user_id_check = auth.authenticate_channel_user('IRC', norm_nick, candidate)
+        auth_candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
+        user_id_check = auth.authenticate_channel_user('IRC', norm_nick, auth_candidate)
         if user_id_check in ["auth_bound", "allow"]:
             _authenticated_nick = norm_nick
             return user_id_check

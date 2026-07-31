@@ -1,3 +1,4 @@
+import hmac
 import json
 import os
 import time
@@ -26,14 +27,18 @@ def get_proxy_url():
     return _proxy_url
 
 
+def _local_auth_secret():
+    return os.environ.get("OMEGACLAW_AUTH_SECRET", "").strip()
+
+
 def is_auth_enabled():
     global _auth_enabled
     if _auth_enabled is not None:
         return _auth_enabled
     proxy = get_proxy_url()
     if not proxy:
-        _auth_enabled = False
-        return False
+        _auth_enabled = bool(_local_auth_secret())
+        return _auth_enabled
     try:
         url = f"{proxy}/auth/status"
         with urllib.request.urlopen(url, timeout=5) as resp:
@@ -48,7 +53,10 @@ def is_auth_enabled():
 def verify_token(candidate):
     proxy = get_proxy_url()
     if not proxy:
-        return True
+        secret = _local_auth_secret()
+        return bool(secret) and hmac.compare_digest(
+            str(candidate).encode("utf-8"), secret.encode("utf-8")
+        )
     url = f"{proxy}/auth/verify"
     req = urllib.request.Request(url)
     req.add_header("X-Auth-Token", str(candidate))
@@ -121,15 +129,16 @@ def get_channel_saved_user_id(channel_identifier, user_id):
                 if saved_channel_identifier == channel_identifier and saved_user_id == user_id:
                     _user_ID_processed = True
                     return True
+    except FileNotFoundError:
+        return False
     except Exception as e:
         raise RuntimeError("Failed to read channel authenticated user records") from e
     return False
 
-def authenticate_channel_user(channel_identifier, user_id, candidate):
-    # Check if there is a valid "auth <string>" token. 
-    # else see if there was a prior session with the user-id and channel.
-    # Otherwise ignore.
-    if verify_token(candidate):
+def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
+    # A token is accepted only when it came from an explicit auth command.
+    # Otherwise see if there was a prior session with the user-id and channel.
+    if auth_candidate is not None and verify_token(auth_candidate):
        if store_channel_authenticated_user_id(channel_identifier, user_id):
             label = str(channel_identifier).upper()
             logger.info(f"[{label}] Saved authenticated user ID")

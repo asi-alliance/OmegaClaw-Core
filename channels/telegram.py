@@ -133,8 +133,8 @@ def _is_allowed_message(chat_id, user_id, msg):
             if chat_id != _chat_id:
                 return "ignore"
             return "allow" if user_id == _authenticated_user_id else "ignore"
-        candidate = _parse_auth_candidate(msg)
-        user_id_check = auth.authenticate_channel_user('TELEGRAM', user_id, candidate)
+        auth_candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
+        user_id_check = auth.authenticate_channel_user('TELEGRAM', user_id, auth_candidate)
         if user_id_check in ["auth_bound", "allow"]:
             _authenticated_user_id = user_id
             _chat_id = chat_id

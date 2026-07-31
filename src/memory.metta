@@ -52,7 +52,7 @@
 (= (embed $str)
    (if (== (embeddingprovider) Local)
        (py-call (lib_llm_ext.useLocalEmbedding (string-safe $str)))
-       (useGPTEmbedding (string-safe $str))))
+       (py-call (rag.openai_embed (string-safe $str)))))
 
 (= (appendToHistory $addition)
    (append-file-raw (library OmegaClaw-Core ./memory/history.metta) (swrite $addition)))

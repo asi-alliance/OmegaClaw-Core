@@ -95,6 +95,31 @@
        "- Complete with durable reusable memory: complete-goals-ltm summary" (newline)
        "- Clear transient frame data: clear-frame-junk summary"))
 
+; Heartbeat function is called at the start of each iteration of the agentic
+; loop. Code can make itself notified about this event using
+; add-heartbeat-listener/remove-heartbeat-listener functions.
+(= (heartbeat $iteration)
+   (let $_ (collapse (heartbeat-listener $_ $iteration)) ()))
+
+; placeholder to eliminate error when no heartbeat listener is added
+(= (heartbeat-listener placeholder $_) (empty))
+
+; Subscribe on heartbeat event notifications
+; $handle - symbol to identify the subscription
+; $callback - lambda to evaluate on event
+(= (add-heartbeat-listener $handle $callback)
+   (progn
+     (log INFO "skills" (strings-concat ("Add heartbeat listener " $handle)))
+     (add-atom &self (= (heartbeat-listener $handle $iter) ($callback $iter)))))
+
+; Unsubscribe from heartbeat event notifications
+; $handle - symbol to identify the subscription
+(= (remove-heartbeat-listener $handle)
+   (progn
+     (log INFO "skills" (strings-concat ("Remove heartbeat listener: " $handle)))
+     (collapse (match &self (= (heartbeat-listener $handle $arg) $body) (remove-atom &self (= (heartbeat-listener $handle $arg) $body))))
+     True))
+
 (= (read-file $file)
    (progn (translatePredicate (exists_file $file))
           (translatePredicate (read_file_to_string $file $content ()))
