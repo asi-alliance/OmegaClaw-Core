@@ -1,7 +1,9 @@
 from collections import deque
 import json
 import re
+import hashlib
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 import os
 
 try:
@@ -14,15 +16,32 @@ logger = get_logger(__name__)
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
 LLM_COMMANDS = {
     "append-file",
+    "clear-frame-junk",
+    "compact-frame",
+    "complete-goals-ltm",
+    "complete-goals-stm",
+    "ctx-add-hypothesis",
+    "ctx-add-result",
     "episodes",
     "metta",
+    "new-autonomous-frame",
+    "new-frame",
     "pin",
     "query",
     "read-file",
     "remember",
-    "search",
+    "websearch",
     "send",
+    "send_probe",
     "shell",
+    "show-active-framespace",
+    "show-completed-framespace",
+    "show-current-frame",
+    "show-frame-index",
+    "show-frame-relation",
+    "show-root-frame",
+    "switch-frame",
+    "switch-mode",
     "tavily-search",
     "technical-analysis",
     "write-file",
@@ -32,8 +51,31 @@ LLM_COMMANDS = {
 TWO_ARG_COMMANDS = {
     "write-file",
     "append-file",
-    "write-file-b64"
+    "write-file-b64",
+    "ctx-add-hypothesis",
+    "ctx-add-result",
 }
+
+def compact_plain(value, limit=1200):
+    """
+    Return a compact, single-line summary with a stable digest.
+    This does not write files and does not store to LTM.
+    MeTTa decides whether to pin/remember the resulting summary.
+    """
+    text = normalize_string(value)
+    compact = re.sub(r"\s+", " ", text).strip()
+    digest = hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
+
+    if len(compact) > int(limit):
+        compact = compact[: int(limit) - 3].rstrip() + "..."
+
+    return f"sha256:{digest[:16]} chars:{len(text)} excerpt:{compact}"
+
+
+def make_id(prefix="id"):
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{prefix}-{stamp}"
+
 
 def extract_timestamp(line):
     m = TS_RE.search(line)
@@ -93,6 +135,47 @@ def starts_command_line(line):
     first = s.split(maxsplit=1)[0].rstrip(")")
     return first in LLM_COMMANDS
 
+def split_toplevel_forms(line):
+    """Split a line holding several complete s-expressions into separate forms.
+
+    Parentheses inside string literals are ignored. A line that is not a plain
+    sequence of balanced top-level forms is returned unchanged, so single-form
+    answers and free text keep their previous handling.
+    """
+    forms = []
+    depth = 0
+    start = None
+    in_string = False
+    escaped = False
+    for i, ch in enumerate(line):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "(":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0 and start is not None:
+                forms.append(line[start:i + 1])
+                start = None
+            elif depth < 0:
+                return [line]
+        elif depth == 0 and not ch.isspace():
+            return [line]
+    if depth != 0 or len(forms) < 2:
+        return [line]
+    return forms
+
+
 def split_command_blocks(s):
     blocks = []
     cur = []
@@ -108,7 +191,10 @@ def split_command_blocks(s):
             cur.append(raw)
     if cur:
         blocks.append("\n".join(cur).strip())
-    return blocks
+    expanded = []
+    for block in blocks:
+        expanded.extend(split_toplevel_forms(block.strip()))
+    return expanded
 
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
@@ -183,6 +269,162 @@ def joinPath(parts):
 
 def projectRootDirectory():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# ---- HyperClaw Context Frames V2 helper additions ----
+
+def cfv2_now() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _unescape_repr_id(value: str) -> str:
+    value = str(value).strip()
+    value = value.replace("'", "").replace('"', "")
+    value = value.replace("[", "").replace("]", "")
+    return value.strip()
+
+
+def _balanced_exprs(text: str, head: str) -> List[str]:
+    """Extract top-level balanced s-expressions whose head is `head`.
+
+    This is a pragmatic parser for scorer/runtime helper use. It is not a full MeTTa parser,
+    but it handles strings and nested parentheses well enough for Frame/FrameRef atoms.
+    """
+    text = str(text)
+    starts = []
+    token = f"({head}"
+    i = 0
+    while True:
+        idx = text.find(token, i)
+        if idx < 0:
+            break
+        starts.append(idx)
+        i = idx + len(token)
+
+    out = []
+    for start in starts:
+        depth = 0
+        in_str = False
+        escaped = False
+        for j in range(start, len(text)):
+            ch = text[j]
+            if in_str:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    out.append(text[start : j + 1])
+                    break
+    return out
+
+
+def _field(expr: str, field_name: str) -> Optional[str]:
+    """Return the raw value of a first-level-ish `(field value)` form.
+
+    This intentionally works on the stable constructor format emitted by the MeTTa code.
+    """
+    pattern = f"({field_name}"
+    idx = expr.find(pattern)
+    if idx < 0:
+        return None
+    start = idx + len(pattern)
+    # Skip whitespace.
+    while start < len(expr) and expr[start].isspace():
+        start += 1
+    if start >= len(expr):
+        return None
+    if expr[start] == "(":
+        depth = 0
+        in_str = False
+        escaped = False
+        for j in range(start, len(expr)):
+            ch = expr[j]
+            if in_str:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    return expr[start : j + 1]
+        return None
+    if expr[start] == '"':
+        escaped = False
+        for j in range(start + 1, len(expr)):
+            ch = expr[j]
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                return expr[start : j + 1]
+        return None
+    # Atom/number until whitespace or close paren.
+    end = start
+    while end < len(expr) and not expr[end].isspace() and expr[end] != ")":
+        end += 1
+    return expr[start:end]
+
+def cfv2_refs_completed_after(index_repr, date_prefix) -> str:
+    """Return completed FrameRefs whose completed-timestamp starts with or compares after date_prefix.
+
+    date_prefix can be YYYY-MM-DD or a longer timestamp prefix. This is intentionally simple.
+    """
+    prefix = _unescape_repr_id(date_prefix)
+    refs = []
+    for ref in _balanced_exprs(str(index_repr), "FrameRef"):
+        status = _unescape_repr_id(_field(ref, "status") or "")
+        t = _unescape_repr_id(_field(ref, "completed-timestamp") or "")
+        if status == "Completed" and t and t >= prefix:
+            refs.append(ref)
+    return "(" + " ".join(refs) + ")"
+
+
+def cfv2_select_next_frame_id(index_repr, root_mode="Fast") -> str:
+    """Select highest-priority active frame matching root mode from FrameRef space.
+
+    If multiple FrameRefs exist for a frame, the last one wins. This supports append-only refs.
+    """
+    mode = _unescape_repr_id(root_mode)
+    latest: Dict[str, Tuple[float, str, str, str]] = {}
+    for ref in _balanced_exprs(str(index_repr), "FrameRef"):
+        fid = _unescape_repr_id(_field(ref, "frameID") or "")
+        status = _unescape_repr_id(_field(ref, "status") or "")
+        frame_mode = _unescape_repr_id(_field(ref, "frame-mode") or "")
+        space = _unescape_repr_id(_field(ref, "space") or "")
+        priority_raw = _unescape_repr_id(_field(ref, "priority") or "0")
+        try:
+            priority = float(priority_raw)
+        except Exception:
+            priority = 0.0
+        if fid:
+            latest[fid] = (priority, status, frame_mode, space)
+
+    best_id = "NON"
+    best_priority = float("-inf")
+    for fid, (priority, status, frame_mode, space) in latest.items():
+        if space == "Active" and status in {"Active", "Focused"} and frame_mode == mode:
+            if priority > best_priority:
+                best_priority = priority
+                best_id = fid
+    return best_id
 
 def test_balance_parenthesis():
     assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
