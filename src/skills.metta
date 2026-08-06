@@ -21,6 +21,9 @@
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
     "- Search the web: websearch string"
+    "- Fetch and read the full text content of a web page by URL: webfetch url"
+    "- Extract hyperlinks from a web page (returns up to 20 links): weblinks url"
+    "- Search the web and read the full content of the top results: websearch-and-read query"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
     "- To get the OmegaClaw version number: version"
@@ -136,6 +139,15 @@
 
 (= (technical-analysis $ticker)
    (py-call (agentverse.technical_analysis $ticker)))
+
+(= (webfetch $url)
+   (py-call (webfetch.fetch $url)))
+
+(= (weblinks $url)
+   (py-call (webfetch.links $url)))
+
+(= (websearch-and-read $query)
+   (py-call (webfetch.search_and_read $query)))
 
 (= (websearch $msg)
    (py-call (websearch.search $msg)))
