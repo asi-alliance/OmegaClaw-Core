@@ -9,3 +9,5 @@ py-landlock==0.1.1
 pyyaml==6.0.3
 ddgs==9.14.4
 websockets==16.0
+# web-browsing skill (webfetch.py) — optional but recommended
+trafilatura>=1.12,<2.0
