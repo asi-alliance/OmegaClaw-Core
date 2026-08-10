@@ -21,6 +21,7 @@
 !(import! &self (library OmegaClaw-Core ./src/providers))
 !(import! &self (library OmegaClaw-Core ./profile/policy))
 !(import! &self (library OmegaClaw-Core ./src/fileio.py))
+!(import! &self (library OmegaClaw-Core ./src/action_risk.py))
 !(import! &self (library OmegaClaw-Core ./src/skills))
 !(import! &self (library OmegaClaw-Core ./src/websearch.py))
 !(import! &self (library OmegaClaw-Core ./src/memory))

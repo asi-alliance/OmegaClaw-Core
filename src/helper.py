@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
 LLM_COMMANDS = {
+    "action-risk-check",
     "append-file",
     "episodes",
     "metta",
@@ -34,6 +35,7 @@ LLM_COMMANDS = {
     "write-file-b64",
 }
 TWO_ARG_COMMANDS = {
+    "action-risk-check",
     "write-file",
     "append-file",
     "write-file-b64"
@@ -246,6 +248,9 @@ def test_omegaclaw_version():
 
 
 def test_balance_parenthesis():
+    assert balance_parentheses(
+        'action-risk-check read-file public/readme.txt\nversion'
+    ) == '((action-risk-check "read-file" "public/readme.txt") (version))'
     assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
     assert balance_parentheses('(append-file test.txt hello world)') == '((append-file "test.txt" "hello world"))'
     assert balance_parentheses('(write-file-b64 test.txt aGVsbG8=)') == '((write-file-b64 "test.txt" "aGVsbG8="))'

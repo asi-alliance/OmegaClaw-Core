@@ -18,6 +18,7 @@
     "- Write base64-encoded content to file as a single line, prefer it when the content contains quotes, backslashes or multiple lines: write-file-b64 filename base64string"
     "- Append line to existing file, result read back from disk like write-file: append-file filename string"
     "- Get a list of allowed base paths for reading, writing, and updating files: get-io-policy"
+    "- Advisory deterministic risk classification for an intended action; this does not execute or automatically intercept the action: action-risk-check skill_name target_or_argument"
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
     "- Search the web: websearch string"
@@ -142,6 +143,9 @@
 
 (= (get-io-policy)
    (py-call (policy.get_allowed_policy_paths (securityPolicyPath))))
+
+(= (action-risk-check $skill $target)
+   (py-call (action_risk.check $skill $target)))
 
 !(import_prolog_functions_from_file (library OmegaClaw-Core ./src/skills.pl) (shell first_char gc read_file_tail))
 
