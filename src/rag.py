@@ -20,11 +20,14 @@ MAX_CHUNK_CHARS = 6000
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DB_PATH = os.environ.get(
-    "CHROMA_DB_PATH",
-    "/PeTTa/chroma_db" if os.path.isdir("/PeTTa/chroma_db") else
-    os.path.join(_PROJECT_ROOT, "..", "..","chroma_db")
-)
+# ChromaDB 1.5.x keys a PersistentClient's identity off the literal path
+# string it's given, not the resolved directory. Both Docker and the bare-
+# metal install (see README) always run this process with cwd set to the
+# PeTTa root, where repos/OmegaClaw-Core and repos/petta_lib_chromadb are
+# siblings - and lib_chromadb.py opens its own client with the literal
+# "./chroma_db". Matching that literal here (rather than resolving to an
+# absolute path) keeps both clients on the same Chroma "system" (see #295).
+DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 
 # --- Lazy ChromaDB client ------------------------------------------------
 

@@ -69,7 +69,7 @@ class FileSystemPolicy:
                              | AccessFs.MAKE_REG | AccessFs.MAKE_DIR
                              | AccessFs.MAKE_SYM | AccessFs.REMOVE_FILE
                              | AccessFs.REMOVE_DIR | AccessFs.MAKE_FIFO
-                             | AccessFs.MAKE_SOCK)
+                             | AccessFs.MAKE_SOCK | AccessFs.REFER)
     READ_WRITE_FILE_ACCESS = (AccessFs.READ_FILE | AccessFs.WRITE_FILE |
                               AccessFs.TRUNCATE)
 
