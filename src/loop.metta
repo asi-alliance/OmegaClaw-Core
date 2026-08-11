@@ -18,7 +18,7 @@
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
           (configure memoryDirectory ./)
-          (configure heartbeatLogInterval 100)
+          (configurePositiveInt heartbeatLogInterval 100)
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))

@@ -44,6 +44,26 @@ def config_get_by_key(key, default=None):
         return _cache_config(key, _CONFIG_FILE.get(key), "config file")
     return _cache_config(key, default, "defaults")
 
+def config_get_positive_int(key, default):
+    """Return a configured positive integer, falling back to ``default``."""
+    value = config_get_by_key(key, default)
+    try:
+        interval = int(value)
+    except (OverflowError, TypeError, ValueError):
+        interval = 0
+
+    if (
+        isinstance(value, bool)
+        or (isinstance(value, float) and not value.is_integer())
+        or interval <= 0
+    ):
+        logger.warning(
+            "Invalid positive integer for %s: %r; using %s", key, value, default
+        )
+        return default
+
+    return interval
+
 def _cache_config(key, value, source):
     global _CONFIG
     _CONFIG[key] = value

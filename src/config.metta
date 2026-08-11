@@ -12,6 +12,11 @@
    (let $value (configGetByKey $key $default)
      (add-atom &self (= ($key) $value))))
 
+; Configure a value that must be a positive integer.
+(= (configurePositiveInt $key $default)
+   (let $value (py-call (config.config_get_positive_int $key $default))
+     (add-atom &self (= ($key) $value))))
+
 ; Get configuration parameter from the list of sources: (1) command line
 ; parameters, (2) environment variable with OMEGACLAW_$key name, (3)
 ; configuration file, (4) use $default value.
