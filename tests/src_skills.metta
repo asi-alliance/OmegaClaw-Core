@@ -1,7 +1,21 @@
 !(import! &self ./tests/lib/utils)
+!(import! &self ../src/config.py)
+!(import! &self ./src/config)
 !(import! &self ./src/utils)
 !(import! &self ./src/skills)
 !(import! &self ./src/loop)
+
+; Keep listener tests independent of the Python logging module.
+(= (log $type $module $message)
+   (if (and (== $type INFO) (== $module "heartbeat"))
+       (let $count (get-state &test_heartbeat_log_count)
+         (change-state! &test_heartbeat_log_count (+ $count 1)))
+       ()))
+
+(= (command-line) ())
+!(initConfig)
+!(initLoop)
+!(test (heartbeatLogInterval) 100)
 
 !(test (progn
          (add-skill test-skill "This is a test skill" (test_arg))
@@ -43,3 +57,14 @@
          (heartbeat 1)
          (get-state &test_heartbeat_counter))
        0)
+
+; Default logger fires on multiples of heartbeatLogInterval, silent otherwise
+!(test (progn
+         (change-state! &test_heartbeat_log_count 0)
+         (heartbeat 100)
+         (get-state &test_heartbeat_log_count))
+       1)
+!(test (progn
+         (heartbeat 50)
+         (get-state &test_heartbeat_log_count))
+       1)
