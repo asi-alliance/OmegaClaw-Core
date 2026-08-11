@@ -89,6 +89,17 @@
 ; placeholder to eliminate error when no heartbeat listener is added
 (= (heartbeat-listener placeholder $_) (empty))
 
+; Default heartbeat listener: logs an "agent alive" message every
+; heartbeatLogInterval iterations so operators can confirm the agent
+; loop is running without needing to write their own plugin.
+; heartbeatLogInterval is configured during loop initialization.
+(= (heartbeat-listener default-logger $iteration)
+   (match &self (= (heartbeatLogInterval) $raw-interval)
+     (let $interval (py-call (builtins.int $raw-interval))
+       (if (== 0 (% $iteration $interval))
+           (log INFO "heartbeat" (strings-concat ("agent alive - iteration " $iteration)))
+           (empty)))))
+
 ; Subscribe on heartbeat event notifications
 ; $handle - symbol to identify the subscription
 ; $callback - lambda to evaluate on event
