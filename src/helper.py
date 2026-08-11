@@ -15,7 +15,7 @@ except ModuleNotFoundError:  # running this file directly as a script
 logger = get_logger(__name__)
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
-LLM_COMMANDS = {
+STATIC_LLM_COMMANDS = {
     "append-file",
     "episodes",
     "metta",
@@ -29,15 +29,29 @@ LLM_COMMANDS = {
     "tavily-search",
     "technical-analysis",
     "version",
+    "websearch",
     "write-file",
     "get-io-policy",
     "write-file-b64",
 }
+LLM_COMMANDS = set(STATIC_LLM_COMMANDS)
 TWO_ARG_COMMANDS = {
     "write-file",
     "append-file",
     "write-file-b64"
 }
+
+
+def add_llm_command(command):
+    LLM_COMMANDS.add(str(command))
+    return True
+
+
+def remove_llm_command(command):
+    command = str(command)
+    if command not in STATIC_LLM_COMMANDS:
+        LLM_COMMANDS.discard(command)
+    return True
 
 def extract_timestamp(line):
     m = TS_RE.search(line)
@@ -135,6 +149,11 @@ def balance_parentheses(s):
             continue
         cmd = parts[0]
         rest = parts[1].strip() if len(parts) > 1 else ""
+        if cmd not in LLM_COMMANDS:
+            # Do not let model commentary become a MeTTa expression.  The
+            # loop turns this into ALERT_FAILED feedback for the next turn.
+            sexprs.append(f"(Error UNKNOWN_SKILL_CALL {quote_arg(line)})")
+            continue
         if cmd in TWO_ARG_COMMANDS:
             if not rest:
                 sexprs.append(f"({cmd})")
@@ -277,6 +296,14 @@ def test_balance_parenthesis():
     assert balance_parentheses('(- Found a bug)') == '((pin "Found a bug"))'
     assert balance_parentheses('- Found\na\nbug') == '((pin "Found\\na\\nbug"))'
     assert balance_parentheses('(- Found a bug') == '((pin "Found a bug"))'
+    assert balance_parentheses('(No "action needed")') == \
+        '((Error UNKNOWN_SKILL_CALL "No \\"action needed\\""))'
+    add_llm_command("workflow-load-instructions")
+    assert balance_parentheses('workflow-load-instructions test-workflow') == \
+        '((workflow-load-instructions "test-workflow"))'
+    remove_llm_command("workflow-load-instructions")
+    assert balance_parentheses('workflow-load-instructions test-workflow') == \
+        '((Error UNKNOWN_SKILL_CALL "workflow-load-instructions test-workflow"))'
 
 if __name__ == "__main__":
     test_omegaclaw_version()

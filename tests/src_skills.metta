@@ -1,4 +1,5 @@
 !(import! &self ./tests/lib/utils)
+!(import! &self ../src/helper.py)
 !(import! &self ./src/utils)
 !(import! &self ./src/skills)
 !(import! &self ./src/loop)
