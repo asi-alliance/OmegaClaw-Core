@@ -99,14 +99,13 @@
 ; placeholder to eliminate error when no heartbeat listener is added
 (= (heartbeat-listener placeholder $_) (empty))
 
-; Default heartbeat listener logs and sends a periodic user-facing health check.
-; heartbeatLogInterval is configured during loop initialization.
+; Default heartbeat listener sends a user-facing health check every
+; heartbeatLogInterval loop iterations. The interval is configured during loop
+; initialization and defaults to 100 iterations.
 (= (heartbeat-listener default-logger $iteration)
    (match &self (= (heartbeatLogInterval) $interval)
      (if (== 0 (% $iteration $interval))
-         (progn
-           (log INFO "heartbeat" (strings-concat ("agent alive - iteration " $iteration)))
-           (send (strings-concat ("Heartbeat: agent alive - iteration " $iteration))))
+         (send (strings-concat ("Heartbeat: agent alive - iteration " $iteration)))
          (empty))))
 
 ; Subscribe on heartbeat event notifications

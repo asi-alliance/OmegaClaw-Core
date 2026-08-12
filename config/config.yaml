@@ -8,6 +8,8 @@ maxWakeLoops: 1
 spamShield: False
 # Delay between loop iterations (seconds)
 sleepInterval: 1
+# Number of loop iterations between user-facing heartbeat health checks
+heartbeatLogInterval: 100
 # LLM model to load overrides *_model parameters see below
 #model: 
 # LLM provider, see the list below in the Providers section

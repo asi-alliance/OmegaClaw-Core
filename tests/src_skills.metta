@@ -7,11 +7,7 @@
 !(import! &self ./src/loop)
 
 ; Keep listener tests independent of the Python logger and channel modules.
-(= (log $type $module $message)
-   (if (and (== $type INFO) (== $module "heartbeat"))
-       (let $count (get-state &test_heartbeat_log_count)
-         (change-state! &test_heartbeat_log_count (+ $count 1)))
-       ()))
+(= (log $type $module $message) ())
 (= (send $message)
    (progn
      (let $count (get-state &test_heartbeat_send_count)
@@ -67,13 +63,11 @@
 ; Default health checks fire on every configured interval.
 !(test (progn
          (change-state! &test_heartbeat_send_count 0)
-         (change-state! &test_heartbeat_log_count 0)
          (heartbeat 100)
          (heartbeat 200)
          (and (== (get-state &test_heartbeat_send_count) 2)
-              (and (== (get-state &test_heartbeat_log_count) 2)
-                   (== (get-state &test_heartbeat_last_message)
-                       "Heartbeat: agent alive - iteration 200"))))
+              (== (get-state &test_heartbeat_last_message)
+                  "Heartbeat: agent alive - iteration 200")))
        True)
 !(test (progn
          (heartbeat 50)
