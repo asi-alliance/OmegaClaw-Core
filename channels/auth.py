@@ -103,17 +103,11 @@ def store_channel_authenticated_user_id(channel_identifier, user_id):
     return True
 
 
-def get_channel_saved_user_id(channel_identifier, user_id):
-    # For any single run of OmegaClaw, allow only a single save of a user-id or verification    
-    global _user_ID_processed
-    if _user_ID_processed:
-        logger.warning(f"[{channel_identifier}] Warning: a user was already validated, ignoring")
-        return False
-
+def get_channel_authenticated_user_id(channel_identifier):
+    """Return the first owner persisted for a channel, if one exists."""
     channel_identifier = str(channel_identifier or "").strip()
-    user_id = str(user_id or "").strip()
-    if not user_id:
-        return False
+    if not channel_identifier:
+        raise ValueError("channel_identifier is required")
     try:
         path = _channel_auth_user_path()
         with open(path, "r", encoding="utf-8") as f:
@@ -125,29 +119,38 @@ def get_channel_saved_user_id(channel_identifier, user_id):
                 except (AttributeError, json.JSONDecodeError) as e:
                     logger.warning(f"Skipping malformed channel authenticated user record: {e}")
                     continue
-                if saved_channel_identifier == channel_identifier and saved_user_id == user_id:
-                    _user_ID_processed = True
-                    return True
+                if saved_channel_identifier == channel_identifier and saved_user_id:
+                    return saved_user_id
     except FileNotFoundError:
-        return False
+        return None
     except Exception as e:
         raise RuntimeError("Failed to read channel authenticated user records") from e
-    return False
+    return None
+
+
+def get_channel_saved_user_id(channel_identifier, user_id):
+    global _user_ID_processed
+    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
+    if saved_user_id != str(user_id or "").strip():
+        return False
+    _user_ID_processed = True
+    return True
+
 
 def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
+    # A persisted owner takes precedence over the reusable startup secret,
+    # including after a process restart.
+    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
+    if saved_user_id is not None:
+        return "allow" if saved_user_id == str(user_id or "").strip() else "ignore"
+
     # A token is accepted only when it came from an explicit auth command.
-    # Otherwise see if there was a prior session with the user-id and channel.
     if auth_candidate is not None and verify_token(auth_candidate):
-       if store_channel_authenticated_user_id(channel_identifier, user_id):
+        if store_channel_authenticated_user_id(channel_identifier, user_id):
             label = str(channel_identifier).upper()
             logger.info(f"[{label}] Saved authenticated user ID")
             return "auth_bound"
-       else:
+        else:
             logger.error(f"[{label}] ERROR -- Unable to save user ID")
             return "ignore"
-    elif get_channel_saved_user_id(channel_identifier, user_id):
-        label = str(channel_identifier).upper()
-        logger.info(f"[{label}] Verified previously validated user ID")
-        return "allow"
-    else:
-        return "ignore"
+    return "ignore"

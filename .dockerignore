@@ -1,5 +1,10 @@
 # VCS
-.git
+# Keep .git in the context long enough for Dockerfile to bake the version.
+# Dockerfile removes the repository metadata after creating the version file.
+.git/config
+.git/config.worktree
+.git/hooks
+.git/logs
 .gitignore
 
 # Local secrets/config

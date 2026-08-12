@@ -58,6 +58,12 @@ jobs:
     if: always() && (needs.autotests.result == 'success' || needs.autotests.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Login to Docker Hub
         if: inputs.publish_docker
         uses: docker/login-action@v4
@@ -77,6 +83,7 @@ jobs:
         continue-on-error: true
         uses: docker/build-push-action@v7
         with:
+          context: .
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |
@@ -92,6 +99,7 @@ jobs:
         if: inputs.publish_docker && steps.push.outcome == 'failure'
         uses: docker/build-push-action@v7
         with:
+          context: .
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |

@@ -17,6 +17,7 @@ mock/test_memory_history_byte_window_truncation_mock.py
 mock/test_memory_history_mock.py
 mock/test_memory_missing_history_file_mock.py
 mock/test_memory_pin_window_visibility_mock.py
+mock/test_openclaw_delegate_mock.py
 mock/test_pin_invisible_within_iteration_mock.py
 mock/test_prompt_missing_files_mock.py
 mock/test_rpc.py
@@ -37,5 +38,8 @@ mock_websocket/test_wschat_unit.py
 test_openai_runtime_embeddings.py
 test_prompt_grounding.py
 test_websearch_smoke.py
-unit/test_fileio_verified_writes.py
+test_wschat.py
 unit/test_config.py
+unit/test_fileio_verified_writes.py
+unit/test_helper_parsing.py
+unit/test_openclaw_unit.py

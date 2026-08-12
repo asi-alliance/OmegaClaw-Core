@@ -6,6 +6,7 @@ import urllib.parse
 import urllib.request
 import auth
 from src.logger import get_logger
+from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
 
@@ -24,6 +25,7 @@ _offset = None
 _connected = False
 
 _authenticated_user_id = None
+_outbox = PendingMessages()
 
 
 def _set_last(msg):
@@ -143,6 +145,33 @@ def _is_allowed_message(chat_id, user_id, msg):
             return "ignore"
 
 
+def _ready_to_send():
+    with _state_lock:
+        return _connected and bool(_chat_id)
+
+
+def _deliver_outbound(chunk):
+    with _state_lock:
+        target_chat = _chat_id
+    if not target_chat:
+        raise RuntimeError("Telegram chat is not bound")
+    _api_call(
+        "sendMessage",
+        {"chat_id": target_chat, "text": chunk},
+        timeout=15,
+        use_post=True,
+    )
+
+
+def _flush_outbox():
+    global _connected
+    try:
+        _outbox.flush(_deliver_outbound, _ready_to_send)
+    except Exception as exc:
+        _connected = False
+        logger.warning(f"Telegram send failed; retaining queued message: {exc}")
+
+
 def _poll_loop():
     global _connected, _offset
     logger.info("Polling started")
@@ -185,6 +214,7 @@ def _poll_loop():
                     _set_last(f"{display_name}: {text}")
                 elif state == "auth_bound":
                     send_message(f"Authentication successful for {display_name}.")
+            _flush_outbox()
         except Exception as exc:
             _connected = False
             logger.warning(f"Poll error: {exc}")
@@ -236,27 +266,14 @@ def send_message(text):
     if not text:
         return
 
-    with _state_lock:
-        target_chat = _chat_id
-
-    if not _connected or not target_chat:
-        return
-
     max_len = 3900
+    chunks = []
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
-        if not chunk:
-            continue
-        try:
-            _api_call(
-                "sendMessage",
-                {"chat_id": target_chat, "text": chunk},
-                timeout=15,
-                use_post=True,
-            )
-        except Exception as exc:
-            logger.exception(f"Send failed: {exc}")
-            return
+        if chunk:
+            chunks.append(chunk)
+    _outbox.extend(chunks)
+    _flush_outbox()
 
 class TelegramChannel(channels.CommChannel):
 

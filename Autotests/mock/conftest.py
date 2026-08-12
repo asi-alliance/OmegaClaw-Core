@@ -19,11 +19,16 @@ needed. We monkey-patch helpers at session start to drop those waits
 and lower POLL, which leaves Autotests/helpers.py untouched for live
 runs.
 """
+import os
+import re
+import subprocess
+
 import pytest
 
 import helpers
 from comm import CommMockServer, COMM_MOCK_PORT
 from llm import LlmMockController, LLM_MOCK_PORT
+from ocgw_stub import GATEWAY_PORT, GatewayStub
 
 
 def _mock_checker_exit(self, _exc_type, _exc_val, _exc_tb):
@@ -60,3 +65,38 @@ def comm():
         yield server
     finally:
         server.stop(5)
+
+
+@pytest.fixture(scope="session")
+def openclaw_gateway():
+    token = os.environ.get("OMEGACLAW_OPENCLAW_TOKEN", "")
+    if not token:
+        pytest.skip("OMEGACLAW_OPENCLAW_TOKEN is not set, so the openclaw plugin cannot be "
+                    "exercised; start the container with -g <gateway url> and the token")
+    # A token with the plugin disabled means the container was started without
+    # -g. Fail here instead of skipping: the token is always set in CI, so a
+    # skip would hide a suite that checks nothing.
+    #
+    # Match the runtime log line, not the phrase: the container log also carries
+    # the MeTTa source dump and its prolog translation, so the plain text
+    # appears even when the plugin is off.
+    container = os.environ.get("OMEGACLAW_CONTAINER", "omegaclaw")
+    logs = subprocess.run(["docker", "logs", container],
+                          capture_output=True, text=True, errors="replace")
+    enabled = re.search(r"\|\s*openclaw-plugin\s*\|\s*\"OpenClaw integration is enabled\"",
+                        logs.stdout + logs.stderr)
+    if not enabled:
+        pytest.fail("OMEGACLAW_OPENCLAW_TOKEN is set but the openclaw plugin is disabled in "
+                    f"container {container!r}: start it with -g <gateway url> "
+                    f"pointing at port {GATEWAY_PORT}")
+    stub = GatewayStub(token).start()
+    try:
+        yield stub
+    finally:
+        stub.stop(5)
+
+
+@pytest.fixture
+def gateway(openclaw_gateway):
+    openclaw_gateway.recorder.reset()
+    return openclaw_gateway

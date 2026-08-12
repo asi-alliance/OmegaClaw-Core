@@ -138,3 +138,12 @@ TAVILY_SEARCH_AGENT_ADDRESS: "agent1qt5uffgp0l3h9mqed8zh8vy5vs374jl2f8y0mjjvqm44
 # Path to the directory to keep workflow working files when workflow is active.
 # Default value is <memoryDirectory>/workflow_space
 #pluginWorkflowMemoryDir: ./memory/workflow_space
+
+# OpenClaw
+openClawEnabled: disabled
+# In Docker, openClawURL is only a fallback: the real Gateway target and its
+# token are set at container start (openclaw_url=, OMEGACLAW_OPENCLAW_TOKEN)
+# and injected by the local Nginx proxy, so the agent never sees the token.
+# See plugins/openclaw/README.md.
+openClawURL: "http://172.17.0.1:18789"
+openClawAgent: "main"

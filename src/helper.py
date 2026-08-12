@@ -1,8 +1,11 @@
-from collections import deque
 import json
-import re
-from datetime import datetime
 import os
+import re
+import subprocess
+from collections import deque
+from datetime import datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 try:
     from src.logger import get_logger
@@ -12,7 +15,7 @@ except ModuleNotFoundError:  # running this file directly as a script
 logger = get_logger(__name__)
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
-LLM_COMMANDS = {
+STATIC_LLM_COMMANDS = {
     "append-file",
     "episodes",
     "metta",
@@ -25,15 +28,30 @@ LLM_COMMANDS = {
     "shell",
     "tavily-search",
     "technical-analysis",
+    "version",
+    "websearch",
     "write-file",
     "get-io-policy",
-    "write-file-b64",
+    "write-file-b64"
 }
+LLM_COMMANDS = set(STATIC_LLM_COMMANDS)
 TWO_ARG_COMMANDS = {
     "write-file",
     "append-file",
     "write-file-b64"
 }
+
+
+def add_llm_command(command):
+    LLM_COMMANDS.add(str(command))
+    return True
+
+
+def remove_llm_command(command):
+    command = str(command)
+    if command not in STATIC_LLM_COMMANDS:
+        LLM_COMMANDS.discard(command)
+    return True
 
 def extract_timestamp(line):
     m = TS_RE.search(line)
@@ -131,6 +149,11 @@ def balance_parentheses(s):
             continue
         cmd = parts[0]
         rest = parts[1].strip() if len(parts) > 1 else ""
+        if cmd not in LLM_COMMANDS:
+            # Do not let model commentary become a MeTTa expression.  The
+            # loop turns this into ALERT_FAILED feedback for the next turn.
+            sexprs.append(f"(Error UNKNOWN_SKILL_CALL {quote_arg(line)})")
+            continue
         if cmd in TWO_ARG_COMMANDS:
             if not rest:
                 sexprs.append(f"({cmd})")
@@ -184,6 +207,66 @@ def joinPath(parts):
 def projectRootDirectory():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def _format_omegaclaw_version(version: str) -> str | None:
+    version = version.strip()
+    if not version:
+        return None
+    if version.startswith("OmegaClaw version="):
+        return version
+    if version.startswith("OmegaClaw "):
+        version = version[len("OmegaClaw "):]
+    return f"OmegaClaw version={version}"
+
+
+def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
+    """Return the checkout version, falling back to the baked version file."""
+    root = Path(repo_root) if repo_root is not None else Path(projectRootDirectory())
+
+    try:
+        # Prevent `git -C` from walking up to a parent repository such as /PeTTa.
+        if not (root / ".git").exists():
+            raise FileNotFoundError
+        result = subprocess.run(
+            ["git", "-C", str(root), "describe", "--tags", "--dirty", "--always"],
+            check=False,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=3,
+        )
+        if result.returncode == 0:
+            version = _format_omegaclaw_version(result.stdout)
+            if version is not None:
+                return version
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    try:
+        version = _format_omegaclaw_version(
+            (root / "version").read_text(encoding="utf-8")
+        )
+        if version is not None:
+            return version
+    except OSError:
+        pass
+
+    return "OmegaClaw unknown"
+
+
+def test_omegaclaw_version():
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        assert omegaclaw_version(root) == "OmegaClaw unknown"
+
+        (root / "version").write_text("v1.2.3-4-g1234567\n", encoding="utf-8")
+        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3-4-g1234567"
+
+        (root / "version").write_text("OmegaClaw v1.2.3\n", encoding="utf-8")
+        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3"
+
+
 def test_balance_parenthesis():
     assert balance_parentheses('(write-file test.txt hello world)') == '((write-file "test.txt" "hello world"))'
     assert balance_parentheses('(append-file test.txt hello world)') == '((append-file "test.txt" "hello world"))'
@@ -201,6 +284,7 @@ def test_balance_parenthesis():
     assert balance_parentheses('send test.xt hello world') == '((send "test.xt hello world"))'
     assert balance_parentheses('send Here are the planets:\n1. Mercury\n2. Venus') == '((send "Here are the planets:\\n1. Mercury\\n2. Venus"))'
     assert balance_parentheses('send Here are the options:\n- MacBook Air\n- ThinkPad X1\npin done') == '((send "Here are the options:\\n- MacBook Air\\n- ThinkPad X1") (pin "done"))'
+    assert balance_parentheses('(shell "pwd")\n(version)') == '((shell "pwd") (version))'
     assert balance_parentheses('send "Plain text version:"\n**Mars** - red planet\nNote: Pluto is a dwarf planet') == '((send "\\\"Plain text version:\\\"\\n**Mars** - red planet\\nNote: Pluto is a dwarf planet"))'
     assert balance_parentheses('(send Here are the planets:\n1. Mercury\n2. Venus)') == '((send "Here are the planets:\\n1. Mercury\\n2. Venus"))'
     assert balance_parentheses('send "hello" world') == '((send "\\"hello\\" world"))'
@@ -215,6 +299,15 @@ def test_balance_parenthesis():
     assert balance_parentheses('(- Found a bug)') == '((pin "Found a bug"))'
     assert balance_parentheses('- Found\na\nbug') == '((pin "Found\\na\\nbug"))'
     assert balance_parentheses('(- Found a bug') == '((pin "Found a bug"))'
+    assert balance_parentheses('(No "action needed")') == \
+        '((Error UNKNOWN_SKILL_CALL "No \\"action needed\\""))'
+    add_llm_command("workflow-load-instructions")
+    assert balance_parentheses('workflow-load-instructions test-workflow') == \
+        '((workflow-load-instructions "test-workflow"))'
+    remove_llm_command("workflow-load-instructions")
+    assert balance_parentheses('workflow-load-instructions test-workflow') == \
+        '((Error UNKNOWN_SKILL_CALL "workflow-load-instructions test-workflow"))'
 
 if __name__ == "__main__":
+    test_omegaclaw_version()
     test_balance_parenthesis()

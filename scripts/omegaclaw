@@ -460,6 +460,18 @@ start
 
 }
 
+version() {
+    local script_dir
+    local repo_root
+
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    repo_root="$(cd -- "${script_dir}/.." && pwd)"
+    (
+        cd -- "$repo_root"
+        python3 -c 'from src.helper import omegaclaw_version; print(omegaclaw_version())'
+    )
+}
+
 help() {
     echo -e "Usage: ${0} [<image tag> | command [options]]"
     echo
@@ -477,10 +489,14 @@ help() {
     echo -e "\t              Pass API token via environment variable."
     echo -e "\t-m <model> set LLM model to use with provider (default depends on provider)."
     echo -e "\t-u <LLM API url> set LLM API URL for the OpenAIAPI provider"
+    echo -e "\t-g <OpenClaw Gateway url> enable the openclaw plugin against this Gateway"
+    echo -e "\t              Pass the Gateway token via OMEGACLAW_OPENCLAW_TOKEN"
     echo -e "\t-c <IRC channel> set IRC channel"
     echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket|mattermost|test"
     echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
     echo -e "\t-l <logging config> set Python logging config file"
+    echo -e "\t--version, -v show the OmegaClaw version"
+    echo -e "\t--help, -h show this help"
 }
 
 options() {
@@ -496,6 +512,7 @@ options() {
     SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
     WS_URL="${WS_URL:-}"
     WS_TOKEN="${WS_TOKEN:-}"
+    OMEGACLAW_OPENCLAW_TOKEN="${OMEGACLAW_OPENCLAW_TOKEN:-}"
     commchannel=irc
     log_config_path=""
 
@@ -507,13 +524,14 @@ options() {
     command=${1}
     shift 1
 
-    while getopts s:t:p:u:c:d:l:m: flag
+    while getopts s:t:p:u:g:c:d:l:m: flag
     do
         case "${flag}" in
             s) OMEGACLAW_AUTH_SECRET=${OPTARG};;
             t) commchannel=${OPTARG};;
             p) provider=${OPTARG};;
             u) openaiapi_url=${OPTARG};;
+            g) openclaw_url=${OPTARG};;
             c) IRC_channel=${OPTARG};;
             d) image=${OPTARG};;
             l) log_config_path=${OPTARG};;
@@ -599,6 +617,7 @@ start() {
             -e "${api_token_var}"="${api_token}"
             -e "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}"
             -e "SL_BOT_TOKEN=${SL_BOT_TOKEN:-}"
+            -e "OMEGACLAW_OPENCLAW_TOKEN=${OMEGACLAW_OPENCLAW_TOKEN:-}"
             -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET"
             -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-0}"
             "$image"
@@ -638,6 +657,12 @@ start() {
       docker_cmd+=("openaiapi_url=${openaiapi_url}")
     fi
 
+    if [ -n "${openclaw_url:-}" ]; then
+      docker_cmd+=("openclaw_url=${openclaw_url}")
+      docker_cmd+=("openClawEnabled=enabled")
+      docker_cmd+=("openClawURL=${openclaw_url}")
+    fi
+
     "${docker_cmd[@]}"
 }
 
@@ -656,7 +681,8 @@ case "${command}" in
     start) start ;;
     stop) stop ;;
     clean) clean ;;
-    -h) help ;;
+    --version|-v) version ;;
+    -h|--help) help ;;
     *) image="${command}"
        bootstrap
        ;;

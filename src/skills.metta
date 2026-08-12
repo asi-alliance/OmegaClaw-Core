@@ -23,6 +23,7 @@
     "- Search the web: websearch string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
+    "- To get the OmegaClaw version number: version"
     ;CODE EXECUTION:
     "- Execute MeTTa expression: metta sexpression"
     ;ADDITIONAL RULES AND CLARIFICATIONS FOR SKILLS
@@ -51,6 +52,7 @@
 (= (add-skill $function $description $arguments)
    (let $text (strings-concat ("- " $description ": " $function " " (join " " $arguments)))
      (progn
+       (py-call (helper.add_llm_command $function))
        (log INFO "skills" (strings-concat ("Add skill: " $text)))
        (add-atom &self (= (dynamic-skill $function) $text)))))
 
@@ -58,6 +60,7 @@
 ; $function - MeTTa function which implements the skill
 (= (remove-skill $function)
    (progn
+     (py-call (helper.remove_llm_command $function))
      (log INFO "skills" (strings-concat ("Remove skill: " $function)))
      (collapse (match &self (= (dynamic-skill $function) $text) (remove-atom &self (= (dynamic-skill $function) $text))))
      True))
@@ -150,3 +153,6 @@
 
 (= (pin $x)
    PIN-SUCCESS)
+
+(= (version)
+   (py-call (helper.omegaclaw_version)))

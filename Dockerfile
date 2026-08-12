@@ -69,6 +69,21 @@ SentenceTransformer(model_name)
 print("Model download complete.")
 PY
 
+FROM builder AS versioned-source
+
+WORKDIR /omegaclaw-source
+COPY . .
+RUN : > /tmp/omegaclaw-ignored-tracked \
+ && if [ -e .git ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+      git ls-files -ci --exclude-from=.dockerignore -z > /tmp/omegaclaw-ignored-tracked; \
+      git checkout-index --force --stdin -z < /tmp/omegaclaw-ignored-tracked; \
+    fi \
+ && python3 -c 'from src.helper import omegaclaw_version; print(omegaclaw_version())' > /tmp/omegaclaw-version \
+ && mv /tmp/omegaclaw-version ./version \
+ && while IFS= read -r -d '' path; do rm -f -- "$path"; done < /tmp/omegaclaw-ignored-tracked \
+ && rm -rf ./.git \
+ && chmod 0444 ./version
+
 FROM ${SWIPL_IMAGE} AS runtime
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -114,14 +129,15 @@ ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
 # Start defaults for import-kb
 ENV IMPORT_KB_ON_START=0
 
-# Bring in only local OmegaClaw source (filtered by .dockerignore).
-COPY . ${OMEGACLAW_DIR}
+# Bring in the clean source tree and its version generated from Git metadata.
+COPY --from=versioned-source /omegaclaw-source ${OMEGACLAW_DIR}
 
 RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
  && mkdir -p ${MEMORY_DIR}/chroma_db \
  && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
  && chmod +x ${OMEGACLAW_DIR}/entrypoint.sh \
  && chmod +x ${OMEGACLAW_DIR}/scripts/import_knowledge.sh \
+ && chmod +x ${OMEGACLAW_DIR}/scripts/omegaclaw \
  && chown -R 65534:65534 ${MEMORY_DIR} \
  && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \

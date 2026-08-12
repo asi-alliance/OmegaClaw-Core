@@ -17,6 +17,8 @@ from helpers import (
 )
 
 TARGET_DIR = "/tmp/git_pull"
+CLONE_LOG = "/tmp/git_pull_clone.log"
+CLONE_WAIT_SECONDS = 120
 
 
 def _normalize_git_url(url: str) -> str:
@@ -31,7 +33,7 @@ def _normalize_git_url(url: str) -> str:
 def test_git_pull_public_mock(llm, comm):
     remote = get_git_remote()
 
-    with Checker("git pull public (mock)", cleanup_dirs=[TARGET_DIR]) as c:
+    with Checker("git pull public (mock)", cleanup_dirs=[TARGET_DIR, CLONE_LOG]) as c:
         print(f"\n=== git pull public mock (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
@@ -51,21 +53,32 @@ def test_git_pull_public_mock(llm, comm):
             f"Clone the public git repository {remote} into {TARGET_DIR}/. "
             "Use anonymous HTTPS, no credentials are needed.",
         )
-        # Need an empty target dir for `git clone .` form. Use a
-        # ./tmp_clone shim then move contents — simpler: rm -rf then
-        # clone into the path directly.
+        # The shell skill itself has a five-second timeout. Run the network
+        # operation in a background worker so the shell call can return while
+        # this test polls repository state. Keep each attempt bounded and
+        # retry transient runner/network failures. A shallow clone is enough
+        # because the assertions only require HEAD, tracked files and origin.
+        clone_command = (
+            f"rm -rf {TARGET_DIR} {CLONE_LOG}; "
+            "(for attempt in 1 2 3; do "
+            f"rm -rf {TARGET_DIR}; "
+            "GIT_TERMINAL_PROMPT=0 timeout 35s "
+            f"git clone --depth 1 {remote} {TARGET_DIR} && exit 0; "
+            "sleep 2; "
+            f"done; exit 1) > {CLONE_LOG} 2>&1 &"
+        )
         llm.set_answer(
             prompt,
-            f'(shell "rm -rf {TARGET_DIR} && git clone {remote} {TARGET_DIR}")',
+            f'(shell "{clone_command}")',
         )
         if not comm.send_message(prompt):
             c.fail("comm", "could not deliver prompt within 60s")
         c.ok("comm", f"run-id={c.run_id}")
 
         c.step("wait for valid cloned repository")
-        deadline = time.time() + 60
+        deadline = time.monotonic() + CLONE_WAIT_SECONDS
         valid = False
-        while time.time() < deadline:
+        while time.monotonic() < deadline:
             if dexec("test", "-d", f"{TARGET_DIR}/.git").returncode == 0:
                 head = dexec_root("git", "-C", TARGET_DIR, "rev-parse",
                                   "--verify", "HEAD")
@@ -81,7 +94,27 @@ def test_git_pull_public_mock(llm, comm):
                         break
             time.sleep(1)
         if not valid:
-            c.fail("clone", f"valid clone not present at {TARGET_DIR} within timeout")
+            sh_calls = find_skill_calls(c.run_id, "shell") or []
+            listing = dexec_root("ls", "-la", TARGET_DIR)
+            clone_log = dexec_root("tail", "-n", "80", CLONE_LOG)
+            head = dexec_root("git", "-C", TARGET_DIR, "rev-parse",
+                              "--verify", "HEAD")
+            origin = dexec_root("git", "-C", TARGET_DIR, "remote",
+                                "get-url", "origin")
+            c.fail(
+                "clone",
+                f"valid clone not present at {TARGET_DIR} within "
+                f"{CLONE_WAIT_SECONDS}s; shell_calls={sh_calls[:3]!r}; "
+                f"listing_rc={listing.returncode}, listing={listing.stdout[-1000:]!r}, "
+                f"listing_error={listing.stderr[-500:]!r}; "
+                f"clone_log_rc={clone_log.returncode}, "
+                f"clone_log={clone_log.stdout[-2000:]!r}, "
+                f"clone_log_error={clone_log.stderr[-500:]!r}; "
+                f"head_rc={head.returncode}, head={head.stdout.strip()!r}, "
+                f"head_error={head.stderr[-500:]!r}; "
+                f"origin_rc={origin.returncode}, origin={origin.stdout.strip()!r}, "
+                f"origin_error={origin.stderr[-500:]!r}",
+            )
         c.ok("clone", "valid cloned repository present")
 
         c.step("verify clone has at least one tracked file")

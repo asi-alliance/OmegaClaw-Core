@@ -67,9 +67,31 @@ def test_corrupt_saved_user_file_is_wrapped(monkeypatch, tmp_path):
         auth.get_channel_saved_user_id("IRC", "alice")
 
 
+def test_saved_owner_blocks_auth_secret_reuse_after_restart(monkeypatch, tmp_path):
+    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "one-time-secret")
+
+    first_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(first_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert first_process.authenticate_channel_user(
+        "IRC", "owner", "one-time-secret"
+    ) == "auth_bound"
+
+    restarted_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(restarted_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert restarted_process.authenticate_channel_user(
+        "IRC", "attacker", "one-time-secret"
+    ) == "ignore"
+
+    owner_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(owner_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert owner_process.authenticate_channel_user("IRC", "owner") == "allow"
+
+
 def test_plain_message_does_not_verify_a_token(monkeypatch):
     auth = load_auth_module(monkeypatch)
-    monkeypatch.setattr(auth, "verify_token", lambda candidate: pytest.fail("unexpected token check"))
-    monkeypatch.setattr(auth, "get_channel_saved_user_id", lambda *args: False)
+    monkeypatch.setattr(
+        auth, "verify_token", lambda candidate: pytest.fail("unexpected token check")
+    )
+    monkeypatch.setattr(auth, "get_channel_authenticated_user_id", lambda *args: None)
 
     assert auth.authenticate_channel_user("IRC", "alice") == "ignore"

@@ -6,6 +6,7 @@ import time
 import textwrap
 import auth
 from src.logger import get_logger
+from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
 
@@ -20,11 +21,13 @@ _channel = None
 _connected = False
 _auth_lock = threading.Lock()
 _authenticated_nick = None
+_outbox = PendingMessages()
 
 def _send(cmd):
     with _sock_lock:
-        if _sock:
-            _sock.sendall((cmd + "\r\n").encode())
+        if _sock is None:
+            raise RuntimeError("IRC channel is not connected")
+        _sock.sendall((cmd + "\r\n").encode())
     time.sleep(1)
 
 def _set_last(msg):
@@ -76,69 +79,114 @@ def _is_allowed_message(nick, msg):
         else:
             return "ignore"
 
-def _irc_loop(channel, server, port, nick):
+def _ready_to_send():
+    return _connected and bool(_channel)
+
+
+def _deliver_outbound(chunk):
+    _send(f"PRIVMSG {_channel} :{chunk}")
+
+
+def _flush_outbox():
+    try:
+        _outbox.flush(_deliver_outbound, _ready_to_send)
+    except Exception as exc:
+        logger.warning(f"IRC send failed; retaining queued message: {exc}")
+
+
+def _irc_session(channel, server, port, nick):
     global _running, _sock, _connected
     logger.info(f"Connecting to {server}:{port} as {nick} for channel {channel}")
+    sock = None
     try:
         sock = socket.create_connection((server, int(port)), timeout=15)
         sock.settimeout(60)
         logger.info("TCP connected")
     except OSError as e:
-        logger.exception(f"Connect failed: {e}")
-        return
-    _sock = sock
-    _send(f"NICK {nick}")
-    _send(f"USER {nick} 0 * :{nick}")
-    #_send(f"JOIN {channel}")
-    read_buffer = ""
+        raise ConnectionError(f"IRC connect failed: {e}") from e
+
+    with _sock_lock:
+        _sock = sock
+
+    try:
+        _send(f"NICK {nick}")
+        _send(f"USER {nick} 0 * :{nick}")
+        read_buffer = ""
+        while _running:
+            try:
+                data = sock.recv(4096).decode(errors="ignore")
+            except socket.timeout:
+                logger.debug("IRC receive timed out, polling again")
+                _flush_outbox()
+                continue
+            if not data:
+                raise ConnectionError("IRC server closed the connection")
+            read_buffer += data
+            while "\r\n" in read_buffer:
+                line, read_buffer = read_buffer.split("\r\n", 1)
+                if not line:
+                    continue
+                if line.startswith("PING"):
+                    _send(f"PONG {line.split()[1]}")
+                parts = line.split()
+                if len(parts) > 1 and parts[1] == "001":
+                    logger.info(f"Registered. Joining {_channel}")
+                    _send(f"JOIN {_channel}")
+                elif (
+                    len(parts) > 3
+                    and parts[1] == "366"
+                    and parts[3].lower() == _channel.lower()
+                ):
+                    logger.info(f"Joined {_channel}")
+                    _connected = True
+                    _flush_outbox()
+                elif len(parts) > 1 and parts[1] in {"403", "405", "471", "473", "474", "475"}:
+                    logger.error(f"Join failed: {line}")
+                elif len(parts) > 1 and parts[1] == "433":
+                    raise ConnectionError(f"Nickname in use: {line}")
+                elif line.startswith(":") and " PRIVMSG " in line:
+                    try:
+                        prefix, trailing = line[1:].split(" PRIVMSG ", 1)
+                        sender_nick = prefix.split("!", 1)[0]
+
+                        if " :" not in trailing:
+                            continue  # malformed, ignore safely
+
+                        msg = trailing.split(" :", 1)[1]
+                        state = _is_allowed_message(sender_nick, msg)
+                        if state == "allow":
+                            _set_last(f"{sender_nick}: {msg}")
+                        elif state == "auth_bound":
+                            send_message(f"Authentication successful for {sender_nick}.")
+                    except Exception as e:
+                        logger.exception(f"Exception caught {repr(e)}")
+    finally:
+        _connected = False
+        with _sock_lock:
+            if _sock is sock:
+                _sock = None
+        if sock is not None:
+            sock.close()
+        logger.info("Disconnected")
+
+
+def _irc_loop(channel, server, port, nick):
+    backoff_seconds = 1
     while _running:
         try:
-            data = sock.recv(4096).decode(errors="ignore")
-            if not data:
-                break
+            _irc_session(channel, server, port, nick)
+            backoff_seconds = 1
         except socket.timeout:
-            logger.debug("IRC receive timed out, polling again")
-            continue
-        except OSError as e:
-            logger.exception(f"IRC socket error, stopping receive loop: {e}")
+            logger.debug("IRC receive timed out, reconnecting")
+        except Exception as exc:
+            if _running:
+                logger.warning(f"IRC connection error: {exc}")
+
+        if not _running:
             break
-        read_buffer += data
-        while "\r\n" in read_buffer:
-            line, read_buffer = read_buffer.split("\r\n", 1)
-            if not line:
-                continue
-            if line.startswith("PING"):
-                _send(f"PONG {line.split()[1]}")
-            parts = line.split()
-            if len(parts) > 1 and parts[1] == "001":
-                _connected = True
-                logger.info(f"Registered. Joining {_channel}")
-                _send(f"JOIN {_channel}")
-            elif len(parts) > 1 and parts[1] in {"403", "405", "471", "473", "474", "475"}:
-                logger.error(f"Join failed: {line}")
-            elif len(parts) > 1 and parts[1] == "433":
-                logger.error(f"Nickname in use: {line}")
-            elif line.startswith(":") and " PRIVMSG " in line:
-                try:
-                    prefix, trailing = line[1:].split(" PRIVMSG ", 1)
-                    nick = prefix.split("!", 1)[0]
-
-                    if " :" not in trailing:
-                        continue  # malformed, ignore safely
-
-                    msg = trailing.split(" :", 1)[1]
-                    state = _is_allowed_message(nick, msg)
-                    if state == "allow":
-                        _set_last(f"{nick}: {msg}")
-                    elif state == "auth_bound":
-                        _send(f"PRIVMSG {_channel} :Authentication successful for {nick}.")
-                except Exception as e:
-                    logger.exception(f"Exception caught {repr(e)}")
-    _connected = False
-    with _sock_lock:
-        _sock = None
-    sock.close()
-    logger.info("Disconnected")
+        logger.info(f"Reconnecting IRC in {backoff_seconds}s")
+        time.sleep(backoff_seconds)
+        backoff_seconds = min(backoff_seconds * 2, 30)
 
 def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw"):
     global _running, _channel, _connected
@@ -155,19 +203,22 @@ def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw"):
 def stop_irc():
     global _running
     _running = False
+    with _sock_lock:
+        sock = _sock
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
 def send_message(text):
     max_len = 400
-    segments = text.replace("\r", "").split("\\n")
+    segments = str(text).replace("\r", "").split("\\n")
     lines = []
     for segment in segments:
         lines.extend(textwrap.wrap(segment, width=max_len, break_long_words=True, break_on_hyphens=False))
-    for chunk in lines:
-        try:
-            if _connected and _channel:
-                 _send(f"PRIVMSG {_channel} :{chunk}")
-        except Exception as e:
-            logger.exception(f"Error in send_message on channel {_channel}: {e}")
+    _outbox.extend(lines)
+    _flush_outbox()
 
 class IRCChannel(channels.CommChannel):
 

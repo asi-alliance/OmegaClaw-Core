@@ -212,12 +212,26 @@ def _drain_outbox(ws):
     with _msg_lock:
         pending = list(_outbox)
         _outbox.clear()
-    for payload in pending:
+    for index, payload in enumerate(pending):
         try:
             _send_json(payload, ws=ws)
         except Exception:
+            # Requeue the failed payload AND every payload after it, preserving order, so a
+            # mid-flush failure doesn't silently drop the not-yet-sent messages (only the one
+            # that failed was requeued before).
+            #
+            # Rebuild the deque rather than appendleft()-ing each item: the lock was released
+            # during the send loop, so send_message() may have enqueued newer payloads into the
+            # (cleared) outbox concurrently. Per-item appendleft() overflows from the RIGHT once
+            # maxlen is hit, silently displacing those newer messages. Placing the unsent tail
+            # (older) first and the concurrent messages (newer) after lets overflow drop the
+            # OLDEST instead — matching deque(maxlen)'s normal contract and send_message()'s own
+            # overflow behavior.
             with _msg_lock:
-                _outbox.appendleft(payload)
+                concurrent = list(_outbox)
+                _outbox.clear()
+                _outbox.extend(pending[index:])
+                _outbox.extend(concurrent)
             raise
 
 
