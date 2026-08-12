@@ -54,6 +54,10 @@ jobs:
     env:
       AUTOTESTS_OMEGACLAW_CONTAINER: omegaclaw
       AUTOTESTS_OMEGACLAW_TAG: 'cicd-${{ github.run_id }}'
+      # Not a real credential: it authenticates against the stub Gateway that
+      # the openclaw fixture starts. It also gives test_credentials_scrubbed_mock
+      # a token that is really present, so that check can fail if one leaks.
+      OMEGACLAW_OPENCLAW_TOKEN: 'ci-openclaw-stub-token'
     steps:
       - name: Complete tag name
         run: |
@@ -89,7 +93,7 @@ jobs:
 
       - name: Verify version in release image
         run: |
-          expected="OmegaClaw $(git describe --tags --dirty --always)"
+          expected="OmegaClaw version=$(git describe --tags --dirty --always)"
           test "$(./scripts/omegaclaw --version)" = "$expected"
           actual="$(docker run --rm \
             --entrypoint /PeTTa/repos/OmegaClaw-Core/scripts/omegaclaw \
@@ -99,7 +103,7 @@ jobs:
       - name: Autotests - Set up
         run: |
           chmod +x ./scripts/omegaclaw
-          ./scripts/omegaclaw start -p Test -t test -d singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }}
+          ./scripts/omegaclaw start -p Test -t test -d singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }} -g "http://host.docker.internal:18789"
           pip install pytest
           echo "Waiting for agent to become ready..."
           ready=
