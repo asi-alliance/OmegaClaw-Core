@@ -86,10 +86,22 @@ def test_environment_key_without_prefix_is_ignored(config, monkeypatch):
     assert config.config_get_by_key("provider", "Anthropic") == "Anthropic"
 
 
-def test_reads_from_config_file(config):
+def test_reads_from_config_file(config, monkeypatch):
+    monkeypatch.delenv("OMEGACLAW_provider", raising=False)
     config._CONFIG_FILE = {"provider": "OpenRouter"}
 
     assert config.config_get_by_key("provider", "Anthropic") == "OpenRouter"
+
+
+def test_init_config_reads_yaml_file(config, monkeypatch, tmp_path):
+    # Goes through the real open() and yaml.safe_load(), not an injected dict.
+    monkeypatch.delenv("OMEGACLAW_provider", raising=False)
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("provider: Anthropic\n", encoding="utf-8")
+
+    config.init_config([f"config={config_file}"])
+
+    assert config.config_get_by_key("provider", "Fallback") == "Anthropic"
 
 
 def test_command_line_beats_environment_and_file(config, monkeypatch):
@@ -125,11 +137,13 @@ def test_resolved_value_is_cached(config):
     assert second_result == "OpenRouter"
 
 
-def test_init_config_resets_old_cache(config, tmp_path):
+def test_init_config_resets_old_cache(config, monkeypatch, tmp_path):
+    monkeypatch.delenv("OMEGACLAW_model", raising=False)
     config._CONFIG["provider"] = "OldProvider"
     config_file = tmp_path / "config.yaml"
-    config_file.write_text("provider: Anthropic\n", encoding="utf-8")
+    config_file.write_text("provider: Anthropic\nmodel: free\n", encoding="utf-8")
 
     config.init_config([f"config={config_file}", "provider=OpenRouter"])
 
     assert config.config_get_by_key("provider") == "OpenRouter"
+    assert config.config_get_by_key("model") == "free"
