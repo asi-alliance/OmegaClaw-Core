@@ -60,3 +60,34 @@
 !(test (configGetByKey arg_env val_default) val_env)
 !(test (configGetByKey arg_config val_default) val_config)
 !(test (configGetByKey arg_notexist val_default) val_default)
+
+; positive integer configuration
+(= (cleanup-heartbeat-interval)
+   (progn
+     (collapse (match &self (= (heartbeatLogInterval) $value)
+                       (remove-atom &self (= (heartbeatLogInterval) $value))))
+     (py-call (utils.unsetenv OMEGACLAW_heartbeatLogInterval))))
+
+!(py-call (utils.setenv OMEGACLAW_heartbeatLogInterval "2"))
+!(initConfig)
+!(configurePositiveInt heartbeatLogInterval 100)
+!(test (heartbeatLogInterval) 2)
+!(cleanup-heartbeat-interval)
+
+!(py-call (utils.setenv OMEGACLAW_heartbeatLogInterval "0"))
+!(initConfig)
+!(configurePositiveInt heartbeatLogInterval 100)
+!(test (heartbeatLogInterval) 100)
+!(cleanup-heartbeat-interval)
+
+!(py-call (utils.setenv OMEGACLAW_heartbeatLogInterval "-1"))
+!(initConfig)
+!(configurePositiveInt heartbeatLogInterval 100)
+!(test (heartbeatLogInterval) 100)
+!(cleanup-heartbeat-interval)
+
+!(py-call (utils.setenv OMEGACLAW_heartbeatLogInterval "fast"))
+!(initConfig)
+!(configurePositiveInt heartbeatLogInterval 100)
+!(test (heartbeatLogInterval) 100)
+!(cleanup-heartbeat-interval)

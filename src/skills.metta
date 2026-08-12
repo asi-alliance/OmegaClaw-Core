@@ -86,10 +86,28 @@
 ; loop. Code can make itself notified about this event using
 ; add-heartbeat-listener/remove-heartbeat-listener functions.
 (= (heartbeat $iteration)
-   (let $_ (collapse (heartbeat-listener $_ $iteration)) ()))
+   (let $_
+     (collapse
+       (let $result (catch (heartbeat-listener $_ $iteration))
+         (if-error $result
+           (progn
+             (log ERROR "heartbeat" (HEARTBEAT_LISTENER_FAILED $result))
+             ())
+           $result)))
+     ()))
 
 ; placeholder to eliminate error when no heartbeat listener is added
 (= (heartbeat-listener placeholder $_) (empty))
+
+; Default heartbeat listener logs and sends a periodic user-facing health check.
+; heartbeatLogInterval is configured during loop initialization.
+(= (heartbeat-listener default-logger $iteration)
+   (match &self (= (heartbeatLogInterval) $interval)
+     (if (== 0 (% $iteration $interval))
+         (progn
+           (log INFO "heartbeat" (strings-concat ("agent alive - iteration " $iteration)))
+           (send (strings-concat ("Heartbeat: agent alive - iteration " $iteration))))
+         (empty))))
 
 ; Subscribe on heartbeat event notifications
 ; $handle - symbol to identify the subscription
