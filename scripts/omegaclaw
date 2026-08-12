@@ -282,6 +282,31 @@ def _choose_import_kb():
         print("Please enter y or n.")
 
 
+def _choose_heartbeat_interval():
+    while True:
+        value = input(
+            "Heartbeat health-check interval in loop iterations (default: 100): "
+        ).strip()
+
+        if value.lower() == "q":
+            sys.exit(1)
+
+        if not value:
+            return "100"
+
+        try:
+            interval = int(value)
+        except ValueError:
+            print("Heartbeat interval must be a positive integer.", file=sys.stderr)
+            continue
+
+        if interval <= 0:
+            print("Heartbeat interval must be a positive integer.", file=sys.stderr)
+            continue
+
+        return str(interval)
+
+
 def _prompt_llm_token():
     while True:
         token = getpass.getpass("Please paste your LLM token and press ENTER or 'q' to exit: ").strip()
@@ -309,6 +334,7 @@ def config_run_omegaclaw(config_output_path):
     channel_config = _choose_channel()
     provider, embeddingprovider, api_token_var, model, openaiapi_url, token = _choose_provider()
     import_kb_on_start = _choose_import_kb()
+    heartbeat_log_interval = _choose_heartbeat_interval()
 
     with open(config_output_path, "w", encoding="utf-8") as f:
         _write_kv(f, "api_token_var", api_token_var)
@@ -319,6 +345,7 @@ def config_run_omegaclaw(config_output_path):
         _write_kv(f, "model", model)
         _write_kv(f, "openaiapi_url", openaiapi_url)
         _write_kv(f, "IMPORT_KB_ON_START", import_kb_on_start)
+        _write_kv(f, "heartbeatLogInterval", heartbeat_log_interval)
         for key, value in channel_config.items():
             _write_kv(f, key, value)
 
@@ -512,6 +539,7 @@ options() {
     SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
     WS_URL="${WS_URL:-}"
     WS_TOKEN="${WS_TOKEN:-}"
+    heartbeatLogInterval="${heartbeatLogInterval:-100}"
     OMEGACLAW_OPENCLAW_TOKEN="${OMEGACLAW_OPENCLAW_TOKEN:-}"
     commchannel=irc
     log_config_path=""
@@ -624,6 +652,7 @@ start() {
             "commchannel=${commchannel}"
             "provider=${provider}"
             "embeddingprovider=${embeddingprovider}"
+            "heartbeatLogInterval=${heartbeatLogInterval}"
             "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
             "memoryDirectory=\$MEMORY_DIR"
     )
