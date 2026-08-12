@@ -32,7 +32,7 @@ STATIC_LLM_COMMANDS = {
     "websearch",
     "write-file",
     "get-io-policy",
-    "write-file-b64",
+    "write-file-b64"
 }
 LLM_COMMANDS = set(STATIC_LLM_COMMANDS)
 TWO_ARG_COMMANDS = {
@@ -212,9 +212,11 @@ def _format_omegaclaw_version(version: str) -> str | None:
     version = version.strip()
     if not version:
         return None
-    if version.startswith("OmegaClaw "):
+    if version.startswith("OmegaClaw version="):
         return version
-    return f"OmegaClaw {version}"
+    if version.startswith("OmegaClaw "):
+        version = version[len("OmegaClaw "):]
+    return f"OmegaClaw version={version}"
 
 
 def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
@@ -228,6 +230,7 @@ def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
         result = subprocess.run(
             ["git", "-C", str(root), "describe", "--tags", "--dirty", "--always"],
             check=False,
+            shell=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -258,10 +261,10 @@ def test_omegaclaw_version():
         assert omegaclaw_version(root) == "OmegaClaw unknown"
 
         (root / "version").write_text("v1.2.3-4-g1234567\n", encoding="utf-8")
-        assert omegaclaw_version(root) == "OmegaClaw v1.2.3-4-g1234567"
+        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3-4-g1234567"
 
         (root / "version").write_text("OmegaClaw v1.2.3\n", encoding="utf-8")
-        assert omegaclaw_version(root) == "OmegaClaw v1.2.3"
+        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3"
 
 
 def test_balance_parenthesis():

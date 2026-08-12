@@ -58,3 +58,7 @@
 - name: workflow
   loader: metta
   location: "{REPO}/plugins/workflow"
+
+- name: openclaw
+  loader: metta
+  location: "{REPO}/plugins/openclaw"
