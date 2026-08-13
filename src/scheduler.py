@@ -11,7 +11,15 @@ adds first-class **durable job definitions** + a **scheduler** + a **webhook ada
 - ``run_due(now, runner)`` fires everything due at ``now`` — the clock is **injected**, so tests
   drive a simulated timeline deterministically. Each run executes in its **own session**
   (Issue #16), delivers non-empty output via a delivery hook, and on failure (or an empty result
-  when ``on_empty="alert"``) raises an **alert**; ``on_empty="silent"`` watchdogs stay quiet.
+  when ``on_empty="alert"``) raises an **alert**; ``on_empty="silent"`` watchdogs stay quiet. A
+  bad job (incl. a workdir the io policy forbids) fails **only itself** — it can't abort the tick.
+- ``run_forever(interval)`` is the **operator** that actually drives the store: the
+  ``omegaclaw-cron daemon`` heartbeat loops ``run_due`` so due jobs fire on their own. Its
+  ``delivery_fn``/``alert_fn`` default to a **durable outbox** (``memory/cron_outbox.jsonl``) so a
+  scheduled result/alert is never silently dropped; a live deployment injects channel-backed hooks
+  and a real agent ``runner`` here — that is the intended extension seam.
+- Each run gets a **working dir** (an explicit ``--workdir``, validated against the io policy's
+  read_write roots; else an auto-cleaned temp dir, removed after the run — no unbounded growth).
 - **Context chaining**: a job may consume the previous job's output.
 - Safeguards: **recursion is refused** while a job runs (no self-scheduling storms) and a
   per-job minimum interval guards against runaway loops.
@@ -27,6 +35,7 @@ import hashlib
 import hmac
 import json
 import os
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -56,6 +65,81 @@ def is_safe_skill_name(name: Any) -> bool:
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _MIN_INTERVAL = float(os.environ.get("OMEGACLAW_JOB_MIN_INTERVAL", "1"))   # runaway guard
+
+
+# --------------------------------------------------------------------------- io-policy guard
+
+def _allowed_workdir_roots() -> Optional[List[str]]:
+    """Read-write base paths a job workdir must sit under, or ``None`` when it can't be
+    determined (then the caller does NOT block). Priority: the explicit
+    ``OMEGACLAW_JOB_WORKDIR_ROOTS`` env (``os.pathsep``-separated — deterministic, stdlib-only) and
+    otherwise a best-effort read of the repo security policy's ``read_write`` list (needs the
+    optional yaml/py_landlock deps; absent on a bare host, so we fail open there)."""
+    env = os.environ.get("OMEGACLAW_JOB_WORKDIR_ROOTS")
+    if env is not None:
+        roots = [os.path.abspath(p) for p in env.split(os.pathsep) if p.strip()]
+        return roots or None
+    try:  # optional: profile.policy pulls yaml + py_landlock, unavailable on a bare test host
+        from profile import policy as _pol
+        fsp = _pol.FileSystemPolicy()
+        fsp.load_file(os.path.join(_REPO_ROOT, "profile", "policy.yaml"))
+        return [os.path.abspath(str(p)) for p in fsp._read_write] or None
+    except Exception:  # noqa: BLE001 - can't determine -> caller allows
+        return None
+
+
+def _workdir_allowed(workdir: str) -> bool:
+    """True iff ``workdir`` resolves inside an allowed read-write root (per the io policy). Returns
+    True when the policy is undeterminable so host-only runs aren't blocked; a configured policy
+    fails closed on a path outside its read_write roots (e.g. a job trying to write ``/etc``)."""
+    roots = _allowed_workdir_roots()
+    if not roots:
+        return True
+    real = os.path.realpath(os.path.abspath(workdir))
+    for root in roots:
+        r = os.path.realpath(root)
+        # rstrip so a root of "/" (realpath keeps its trailing sep) contains every subpath instead
+        # of comparing against "//"; normal roots have no trailing sep so this is a no-op.
+        if real == r or real.startswith(r.rstrip(os.sep) + os.sep):
+            return True
+    return False
+
+
+# --------------------------------------------------------------------------- durable output sink
+
+def _outbox_path() -> str:
+    env = os.environ.get("OMEGACLAW_CRON_OUTBOX")
+    if env:
+        return env if os.path.isabs(env) else os.path.join(_REPO_ROOT, env)
+    return os.path.join(_REPO_ROOT, "memory", "cron_outbox.jsonl")
+
+
+def _append_outbox(kind: str, job: Dict[str, Any], text: str) -> None:
+    """Append one run result/alert to the durable JSONL outbox (a policy read_write path), so a
+    scheduled run's output is captured rather than silently dropped. Best-effort: never raises."""
+    path = _outbox_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        rec = {"ts": time.time(), "kind": kind, "job": job.get("id"),
+               "delivery": job.get("delivery") or "", "text": text}
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _default_delivery(job: Dict[str, Any], output: str) -> None:
+    """Default delivery sink: append the run output to the durable outbox. This is the seam a live
+    deployment overrides with a channel/provider push (see ``run_forever``)."""
+    _append_outbox("delivery", job, output)
+
+
+def _default_alert(job: Dict[str, Any], message: str) -> None:
+    """Default alert sink: record durably AND echo to stdout (so a bare `tick`/`daemon` surfaces
+    failures even without a wired alert channel)."""
+    _append_outbox("alert", job, message)
+    print("[scheduler] ALERT job={} {}".format(job.get("id"), message), flush=True)
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -212,6 +296,8 @@ def create_job(job_id: str, kind: str, spec: str, *, prompt: str = "", skills: O
         return {"ok": False, "error": "recursive job creation refused while a job is running"}
     if not is_safe_skill_name(job_id):
         return {"ok": False, "error": "unsafe job id: {!r}".format(job_id)}
+    if workdir and not _workdir_allowed(workdir):
+        return {"ok": False, "error": "workdir not permitted by io policy: {}".format(workdir)}
     now = time.time() if now is None else now
     own = conn is None
     conn = conn or connect()
@@ -354,28 +440,50 @@ def _execute_one(job: Dict[str, Any], now: float, runner: Callable, conn: sqlite
     row = conn.execute("SELECT fires FROM jobs WHERE id=?", (jid,)).fetchone()
     fire_no = row[0] if row else (int(job.get("fires") or 0) + 1)
     sid = "cron-{}-{}".format(jid, fire_no)
-    wd = job.get("workdir") or tempfile.mkdtemp(prefix="omegaclaw-cron-{}-".format(jid))
-    os.makedirs(wd, exist_ok=True)
-    chain_out = None
-    if job.get("chain_from"):
-        prev = get_job(job["chain_from"], conn=conn)
-        chain_out = prev.get("last_output") if prev else None
-    ctx = {"job": job, "workdir": wd, "chain_output": chain_out, "now": now}
-    if extra_ctx:
-        ctx.update(extra_ctx)
-    try:
-        session_store.begin_session(sid, channel="cron", task=job.get("prompt") or jid)
-    except Exception:  # noqa: BLE001
-        pass
 
-    _in_run.active = True
+    # EVERYTHING that can raise for job-specific reasons (workdir resolution, dir creation, the
+    # runner itself) lives inside this try, so a bad job fails ONLY itself: an unhandled exception
+    # here can never propagate out of _execute_one and abort the surrounding run_due() heartbeat
+    # (which would skip every other job due this tick). The occurrence was already claimed above.
     status, output, err = "ok", "", None
+    wd = None
+    created_tmp = False
     try:
-        output = str(runner(job, ctx) or "")
-    except Exception as e:  # noqa: BLE001 - a job failure is isolated + alerted
+        configured = job.get("workdir") or ""
+        if configured:
+            if not _workdir_allowed(configured):
+                raise SchedulerError("workdir not permitted by io policy: {}".format(configured))
+            wd = configured
+        else:
+            wd = tempfile.mkdtemp(prefix="omegaclaw-cron-{}-".format(jid))
+            created_tmp = True                 # ephemeral: we own it, so we remove it after the run
+        os.makedirs(wd, exist_ok=True)
+
+        chain_out = None
+        if job.get("chain_from"):
+            prev = get_job(job["chain_from"], conn=conn)
+            chain_out = prev.get("last_output") if prev else None
+        ctx = {"job": job, "workdir": wd, "chain_output": chain_out, "now": now}
+        if extra_ctx:
+            ctx.update(extra_ctx)
+        try:
+            session_store.begin_session(sid, channel="cron", task=job.get("prompt") or jid)
+        except Exception:  # noqa: BLE001
+            pass
+
+        _in_run.active = True
+        try:
+            output = str(runner(job, ctx) or "")
+        finally:
+            _in_run.active = False
+    except Exception as e:  # noqa: BLE001 - setup OR job failure is isolated + alerted below
         status, err = "error", str(e)
     finally:
-        _in_run.active = False
+        # an ephemeral temp workdir is OURS: always remove it, so a job firing on a schedule can't
+        # leak a new /tmp dir on every run (unbounded disk growth). A job with an explicit workdir
+        # keeps it — the operator manages that directory's lifecycle.
+        if created_tmp and wd:
+            shutil.rmtree(wd, ignore_errors=True)
 
     _set(conn, jid, last_status=status, last_output=output)
     try:
@@ -393,13 +501,15 @@ def _execute_one(job: Dict[str, Any], now: float, runner: Callable, conn: sqlite
             _alert(alert_fn, job, "job produced empty output")
             alerted = True
         # on_empty == "silent": watchdog stays quiet
-    else:
-        if delivery_fn is not None and job.get("delivery"):
-            try:
-                delivery_fn(job, output)
-            except Exception:  # noqa: BLE001
-                pass
-        delivered = True
+    elif job.get("delivery"):
+        # deliver only when a destination is configured; fall back to the durable outbox sink so a
+        # scheduled result is captured even when no delivery_fn was wired (bare `tick`/`daemon`).
+        try:
+            (delivery_fn or _default_delivery)(job, output)
+            delivered = True
+        except Exception:  # noqa: BLE001
+            _alert(alert_fn, job, "delivery failed")
+            alerted = True
     return {"id": jid, "status": status, "session_id": sid, "next_run": nxt,
             "delivered": delivered, "alerted": alerted, "error": err}
 
@@ -425,14 +535,43 @@ def run_due(now: Optional[float] = None, runner: Optional[Callable] = None, *,
             conn.close()
 
 
+def run_forever(interval: float = 60.0, *, runner: Optional[Callable] = None,
+                delivery_fn: Optional[Callable] = None, alert_fn: Optional[Callable] = None,
+                iterations: Optional[int] = None, sleep_fn: Callable = time.sleep) -> Dict[str, Any]:
+    """Scheduler heartbeat — the operator that actually drives the store. A deployment runs
+    ``omegaclaw-cron daemon``; this loops ``run_due`` every ``interval`` seconds so due jobs fire
+    on their own (without this, jobs are only ever created, never run).
+
+    ``delivery_fn``/``alert_fn`` default to the durable file sinks so results/failures are never
+    silently dropped; a live deployment injects channel-backed hooks (and a real agent ``runner``)
+    here — that wiring is the intended extension seam. ``iterations`` bounds the loop (``None`` =
+    until interrupted); ``sleep_fn`` is injectable so tests drive it without real waiting. One
+    tick that raises never kills the heartbeat — it is caught and alerted."""
+    delivery_fn = delivery_fn or _default_delivery
+    alert_fn = alert_fn or _default_alert
+    ticks = fired_total = 0
+    try:
+        while iterations is None or ticks < iterations:
+            try:
+                r = run_due(runner=runner, delivery_fn=delivery_fn, alert_fn=alert_fn)
+                fired_total += r.get("count", 0)
+            except Exception as e:  # noqa: BLE001 - a bad tick must not stop the heartbeat
+                _alert(alert_fn, {"id": "<daemon>"}, "run_due crashed: {}".format(e))
+            ticks += 1
+            if iterations is not None and ticks >= iterations:
+                break
+            sleep_fn(interval)
+    except KeyboardInterrupt:  # pragma: no cover - graceful Ctrl-C on the CLI daemon
+        pass
+    return {"ok": True, "ticks": ticks, "fired_total": fired_total}
+
+
 def _alert(alert_fn, job, message):
-    if alert_fn is not None:
-        try:
-            alert_fn(job, message)
-        except Exception:  # noqa: BLE001
-            pass
-    else:
-        print("[scheduler] ALERT job={} {}".format(job.get("id"), message), flush=True)
+    fn = alert_fn or _default_alert
+    try:
+        fn(job, message)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def run_now(job_id: str, runner: Optional[Callable] = None, **kw) -> Dict[str, Any]:

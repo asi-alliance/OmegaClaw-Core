@@ -25,11 +25,15 @@ def _db():
     d = tempfile.mkdtemp(prefix="sch_")
     os.environ["OMEGACLAW_JOBS_DB"] = os.path.join(d, "jobs.db")
     os.environ["OMEGACLAW_SESSION_DB"] = os.path.join(d, "s.db")
+    # keep the durable-outbox default sink out of the repo's memory/ during tests
+    os.environ["OMEGACLAW_CRON_OUTBOX"] = os.path.join(d, "outbox.jsonl")
     sch.reset(os.environ["OMEGACLAW_JOBS_DB"])
+    return d
 
 
 def _clean():
-    for k in ("OMEGACLAW_JOBS_DB", "OMEGACLAW_SESSION_DB"):
+    for k in ("OMEGACLAW_JOBS_DB", "OMEGACLAW_SESSION_DB", "OMEGACLAW_CRON_OUTBOX",
+              "OMEGACLAW_JOB_WORKDIR_ROOTS"):
         os.environ.pop(k, None)
 
 
@@ -313,6 +317,101 @@ def test_run_now_does_not_resume_paused_or_reschedule():
         assert after["enabled"] == 0                       # still paused
         assert after["next_run"] == before["next_run"]     # not rescheduled
         assert sch.get_job("other")["last_status"] is None  # unrelated due job untouched
+    finally:
+        _clean()
+
+
+def test_setup_failure_isolated_from_tick():
+    """PR #276 review: a job whose SETUP raises (here: a workdir whose parent is a file, so
+    ``os.makedirs`` fails) must fail only ITSELF — the surrounding run_due() heartbeat must still
+    fire the other jobs due this tick (pre-fix, the exception aborted the whole tick)."""
+    d = _db()
+    try:
+        root = os.path.join(d, "roots")
+        os.makedirs(root)
+        os.environ["OMEGACLAW_JOB_WORKDIR_ROOTS"] = root
+        blocker = os.path.join(root, "blocker")           # a FILE where a dir is expected
+        open(blocker, "w").close()
+        bad_wd = os.path.join(blocker, "sub")             # passes the policy check, fails makedirs
+        assert sch.create_job("bad", "once", str(T0), workdir=bad_wd, now=T0)["ok"]
+        sch.create_job("good", "once", str(T0), prompt="p", now=T0)
+        ran, alerts = [], []
+        r = sch.run_due(now=T0 + 1, runner=lambda j, c: ran.append(j["id"]) or "ok",
+                        alert_fn=lambda j, m: alerts.append(j["id"]))
+        assert r["count"] == 2                            # tick did NOT abort
+        assert "good" in ran                              # the healthy job still fired
+        assert sch.get_job("good")["last_status"] == "ok"
+        assert sch.get_job("bad")["last_status"] == "error" and "bad" in alerts
+    finally:
+        _clean()
+
+
+def test_temp_workdir_created_then_cleaned_up():
+    """PR #276 review: a job with no explicit workdir gets a temp dir that exists DURING the run
+    and is removed AFTER — so a scheduled job can't leak a /tmp dir on every fire."""
+    _db()
+    try:
+        sch.create_job("t", "once", str(T0), prompt="p", now=T0)
+        seen = {}
+
+        def runner(job, ctx):
+            seen["wd"] = ctx["workdir"]
+            seen["during"] = os.path.isdir(ctx["workdir"])
+            return "ok"
+
+        sch.run_due(now=T0 + 1, runner=runner)
+        assert seen["during"] is True                     # available while the job runs
+        assert not os.path.exists(seen["wd"])             # cleaned up afterwards (no leak)
+    finally:
+        _clean()
+
+
+def test_workdir_policy_enforced_at_create():
+    """PR #276 review: a configured workdir is validated against the io-policy read_write roots —
+    inside is accepted, outside is rejected, undeterminable (no roots) is not blocked."""
+    d = _db()
+    try:
+        root = os.path.join(d, "allowed")
+        os.makedirs(root)
+        os.environ["OMEGACLAW_JOB_WORKDIR_ROOTS"] = root
+        assert sch.create_job("ins", "once", str(T0), workdir=os.path.join(root, "j"), now=T0)["ok"]
+        r = sch.create_job("out", "once", str(T0), workdir=os.path.join(d, "elsewhere"), now=T0)
+        assert r["ok"] is False and "io policy" in r["error"]
+        os.environ["OMEGACLAW_JOB_WORKDIR_ROOTS"] = ""     # explicitly undeterminable -> allow
+        assert sch.create_job("free", "once", str(T0), workdir="/anywhere/x", now=T0)["ok"]
+    finally:
+        _clean()
+
+
+def test_daemon_run_forever_fires_due_job():
+    """PR #276 review: run_forever() is the operator that actually drives the store — it fires a
+    due job on its own, sleeps BETWEEN ticks (not after the last), and is bounded by iterations."""
+    _db()
+    try:
+        # next_run is seeded far in the past (T0 ~ 1970) vs the real clock run_forever uses -> due
+        sch.create_job("iv", "interval", "60", prompt="p", delivery="chan", now=T0)
+        ran, slept = [], []
+        r = sch.run_forever(interval=5, iterations=2, sleep_fn=lambda s: slept.append(s),
+                            runner=lambda j, c: ran.append(j["id"]) or "out")
+        assert r["ticks"] == 2 and r["fired_total"] == 1
+        assert ran == ["iv"]                              # fired once, then no longer due
+        assert slept == [5]                               # slept between the two ticks only
+    finally:
+        _clean()
+
+
+def test_default_delivery_writes_to_outbox():
+    """PR #276 review: a fired job's output reaches a durable sink even with no delivery_fn wired —
+    run_due falls back to the outbox JSONL so results are captured, not silently dropped."""
+    _db()
+    try:
+        sch.create_job("d", "once", str(T0), prompt="p", delivery="chan", now=T0)
+        sch.run_due(now=T0 + 1)                            # default runner + no delivery_fn
+        outbox = os.environ["OMEGACLAW_CRON_OUTBOX"]
+        assert os.path.exists(outbox)
+        with open(outbox, encoding="utf-8") as fh:
+            recs = [json.loads(line) for line in fh if line.strip()]
+        assert any(x["job"] == "d" and x["kind"] == "delivery" and x["text"] for x in recs)
     finally:
         _clean()
 

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """OmegaClaw scheduler CLI — cron / interval / one-shot jobs + webhook subscriptions (Issue #17).
 
-  cron create <id> --kind once|interval|cron --spec <spec> [--prompt ..] [--on-empty silent|alert]
+  cron create <id> --kind once|interval|cron --spec <spec> [--prompt ..] [--workdir DIR]
+                   [--delivery TARGET] [--on-empty silent|alert]
   cron list | show <id> | pause <id> | resume <id> | remove <id>
   cron run <id>                          force-run a job now
-  cron tick                              fire everything currently due (scheduler heartbeat)
+  cron tick                              fire everything currently due (one heartbeat)
+  cron daemon [--interval S] [--max-ticks N]   run heartbeats continuously (the operator)
   cron webhook subscribe <id> --secret S [--prompt ..]
   cron webhook list | remove <id>
   cron webhook event <id> --payload '{...}' [--signature HEX]
@@ -33,6 +35,7 @@ def _out(args, obj, text):
 
 def cmd_create(args):
     r = sch.create_job(args.id, args.kind, args.spec, prompt=args.prompt or "",
+                       workdir=args.workdir or "", delivery=args.delivery or "",
                        on_empty=args.on_empty, chain_from=args.chain_from or "")
     return _out(args, r, "created {} ({}, next_run={})".format(args.id, args.kind, r.get("next_run"))
                 if r.get("ok") else "error: {}".format(r.get("error")))
@@ -75,11 +78,25 @@ def cmd_run(args):
 
 
 def cmd_tick(args):
-    r = sch.run_due()
+    # a manual heartbeat: wire the durable default delivery/alert sinks so a fired job's output
+    # is captured (not silently dropped) even from a one-off `tick`.
+    r = sch.run_due(delivery_fn=sch._default_delivery, alert_fn=sch._default_alert)
     lines = ["fired {} due job(s):".format(r["count"])]
     for f in r["fired"]:
         lines.append("  {} -> {}{}".format(f["id"], f["status"], " (alerted)" if f["alerted"] else ""))
     return _out(args, r, "\n".join(lines))
+
+
+def cmd_daemon(args):
+    # the operator that actually drives the store: loop run_due every --interval seconds until
+    # interrupted (or --max-ticks). Without this, jobs are only created, never fired.
+    iterations = args.max_ticks if args.max_ticks and args.max_ticks > 0 else None
+    if not getattr(args, "json", False):
+        print("omegaclaw-cron daemon: interval={}s max_ticks={}".format(
+            args.interval, iterations or "∞"), flush=True)
+    r = sch.run_forever(interval=args.interval, iterations=iterations)
+    return _out(args, r, "daemon stopped after {} tick(s), {} job(s) fired".format(
+        r["ticks"], r["fired_total"]))
 
 
 def cmd_webhook(args):
@@ -112,6 +129,10 @@ def build_parser():
     c.add_argument("--kind", required=True, choices=["once", "interval", "cron"])
     c.add_argument("--spec", required=True, help="epoch (once) | seconds (interval) | 5-field cron")
     c.add_argument("--prompt", default="")
+    c.add_argument("--workdir", default="", help="job working dir (must be within an io-policy "
+                   "read_write root); default: an auto-cleaned temp dir per run")
+    c.add_argument("--delivery", default="", help="delivery target label; when set, run output is "
+                   "delivered (default sink: memory/cron_outbox.jsonl)")
     c.add_argument("--on-empty", dest="on_empty", default="silent", choices=["silent", "alert"])
     c.add_argument("--chain-from", dest="chain_from", default="")
     c.set_defaults(func=cmd_create)
@@ -119,6 +140,12 @@ def build_parser():
     for name, fn in (("list", cmd_list), ("tick", cmd_tick)):
         sp = sub.add_parser(name, parents=[jsn])
         sp.set_defaults(func=fn)
+
+    d = sub.add_parser("daemon", parents=[jsn])
+    d.add_argument("--interval", type=float, default=60.0, help="seconds between heartbeats")
+    d.add_argument("--max-ticks", dest="max_ticks", type=int, default=0,
+                   help="stop after N ticks (0 = run until interrupted)")
+    d.set_defaults(func=cmd_daemon)
     for name, fn in (("show", cmd_show), ("pause", cmd_pause), ("resume", cmd_resume),
                      ("remove", cmd_remove), ("run", cmd_run)):
         sp = sub.add_parser(name, parents=[jsn])
