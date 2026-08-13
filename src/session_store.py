@@ -8,10 +8,14 @@ snapshots**.
 Design:
 - stdlib ``sqlite3``; a small schema (sessions / messages / tool_calls / snapshots) plus an FTS5
   search index (transparent LIKE fallback if FTS5 is unavailable).
-- Two ingestion paths: a live **recording API** (``begin_session`` / ``record_message`` /
-  ``record_tool_call`` / ``record_snapshot`` / ``end_session``) and ``ingest_trace`` which
-  backfills from the reasoning-trace JSONL every run already writes (so 100% of runs get a
-  session id + searchable metadata).
+- Two ingestion paths:
+  1. a live **recording API** (``begin_session`` / ``record_message`` / ``record_tool_call`` /
+     ``record_snapshot`` / ``end_session``) — the integration surface the reasoning loop calls to
+     record a session as it runs (wiring lands as a follow-up; see the PR notes);
+  2. ``ingest_trace``, which backfills from the reasoning-trace JSONL emitted by ``src.tracing``.
+     That module is introduced by PR #270 (``contrib/reasoning-trace``); this PR is stacked on it,
+     so ``ingest_trace`` becomes live once #270 merges. Until then the store is exercised directly
+     via the recording API (see the unit tests).
 - **Resume** returns the latest snapshot + recent context — reconstructed state independent of
   the raw prompt log.
 
@@ -334,7 +338,10 @@ def export(session_id: str, conn: Optional[sqlite3.Connection] = None) -> Dict[s
 # --------------------------------------------------------------------------- trace ingest
 
 def ingest_trace(path: str, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
-    """Backfill sessions from a reasoning-trace JSONL (what every run writes via ``src.tracing``).
+    """Backfill sessions from a reasoning-trace JSONL (the format ``src.tracing`` emits).
+
+    ``src.tracing`` is introduced by PR #270 (``contrib/reasoning-trace``); this function reads the
+    JSONL that module writes, so it is only reachable end-to-end once #270 is merged underneath.
 
     Maps the ACTUAL tracing phases — ``iteration_start`` / ``llm_call`` / ``action_parse`` /
     ``policy_decision`` / ``iteration_result`` / ``error`` / ``iteration_end`` — into messages +

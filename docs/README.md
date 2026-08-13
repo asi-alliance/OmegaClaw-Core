@@ -66,3 +66,4 @@ User-facing MeTTa skills the agent invokes. Each page follows the template **Sig
 - [reference-internals-memory-store.md](./reference-internals-memory-store.md) — The three-tier memory architecture, including `knowledge-priors` markdown seeding into ChromaDB
 - [reference-internals-skill-dispatch.md](./reference-internals-skill-dispatch.md) — How `(skill args)` calls resolve
 - [reference-internals-extension-points.md](./reference-internals-extension-points.md) — Where to hook in new skills, tools, channels, LLMs, engines
+- [reference-session-store.md](./reference-session-store.md) — `omegaclaw-sessions`: the SQLite session store, recording API, and trace ingest
