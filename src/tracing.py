@@ -9,8 +9,10 @@ components (``plugin.llmProviderChat``, ``action_protocol.parse_and_render_metta
 MeTTa signatures.
 
 Privacy (mirrors Issue #3): **on by default, metadata/hashes only** — prompt/state/result
-bodies are written only when ``OMEGACLAW_TRACE_BODIES`` (or ``OMEGACLAW_DEBUG_LLM_RAW``) is set.
-IO is best-effort and never breaks the loop.
+bodies are written only when ``OMEGACLAW_TRACE_BODIES`` (or ``OMEGACLAW_DEBUG_LLM_RAW``) is set,
+and even then are scrubbed through ``redaction.redact_secrets`` so tokens / API keys /
+``Authorization`` headers never reach the durable trace. IO is best-effort and never breaks
+the loop.
 
 Env:
 - ``OMEGACLAW_TRACE_PATH``    trace file (default ``<repo>/memory/traces/YYYYMMDD.jsonl``).
@@ -25,6 +27,11 @@ import json
 import os
 import time
 import uuid
+
+try:  # bare import when ``src`` is on sys.path, package import otherwise
+    from redaction import redact_secrets
+except ImportError:  # pragma: no cover - import-path fallback
+    from src.redaction import redact_secrets
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -84,10 +91,14 @@ def _ctx_get():
 
 
 def _body(text):
-    """Full body when bodies are enabled, else None (metadata-only default)."""
+    """Redacted body when bodies are enabled, else None (metadata-only default).
+
+    Even in bodies mode the text is passed through ``redact_secrets`` so tokens / API
+    keys / ``Authorization`` headers do not land in the durable trace.
+    """
     if text is None:
         return None
-    return text if _bodies_enabled() else None
+    return redact_secrets(text) if _bodies_enabled() else None
 
 
 # --------------------------------------------------------------------------- context API
@@ -141,24 +152,31 @@ def reset():
 # --------------------------------------------------------------------------- emit
 
 def emit(kind, **fields):
-    """Write one JSONL trace event of ``kind`` under the current context. None fields dropped."""
-    if _disabled():
+    """Write one JSONL trace event of ``kind`` under the current context. None fields dropped.
+
+    Fully best-effort: emit is invoked from the MeTTa loop via ``py-call`` (parse / policy /
+    error hooks), so it must never raise — any failure degrades to a no-op returning ``""``.
+    """
+    try:
+        if _disabled():
+            return ""
+        c = _ctx_get()
+        record = {
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+            "trace_id": c.get("trace_id"),
+            "session_id": c.get("session_id"),
+            "turn_id": c.get("turn_id"),
+            "iteration": c.get("iteration"),
+            "phase": kind,
+            "input_state_hash": c.get("input_state_hash"),
+        }
+        for k, v in fields.items():
+            if v is not None:
+                record[k] = v
+        _write(record)
+        return record.get("trace_id") or ""
+    except Exception:  # a trace failure must never break the loop
         return ""
-    c = _ctx_get()
-    record = {
-        "ts": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-        "trace_id": c.get("trace_id"),
-        "session_id": c.get("session_id"),
-        "turn_id": c.get("turn_id"),
-        "iteration": c.get("iteration"),
-        "phase": kind,
-        "input_state_hash": c.get("input_state_hash"),
-    }
-    for k, v in fields.items():
-        if v is not None:
-            record[k] = v
-    _write(record)
-    return record.get("trace_id") or ""
 
 
 def _write(record):
@@ -273,7 +291,8 @@ def _selftest():
         trace_llm("X", "y", prompt="tok Bearer abcdef123456ghijkl", response="r")
         ev = [json.loads(x) for x in open(path2, encoding="utf-8") if x.strip()]
         body = next(e for e in ev if e["phase"] == "llm_call")["prompt_body"]
-        assert body == "tok Bearer abcdef123456ghijkl", body
+        # bodies are present but scrubbed: the bearer token must not leak
+        assert body.startswith("tok Bearer ") and "abcdef123456ghijkl" not in body, body
 
         # disable gate
         os.environ["OMEGACLAW_TRACE_DISABLE"] = "1"

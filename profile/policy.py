@@ -8,16 +8,33 @@ from src.logger import get_logger
 
 logger = get_logger(__name__)
 
+
+def _trace_policy_best_effort(tool, allowed, reason):
+    """Emit a ``policy_decision`` reasoning-trace event (Issue #7). Best-effort: never raises,
+    never affects policy enforcement."""
+    try:
+        try:
+            import tracing
+        except ImportError:  # pragma: no cover - package-style import path
+            from src import tracing
+        tracing.trace_policy(tool=tool, allowed=allowed, reason=reason)
+    except Exception:
+        pass
+
+
 def apply_security_policy(path):
     try:
         if path:
             policy = FileSystemPolicy()
             policy.load_file(path)
             policy.apply()
+            _trace_policy_best_effort("filesystem-sandbox", True, "landlock policy applied")
         else:
             logger.warning("SecurityPolicyPath is not set")
+            _trace_policy_best_effort("filesystem-sandbox", False, "security policy path not set")
     except Exception as e:
         logger.exception(f"Unexpected exception: {e}")
+        _trace_policy_best_effort("filesystem-sandbox", False, "policy application failed")
         raise
 
 def get_allowed_policy_paths(path) -> str:
@@ -43,12 +60,14 @@ def get_allowed_policy_paths(path) -> str:
         if path:
             policy = FileSystemPolicy()
             policy.load_file(path)
+            _trace_policy_best_effort("get-io-policy", True, "io policy queried")
             return json.dumps({
                 'read_only': [str(p) for p in policy._read_only],
                 'read_write': [str(p) for p in policy._read_write]
             })
         else:
             logger.warning("SecurityPolicyPath is not set")
+            _trace_policy_best_effort("get-io-policy", False, "security policy path not set")
             return "Could not retrieve policy: policy is not set"
     except Exception as e:
         logger.exception(

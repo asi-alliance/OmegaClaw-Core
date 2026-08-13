@@ -1,9 +1,9 @@
 """Unit tests for structured reasoning-trace logging (Issue #7).
 
 Pure-Python, no Docker/LLM/MeTTa. Runs under pytest and standalone
-(`python3 Autotests/test_tracing.py`). Covers: trace schema + trace_id linkage across an
-iteration's events, metadata-only default vs full bodies, the disable gate, the
-action-pipeline + policy-denial emission hooks, and the trace-summary aggregator.
+(`python3 Autotests/unit/test_tracing.py`). Covers: trace schema + trace_id linkage across an
+iteration's events, metadata-only default vs redacted bodies, the disable gate, the
+action-parse wiring in ``helper.balance_parentheses``, and the trace-summary aggregator.
 """
 import importlib.machinery
 import importlib.util
@@ -12,7 +12,7 @@ import os
 import sys
 import tempfile
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _SRC = os.path.join(_REPO_ROOT, "src")
 for _p in (_SRC, _REPO_ROOT):
     if _p not in sys.path:
@@ -78,14 +78,17 @@ def test_metadata_only_by_default_no_bodies():
         assert llm["prompt_sha"] and llm["prompt_chars"] > 0  # hashes/metadata still present
 
 
-def test_bodies_mode_includes_bodies():
+def test_bodies_mode_includes_redacted_bodies():
     with tempfile.TemporaryDirectory() as d:
         path = _fresh(d)
         os.environ["OMEGACLAW_TRACE_BODIES"] = "1"
         tracing.begin_iteration(1)
         tracing.trace_llm("Test", "mock", prompt="tok Bearer abcdef123456ghijkl", response="r")
         llm = [e for e in _read(path) if e["phase"] == "llm_call"][0]
-        assert llm["prompt_body"] == "tok Bearer abcdef123456ghijkl"
+        # body is captured but the bearer token is scrubbed before it hits the trace
+        assert llm["prompt_body"].startswith("tok Bearer ")
+        assert "abcdef123456ghijkl" not in llm["prompt_body"]
+        assert "[REDACTED]" in llm["prompt_body"]
         os.environ.pop("OMEGACLAW_TRACE_BODIES", None)
 
 
@@ -100,8 +103,35 @@ def test_disable_gate_writes_nothing():
         os.environ.pop("OMEGACLAW_TRACE_DISABLE", None)
 
 
-# NOTE: the action-pipeline / policy-denial emission-hook test lives with those producer
-# modules (action_protocol / tool_policy), which are not part of this tracing-infra change.
+# --- producer wiring -------------------------------------------------------
+
+def test_balance_parentheses_emits_action_parse():
+    """helper.balance_parentheses is the loop's Python parse step; it must emit an
+    action_parse event with the parsed tools under the current iteration's trace_id."""
+    import helper
+    with tempfile.TemporaryDirectory() as d:
+        path = _fresh(d)
+        tracing.begin_session()
+        tracing.begin_iteration(1)
+        helper.balance_parentheses("send hello\nread-file notes.txt")
+        parse = [e for e in _read(path) if e["phase"] == "action_parse"]
+        assert len(parse) == 1, parse
+        assert parse[0]["ok"] is True
+        assert parse[0]["tools"] == ["send", "read-file"]
+        assert "error_codes" not in parse[0]  # all commands recognized
+
+
+def test_balance_parentheses_flags_unknown_command():
+    """An unrecognized command surfaces as error_codes with ok=False, so the summary can
+    count it as a parse error / invalid action."""
+    import helper
+    with tempfile.TemporaryDirectory() as d:
+        path = _fresh(d)
+        tracing.begin_iteration(1)
+        helper.balance_parentheses("bogus-tool whatever")
+        parse = [e for e in _read(path) if e["phase"] == "action_parse"][0]
+        assert parse["ok"] is False and parse["error_codes"] == ["bogus-tool"]
+
 
 # --- summary aggregator ----------------------------------------------------
 

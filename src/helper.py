@@ -92,6 +92,27 @@ def _is_known_command(line):
     return _get_command_name(line) in LLM_COMMANDS
 
 
+def _trace_parse_best_effort(sexprs):
+    """Emit an ``action_parse`` reasoning-trace event for the just-parsed commands (Issue #7).
+
+    Wired here because ``balance_parentheses`` is the loop's Python action-parse step (see
+    ``src/loop.metta``). Best-effort: never raises and never alters parsing. ``tools`` are the
+    parsed command names; unrecognized commands are surfaced as ``error_codes`` so
+    ``omegaclaw-trace-summary`` can report parse errors / invalid actions and link the
+    iteration (input -> llm -> parse -> result)."""
+    try:
+        try:
+            import tracing
+        except ImportError:  # pragma: no cover - package-style import path
+            from src import tracing
+        tools = [name for name in (_get_command_name(s) for s in sexprs) if name]
+        unknown = sorted({t for t in tools if t not in LLM_COMMANDS})
+        tracing.trace_parse(ok=(bool(sexprs) and not unknown), source="metta",
+                            tools=(tools or None), error_codes=(unknown or None))
+    except Exception:
+        pass
+
+
 def _decode_quoted_arg(text):
     try:
         return json.loads(text)
@@ -203,6 +224,7 @@ def balance_parentheses(s):
                 sexprs.append(f'({cmd} "{rest}")')
         else:
             sexprs.append(f"({cmd})")
+    _trace_parse_best_effort(sexprs)
     ret = " ".join(sexprs)
     return "(" + ret + ")"
 

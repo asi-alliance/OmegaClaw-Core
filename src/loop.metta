@@ -49,7 +49,9 @@
 
 (= (HandleError $msg $cmd $sexpr)
    (case $sexpr (((Error $a $b) (let $new (append (get-state &error) (($msg $cmd)))
-                                          (progn (change-state! &error $new) (ALERT_FAILED $a $b))))
+                                          (progn (change-state! &error $new)
+                                                 (py-call (tracing.trace_error (repr $msg) (repr $a) (repr $b) "" (repr $cmd)))
+                                                 (ALERT_FAILED $a $b))))
                  ($else $sexpr))))
 
 (= (omegaclaw)
