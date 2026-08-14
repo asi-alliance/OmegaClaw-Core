@@ -211,7 +211,7 @@ def init_knowledge(embedding_selection):
     _last_query = None
     _last_result = None
     logger.info(f"Embedding type selected is {embedding_selection}")
-    logger.info(f"СhromaDB: using database path {DB_PATH}")
+    logger.info(f"ChromaDB: using database path {os.path.abspath(DB_PATH)}")
 
     try:
         collection = _get_collection()
