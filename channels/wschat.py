@@ -64,6 +64,7 @@ from collections import deque
 from pathlib import Path
 import sys
 from config import config_get_by_key
+from memory_export_handler import is_export_command
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
@@ -193,6 +194,9 @@ def _handle_frame(raw_message):
         text = frame.get("text")
         if not isinstance(seq, int) or not isinstance(text, str):
             logger.warning(f"Ignoring malformed user_message frame: {frame!r}")
+            return
+        if is_export_command(text):
+            logger.info("Ignoring unavailable memory-export command on WebSocket channel")
             return
         _enqueue_user_message(seq, text)
         return

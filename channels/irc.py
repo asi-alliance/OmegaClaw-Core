@@ -9,6 +9,7 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
+from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -87,6 +88,20 @@ def _deliver_outbound(chunk):
     _send(f"PRIVMSG {_channel} :{chunk}")
 
 
+def _send_export_reply(nick, text):
+    """Send export-control output privately to the authenticated requester."""
+    target = _normalize_nick(nick)
+    if not target or any(char.isspace() for char in target):
+        raise ValueError("Invalid IRC nickname for export response")
+    for line in textwrap.wrap(
+        str(text).replace("\r", "").replace("\n", " "),
+        width=400,
+        break_long_words=True,
+        break_on_hyphens=False,
+    ):
+        _send(f"PRIVMSG {target} :{line}")
+
+
 def _flush_outbox():
     try:
         _outbox.flush(_deliver_outbound, _ready_to_send)
@@ -155,7 +170,17 @@ def _irc_session(channel, server, port, nick):
                         msg = trailing.split(" :", 1)[1]
                         state = _is_allowed_message(sender_nick, msg)
                         if state == "allow":
-                            _set_last(f"{sender_nick}: {msg}")
+                            if is_export_command(msg):
+                                owner_key = f"irc:{_normalize_nick(sender_nick)}"
+                                reply = handle_export_command(
+                                    msg,
+                                    owner_key,
+                                    lambda message, target=sender_nick: _send_export_reply(target, message),
+                                )
+                                if reply is not None:
+                                    _send_export_reply(sender_nick, reply)
+                            else:
+                                _set_last(f"{sender_nick}: {msg}")
                         elif state == "auth_bound":
                             send_message(f"Authentication successful for {sender_nick}.")
                     except Exception as e:

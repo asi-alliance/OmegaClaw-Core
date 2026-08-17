@@ -10,6 +10,7 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
+from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -28,6 +29,7 @@ _outbox = PendingMessages()
 MM_URL = "https://chat.singularitynet.io"
 CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "omegaclaw"x
 BOT_TOKEN = ""
+BOT_USER_ID = ""
 
 def _get_bot_user_id():
     global headers
@@ -108,6 +110,29 @@ def _deliver_outbound(text):
     response.raise_for_status()
 
 
+def _send_export_reply(user_id, text):
+    """Deliver export-control output through the requester's Mattermost DM."""
+    if not BOT_USER_ID:
+        raise RuntimeError("Mattermost bot identity is not initialized")
+    direct = requests.post(
+        f"{MM_URL}/api/v4/channels/direct",
+        headers=_headers,
+        json=[BOT_USER_ID, user_id],
+        timeout=15,
+    )
+    direct.raise_for_status()
+    direct_channel_id = str(direct.json().get("id", "")).strip()
+    if not direct_channel_id:
+        raise RuntimeError("Mattermost did not return a direct-message channel")
+    response = requests.post(
+        f"{MM_URL}/api/v4/posts",
+        headers=_headers,
+        json={"channel_id": direct_channel_id, "message": str(text)},
+        timeout=15,
+    )
+    response.raise_for_status()
+
+
 def _flush_outbox():
     try:
         _outbox.flush(_deliver_outbound, _ready_to_send)
@@ -157,7 +182,17 @@ def _ws_session():
                     state = _is_allowed_message(user_id, message)
                     if state == "allow":
                         name = _get_display_name(user_id)
-                        _set_last(f"{name}: {message}")
+                        if is_export_command(message):
+                            owner_key = f"mattermost:{CHANNEL_ID}:{user_id}"
+                            reply = handle_export_command(
+                                message,
+                                owner_key,
+                                lambda text, target=user_id: _send_export_reply(target, text),
+                            )
+                            if reply is not None:
+                                _send_export_reply(user_id, reply)
+                        else:
+                            _set_last(f"{name}: {message}")
                     elif state == "auth_bound":
                         name = _get_display_name(user_id)
                         send_message(f"Authentication successful for {name}.")

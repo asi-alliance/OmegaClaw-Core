@@ -9,6 +9,7 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
+from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -163,6 +164,16 @@ def _deliver_outbound(chunk):
     )
 
 
+def _send_export_reply(user_id, text):
+    """Send private export-control output to the authenticated requester."""
+    _api_call(
+        "sendMessage",
+        {"chat_id": user_id, "text": str(text)},
+        timeout=15,
+        use_post=True,
+    )
+
+
 def _flush_outbox():
     global _connected
     try:
@@ -210,8 +221,19 @@ def _poll_loop():
 
                 state = _is_allowed_message(chat_id, user_id, text)
                 display_name = _display_name(user, chat)
+                export_command = is_export_command(text)
                 if state == "allow":
-                    _set_last(f"{display_name}: {text}")
+                    if export_command:
+                        owner_key = f"telegram:{chat_id}:{user_id}"
+                        reply = handle_export_command(
+                            text,
+                            owner_key,
+                            lambda message, target=user_id: _send_export_reply(target, message),
+                        )
+                        if reply is not None:
+                            _send_export_reply(user_id, reply)
+                    else:
+                        _set_last(f"{display_name}: {text}")
                 elif state == "auth_bound":
                     send_message(f"Authentication successful for {display_name}.")
             _flush_outbox()
