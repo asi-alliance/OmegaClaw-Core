@@ -27,11 +27,7 @@
                "")))))
 
 (= (getHistory)
-   (let $history_file
-         (library OmegaClaw-Core ./memory/history.metta)
-     (if (exists-file $history_file) ;Safely read the history. Return an empty string if the file does not exist.
-         (read_file_tail $history_file (maxHistory))
-         "")))
+   (py-call (memory_gateway.history_tail (maxHistory))))
 
 (= (addToHistory $lastmessage $response $sexpr $msgnew)
    (if $msgnew
@@ -48,14 +44,14 @@
        (py-call (rag.openai_embed (string-safe $str)))))
 
 (= (appendToHistory $addition)
-   (append-file-raw (library OmegaClaw-Core ./memory/history.metta) (swrite $addition)))
+   (py-call (memory_gateway.append_history (swrite $addition))))
 
 (= (remember $str)
-   (progn (py-call (lib_chromadb.remember $str (embed $str) (get_time_as_string)))
+   (progn (py-call (memory_gateway.remember $str (embed $str) (get_time_as_string)))
           REMEMBER-SUCCESS))
 
 (= (query $str)
-   (py-call (lib_chromadb.query (embed $str) (maxRecallItems))))
+   (py-call (memory_gateway.query (embed $str) (maxRecallItems))))
 
 (= (episodes $time)
    (py-call (helper.around_time $time (maxEpisodeRecallLines))))
