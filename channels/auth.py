@@ -14,6 +14,7 @@ _proxy_url = None
 _auth_enabled = None
 _CHANNEL_DIR_NAME = ".channel"
 _CHANNEL_AUTH_USER_FILE = "authenticated-user.json"
+_CHANNEL_AUTH_GROUP_FILE = "authenticated-group.json"
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _MEMORY_DIRECTORY = str(_REPO_ROOT / "memory")
 _user_ID_processed = False
@@ -72,12 +73,16 @@ def _channel_auth_user_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_USER_FILE)
 
 
+def _channel_auth_group_path():
+    return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
+
+
 def store_channel_authenticated_user_id(channel_identifier, user_id):
-    # For any single run of OmegaClaw, allow only a single save of a user-id or verification    
+    # For any single run of OmegaClaw, allow only a single save of a user-id or verification
     global _user_ID_processed
     if _user_ID_processed:
         logger.warning(f"[{channel_identifier}] Warning: a user already was validated, ignoring")
-        return False    
+        return False
     channel_identifier = str(channel_identifier or "").strip()
     if not channel_identifier:
         raise ValueError("channel_identifier is required")
@@ -153,4 +158,65 @@ def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
         else:
             logger.error(f"[{label}] ERROR -- Unable to save user ID")
             return "ignore"
+    return "ignore"
+
+
+def store_channel_authenticated_group_id(channel_identifier, group_id):
+    """Persist a trusted group without changing single-user channel auth."""
+    channel_identifier = str(channel_identifier or "").strip()
+    group_id = str(group_id or "").strip()
+    if not channel_identifier:
+        raise ValueError("channel_identifier is required")
+    if not group_id:
+        raise ValueError("group_id is required")
+
+    payload = {
+        "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "channel_identifier": channel_identifier,
+        "group_id": group_id,
+    }
+    path = _channel_auth_group_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            json.dump(payload, f, separators=(",", ":"))
+            f.write("\n")
+    except OSError as e:
+        raise RuntimeError("Failed to write channel authenticated group record") from e
+    return True
+
+
+def get_channel_saved_group_id(channel_identifier, group_id):
+    """Return whether a group has already been trusted for this channel."""
+    channel_identifier = str(channel_identifier or "").strip()
+    group_id = str(group_id or "").strip()
+    if not channel_identifier or not group_id:
+        return False
+    try:
+        with open(_channel_auth_group_path(), "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    record = json.loads(line)
+                    saved_channel = str(record.get("channel_identifier", "")).strip()
+                    saved_group = str(record.get("group_id", "")).strip()
+                except (AttributeError, json.JSONDecodeError) as e:
+                    logger.warning(f"Skipping malformed channel authenticated group record: {e}")
+                    continue
+                if saved_channel == channel_identifier and saved_group == group_id:
+                    return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        raise RuntimeError("Failed to read channel authenticated group records") from e
+    return False
+
+
+def authenticate_channel_group(channel_identifier, group_id, auth_candidate=None):
+    """Trust one chat after an explicit shared-secret authentication."""
+    if get_channel_saved_group_id(channel_identifier, group_id):
+        return "allow"
+    if auth_candidate is not None and verify_token(auth_candidate):
+        if store_channel_authenticated_group_id(channel_identifier, group_id):
+            logger.info(f"[{str(channel_identifier).upper()}] Saved authenticated group ID")
+            return "auth_bound"
     return "ignore"

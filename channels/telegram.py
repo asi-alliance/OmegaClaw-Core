@@ -4,45 +4,40 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from collections import deque
 import auth
 from src.logger import get_logger
-from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
 
 logger = get_logger(__name__)
 
 _running = False
-_last_message = ""
 _msg_lock = threading.Lock()
 _state_lock = threading.Lock()
+_inbox = deque()
+_active_chat_id = ""
 
 _bot_token = ""
 _api_base = ""
-_chat_id = ""
 _poll_timeout = 20
 _offset = None
 _connected = False
 
-_authenticated_user_id = None
-_outbox = PendingMessages()
-
-
-def _set_last(msg):
-    global _last_message
+def _enqueue_message(msg, chat_id):
     with _msg_lock:
-        if _last_message == "":
-            _last_message = msg
-        else:
-            _last_message = _last_message + " | " + msg
+        _inbox.append((str(chat_id), str(msg)))
 
 
 def getLastMessage():
-    global _last_message
+    global _active_chat_id
     with _msg_lock:
-        tmp = _last_message
-        _last_message = ""
-        return tmp
+        if not _inbox:
+            return ""
+        chat_id, message = _inbox.popleft()
+    with _state_lock:
+        _active_chat_id = chat_id
+    return message
 
 
 def _parse_auth_candidate(msg):
@@ -121,55 +116,21 @@ def _is_auth_command(msg):
     return lower.startswith("auth ") or lower.startswith("/auth ")
 
 
-def _is_allowed_message(chat_id, user_id, msg):
-    global _chat_id, _authenticated_user_id
+def _is_allowed_message(chat_id, _user_id, msg):
+    """Trust an entire chat after one explicit shared-secret authentication."""
+    if not auth.is_auth_enabled():
+        return "allow"
 
-    with _state_lock:
-        if _chat_id and chat_id != _chat_id:
-            return "ignore"
-        if not auth.is_auth_enabled():
-            if not _chat_id:
-                _chat_id = chat_id
-            return "allow"
-        if _authenticated_user_id is not None:
-            if chat_id != _chat_id:
-                return "ignore"
-            return "allow" if user_id == _authenticated_user_id else "ignore"
-        auth_candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
-        user_id_check = auth.authenticate_channel_user('TELEGRAM', user_id, auth_candidate)
-        if user_id_check in ["auth_bound", "allow"]:
-            _authenticated_user_id = user_id
-            _chat_id = chat_id
-            return user_id_check
-        else:
-            return "ignore"
+    # The chat ID is deliberately stored as the authorization subject. Once a
+    # trusted user authenticates a group, all present and future members of
+    # that group may use the bot. Other chats remain independently protected.
+    if auth.get_channel_saved_group_id("TELEGRAM", chat_id):
+        return "allow"
 
-
-def _ready_to_send():
-    with _state_lock:
-        return _connected and bool(_chat_id)
-
-
-def _deliver_outbound(chunk):
-    with _state_lock:
-        target_chat = _chat_id
-    if not target_chat:
-        raise RuntimeError("Telegram chat is not bound")
-    _api_call(
-        "sendMessage",
-        {"chat_id": target_chat, "text": chunk},
-        timeout=15,
-        use_post=True,
-    )
-
-
-def _flush_outbox():
-    global _connected
-    try:
-        _outbox.flush(_deliver_outbound, _ready_to_send)
-    except Exception as exc:
-        _connected = False
-        logger.warning(f"Telegram send failed; retaining queued message: {exc}")
+    candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
+    if candidate is None:
+        return "ignore"
+    return auth.authenticate_channel_group("TELEGRAM", chat_id, candidate)
 
 
 def _poll_loop():
@@ -211,10 +172,9 @@ def _poll_loop():
                 state = _is_allowed_message(chat_id, user_id, text)
                 display_name = _display_name(user, chat)
                 if state == "allow":
-                    _set_last(f"{display_name}: {text}")
+                    _enqueue_message(f"{display_name}: {text}", chat_id)
                 elif state == "auth_bound":
-                    send_message(f"Authentication successful for {display_name}.")
-            _flush_outbox()
+                    send_message(f"Authentication successful for {display_name}.", chat_id)
         except Exception as exc:
             _connected = False
             logger.warning(f"Poll error: {exc}")
@@ -225,7 +185,7 @@ def _poll_loop():
 
 
 def start_telegram(chat_id="", poll_timeout=20):
-    global _running, _bot_token, _api_base, _chat_id, _poll_timeout, _offset, _connected
+    global _running, _bot_token, _api_base, _poll_timeout, _offset, _connected, _active_chat_id
 
     proxy = auth.get_proxy_url()
     if proxy:
@@ -237,7 +197,12 @@ def start_telegram(chat_id="", poll_timeout=20):
             raise ValueError("TG_BOT_TOKEN is required")
         _api_base = f"https://api.telegram.org/bot{_bot_token}"
 
-    _chat_id = str(chat_id).strip()
+    if str(chat_id).strip():
+        logger.warning("TG_CHAT_ID is ignored by multi-chat Telegram mode")
+    with _msg_lock:
+        _inbox.clear()
+    with _state_lock:
+        _active_chat_id = ""
 
     try:
         _poll_timeout = max(1, int(poll_timeout))
@@ -248,7 +213,7 @@ def start_telegram(chat_id="", poll_timeout=20):
     _offset = None
     _running = True
     _connected = False
-    logger.info(f"Starting adapter with chat target: {_chat_id or 'auto-bind'}")
+    logger.info("Starting adapter in multi-chat mode")
     _initialize_offset()
 
     t = threading.Thread(target=_poll_loop, daemon=True)
@@ -261,19 +226,32 @@ def stop_telegram():
     _running = False
 
 
-def send_message(text):
+def send_message(text, target_chat=None):
     text = str(text).replace("\\n", "\n").replace("\r", "")
     if not text:
         return
 
+    with _state_lock:
+        target_chat = str(target_chat or _active_chat_id).strip()
+
+    if not _connected or not target_chat:
+        return
+
     max_len = 3900
-    chunks = []
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
-        if chunk:
-            chunks.append(chunk)
-    _outbox.extend(chunks)
-    _flush_outbox()
+        if not chunk:
+            continue
+        try:
+            _api_call(
+                "sendMessage",
+                {"chat_id": target_chat, "text": chunk},
+                timeout=15,
+                use_post=True,
+            )
+        except Exception as exc:
+            logger.exception(f"Send failed: {exc}")
+            return
 
 class TelegramChannel(channels.CommChannel):
 
