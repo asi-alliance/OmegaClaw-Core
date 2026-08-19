@@ -768,7 +768,10 @@ start() {
 
     if [ -n "${memory_transfer_dir}" ]; then
         memory_transfer_volume=(--volume "${memory_transfer_dir}:/memory-transfer")
-        memory_transfer_env=(-e MEMORY_TRANSFER_MOUNTED=1)
+        memory_transfer_env=(
+            -e MEMORY_TRANSFER_MOUNTED=1
+            -e MEMORY_TRANSFER_DIR=/memory-transfer
+        )
     fi
 
     if [[ "${memory_export_enabled}" == "1" ]]; then

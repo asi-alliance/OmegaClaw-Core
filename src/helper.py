@@ -9,10 +9,10 @@ from tempfile import TemporaryDirectory
 
 try:
     from src.logger import get_logger
-    from src.memory_layout import history_path
+    from src.memory_gateway import history_path
 except ModuleNotFoundError:  # running this file directly as a script
     from logger import get_logger
-    from memory_layout import history_path
+    from memory_gateway import history_path
 
 logger = get_logger(__name__)
 
