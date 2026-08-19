@@ -245,12 +245,17 @@ class _TelegramChannel:
             return None
     
     def _is_admin_dm(self, message: types.Message) -> bool:
-
-        return (
+        """Whether this is an admin's direct message. Admin commands are the most
+        destructive thing the channel exposes, so they clear the same auth
+        handshake as ordinary traffic when the host has it enabled — otherwise
+        /kill and /purge would be the only paths that skip it."""
+        if not (
             message.chat.type == "private"
             and message.from_user is not None
             and message.from_user.id in self.admin_ids
-        )
+        ):
+            return False
+        return self._passes_auth_handshake(message)
     
     def _is_chat_authorized(self, message: types.Message, user_id_override: int = None) -> bool:
         """Check if the chat and user are authorized to interact with the bot.
@@ -318,6 +323,8 @@ class _TelegramChannel:
 
     async def _about_cmd(self, message: types.Message):
         """Handle /about command."""
+        if not self._is_chat_authorized(message):
+            return
 
         await message.answer(self.about_msg)
 
@@ -697,6 +704,9 @@ class _TelegramChannel:
             self._message_queue.append((chat_id, display_text, message.message_id, {"media": None, "context": transcript}))
 
     async def _on_media_rejected(self, message: types.Message):
+        if self._is_paused(message.chat.id):
+            return
+
         if not self._is_chat_authorized(message):
             return
 

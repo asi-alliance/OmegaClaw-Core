@@ -344,6 +344,43 @@ def test_admin_command_refuses_non_admin_allows_admin():
         del sys.modules["rag"]
 
 
+def test_destructive_admin_commands_clear_the_auth_handshake():
+    """/kill, /purge and /togglesearch gate on _is_admin_dm alone. With core's
+    auth enabled an admin who has not bound themselves must not reach them —
+    otherwise the most destructive commands are the only ones skipping auth."""
+    ch = _new_channel(admin_ids=(42,))
+    states = {"result": "ignore"}
+    restore = _stub([
+        (tm.auth, "is_auth_enabled", lambda: True),
+        (tm.auth, "authenticate_channel_user",
+         lambda channel, user_id, candidate=None: states["result"]),
+    ])
+    try:
+        admin = _fake_message(chat_type="private", user_id=42, text="/purge")
+        assert ch._is_admin_dm(admin) is False, "unbound admin must be refused"
+
+        states["result"] = "allow"
+        assert ch._is_admin_dm(admin) is True, "a bound admin must get through"
+    finally:
+        restore()
+
+
+def test_about_respects_the_allowed_chat_list():
+    """/about answered in any chat regardless of restrict_to_config_chat, which
+    is exactly what that setting exists to prevent."""
+    ch = _new_channel()
+    ch.restrict_to_config_chat = True
+    ch.allowed_chat_ids = {"-1001234567890"}
+
+    outside = _fake_message(chat_type="group", chat_id=-1009999999999, user_id=7)
+    asyncio.run(ch._about_cmd(outside))
+    assert not outside._answers, "must not answer in a chat outside allowed_chats"
+
+    inside = _fake_message(chat_type="group", chat_id=-1001234567890, user_id=7)
+    asyncio.run(ch._about_cmd(inside))
+    assert inside._answers, "must answer in an allowed chat"
+
+
 def test_pause_actually_gates_the_chat_it_names():
     """/pause is an admin safety control. Chat ids arrive as ints from aiogram
     and as strings from the command and the config, so a pause recorded in one
@@ -605,6 +642,8 @@ if __name__ == "__main__":
     test_send_photo_dispatches_expected_aiogram_call()
     test_admin_command_refuses_non_admin_allows_admin()
     test_pause_actually_gates_the_chat_it_names()
+    test_destructive_admin_commands_clear_the_auth_handshake()
+    test_about_respects_the_allowed_chat_list()
     test_group_message_requires_tag_or_reply()
     test_dm_authorization_gates_non_admin_allows_admin()
     test_plugin_registration_exposes_comm_channel()
