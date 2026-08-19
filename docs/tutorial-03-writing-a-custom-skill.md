@@ -68,4 +68,3 @@ The LLM should emit `(word-count "the quick brown fox")` and respond with `4`.
 
 - [reference-internals-skill-dispatch.md](./reference-internals-skill-dispatch.md) — how dispatch works.
 - [reference-internals-extension-points.md](./reference-internals-extension-points.md) — other places to hook in.
-- [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md) — delegate skills to a remote agent instead of running them locally.

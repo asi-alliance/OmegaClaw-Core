@@ -120,7 +120,6 @@ lib_omegaclaw.metta       loads all submodules
 ├── src/utils.metta       utility, string ops, time
 ├── src/config.metta      configure
 ├── src/helper.py         parenthesis balancing, normalization
-├── src/agentverse.py     remote-agent bridge
 ├── src/skills.pl         Prolog helpers (shell, first_char)
 ├── src/websearch.py      web search
 ├── lib_nal.metta         NAL truth functions
@@ -325,12 +324,6 @@ An inference rule that merges independent evidence about the same statement. Inc
 ### GIGO amplification
 
 The failure mode where a flawed premise is run through the formal engine and emerges with a mathematically-authoritative-looking conclusion. Why the mitigations matter. See [reference-failure-modes.md](./reference-failure-modes.md).
-
-### Agentverse-backed skill
-
-A skill whose implementation is a remote agent reached through the Agentverse bridge rather than a local function. See [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
-
----
 
 ## Design goals and honest limits
 

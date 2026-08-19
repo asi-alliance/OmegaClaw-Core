@@ -82,5 +82,4 @@ A string of search results suitable for feeding back into the prompt.
 ```
 
 ### Notes / Limits
-- For research-oriented search through an Agentverse agent, see `tavily-search` in [reference-skills-remote-agents.md](./reference-skills-remote-agents.md).
 - Result format depends on the backend used by `websearch.search`.

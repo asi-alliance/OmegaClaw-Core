@@ -9,7 +9,7 @@ from helpers import (
     wait_for_skill_call, wait_for_history_keyword, find_skill_calls,
 )
 
-SEARCH_SKILLS = ("search", "tavily-search")
+SEARCH_SKILLS = ("websearch",)
 
 
 def test_search_basic():
@@ -25,13 +25,13 @@ def test_search_basic():
             c.fail("irc", "could not deliver prompt within 60s")
         c.ok("irc", f"run-id={c.run_id}")
 
-        c.step("verify agent invoked a search skill (search or tavily-search)")
+        c.step("verify agent invoked the search skill")
         skill, arg = wait_for_any_skill_call(
             c.run_id, SEARCH_SKILLS, timeout=60, arg_substr="singularity",
         )
         if arg is None:
             seen = {s: find_skill_calls(c.run_id, s) or [] for s in SEARCH_SKILLS}
-            c.fail("search invoked", f"no search/tavily with 'singularity' arg. Got: {seen}")
+            c.fail("search invoked", f"no search with 'singularity' arg. Got: {seen}")
         c.ok(f"{skill} invoked", f"arg={arg!r}")
 
         c.step("verify (send ...) skill contains SingularityNet keywords")

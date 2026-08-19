@@ -1,0 +1,34 @@
+name: Plugin addition request
+description: Request to add a plugin to the Wiki list
+labels: ["Plugin"]
+body:
+
+# --- Plugin Naming ---
+- type: textarea
+  id: plugin-name
+  attributes:
+    label: Plugin Naming
+    description: Share the plugin name here
+    placeholder: "Provide a name for the plugin..."
+  validations:
+    required: true
+
+# --- Plugin URL ---
+- type: input
+  id: plugin-url
+  attributes:
+    label: Plugin URL
+    description: Please provide a link to your repository where the plugin code is stored
+    placeholder: "Just include the link without any comments..."
+  validations:
+    required: true
+
+# --- Plugin Describtion ---
+- type: textarea
+  id: plugin-describtion
+  attributes:
+    label: Plugin Describtion
+    description: Share the plugin describtion here. Was it created for this purpose? What problem does it solve? What benefits will it bring?
+    placeholder: "Provide a describtion for the plugin..."
+  validations:
+    required: true

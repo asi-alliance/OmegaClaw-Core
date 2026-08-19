@@ -48,7 +48,6 @@ Step 3: atomize with source-anchored confidence
 2. Fetch from a verified source.
    (websearch "netflix 10-K content spend")
    (shell "curl ... SEC EDGAR ...")
-   (tavily-search "netflix content spend 2024 10-K")
 
 3. Atomize with source-quality confidence.
    Primary source (SEC, peer-reviewed):    c = 0.9
@@ -73,7 +72,7 @@ add it to memory with provenance before we reason about it
 
 The agent should, across a few cycles:
 
-1. `(search "Netflix 2024 10-K content spend SEC EDGAR")` or `(tavily-search ...)`.
+1. `(websearch "Netflix 2024 10-K content spend SEC EDGAR")`.
 2. Optionally `(shell "curl -s <filing url> | grep -A2 'content spend'")` to get raw text.
 3. `(remember "SEC 10-K FY2024: netflix content spend $17B (c=0.9)")`.
 4. Pin the verified figure for downstream use.

@@ -22,8 +22,6 @@
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
     "- Search the web: websearch string"
-    "- Search the web using the Tavily Search Agent: tavily-search string"
-    "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
     "- To get the OmegaClaw version number: version"
     ;CODE EXECUTION:
     "- Execute MeTTa expression: metta sexpression"
@@ -136,12 +134,6 @@
           (translatePredicate (nl $Out)),
           (translatePredicate (close $Out))
           APPEND-FILE-SUCCESS))
-
-(= (tavily-search $query)
-   (py-call (agentverse.tavily_search $query)))
-
-(= (technical-analysis $ticker)
-   (py-call (agentverse.technical_analysis $ticker)))
 
 (= (websearch $msg)
    (py-call (websearch.search $msg)))

@@ -122,12 +122,6 @@ asione_model: "asi1-ultra"
 
 # Skills
 
-# agentverse
-# AgentVerse address of the Technical analysis agent
-TECHNICAL_ANALYSIS_AGENT_ADDRESS: "agent1q085746wlr3u2uh4fmwqplude8e0w6fhrmqgsnlp49weawef3ahlutypvu6"
-# AgentVerse address of the Tavily search agent
-TAVILY_SEARCH_AGENT_ADDRESS: "agent1qt5uffgp0l3h9mqed8zh8vy5vs374jl2f8y0mjjvqm44axqseejqzmzx9v8"
-
 # Plugins
 
 # Workflow

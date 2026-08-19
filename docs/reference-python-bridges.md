@@ -73,17 +73,6 @@ LLM and embedding bridges.
 
 OpenAI calls go through MeTTa-side helpers (`useGPT`, `useGPTEmbedding`) that are defined elsewhere in the library but use the same LLM call pattern.
 
-## `src/agentverse.py`
-
-Remote agent bridge.
-
-| Function | Purpose |
-|---|---|
-| `tavily_search(query)` | Forward a query to the remote Tavily search agent. |
-| `technical_analysis(ticker)` | Forward a ticker to the remote technical analysis agent. |
-
-Both use a fixed Agentverse address and return the remote agent's reply as a string. Add your own function following the same pattern — see [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
-
 ## `src/helper.py`
 
 String and time utilities used by the loop.

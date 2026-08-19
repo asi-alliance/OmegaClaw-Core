@@ -361,7 +361,7 @@ def _poll_channel(channel_id):
         state = _is_allowed_message(channel_id, user_id, text)
         display_name = _get_display_name(user_id)
         if state == "allow":
-            _set_last(f"{display_name}: {text}")
+            _set_last(f"<@{user_id}> ({display_name}): {text}")
         elif state == "auth_bound":
             send_message(f"Authentication successful for {display_name}.")
 

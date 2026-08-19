@@ -271,30 +271,16 @@ Asks about a gibberish string.
 - Mock answer: `(send "No results found for <gibberish>. The string appears to be gibberish, no meaningful matches.")`.
 - Checks: the reply contains a negation phrase (`no results`, `not found`, `gibberish`, `nonsense`, `no meaning`, `unknown`, ...).
 
-### 13. test_tavily_search_slack_mock.py
-
-Live variant exercises the external Tavily uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the answer directly via `(send ...)` and the assertion narrows to "did the agent surface a real Fetch.ai-specific reply".
-
-- Mock answer: `(send "Fetch.ai (FET) is a decentralized AI blockchain platform powering autonomous economic agents (uAgents). Recent news covers the ASI Alliance roadmap, FET token activity, and integration work with SingularityNET and CUDOS.")`. The `tavily-search` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body contains at least one strict Fetch keyword (`fetch.ai`, `fetch ai`, `fet `, `asi alliance`, `humayun`, `uagent`, `decentralized`, `blockchain`, `token`) AND none of the delivery-error markers (`delivery failed`, `tavily-search failed`, `currently unavailable`, ...).
-
-### 14. test_technical_analysis_slack_mock.py
-
-Live variant exercises the external technical-analysis uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the TA summary directly via `(send ...)` and the assertion narrows to "did the agent surface TA-style content for the requested ticker".
-
-- Mock answer: `(send "AAPL (Apple) is showing bullish momentum: RSI is rising, MACD crossed above its signal line, and the 50-day SMA is above the 200-day. Composite indicators point to a buy signal with strong trend strength.")`. The `technical-analysis` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body mentions the ticker (`aapl` or `apple`) AND at least one TA indicator (`rsi`, `macd`, `sma`, `bullish`, `bearish`, `buy signal`, `trend`, `momentum`, ...) AND none of the delivery-error markers.
-
 ## Memory
 
-### 15. test_memory_chromadb_slack_mock.py
+### 13. test_memory_chromadb_slack_mock.py
 
 Requests the agent to remember a fact tagged with marker `CI-SMOKE-<run_id>`.
 
 - Mock answer: `(remember "Unique smoke marker CI-SMOKE-<run_id> was emitted by CI.")`.
 - Checks: `(remember ...)` was invoked with the marker; vector count in the `embeddings` table of `chroma.sqlite3` grew by ≥ 1.
 
-### 16. test_memory_history_slack_mock.py
+### 14. test_memory_history_slack_mock.py
 
 Sends "Acknowledge with one short line that you received marker `<run_id>`." and verifies the entry in `history.metta`.
 
@@ -303,14 +289,14 @@ Sends "Acknowledge with one short line that you received marker `<run_id>`." and
 
 ## Skills
 
-### 17. test_skill_metta_slack_mock.py
+### 15. test_skill_metta_slack_mock.py
 
 Asks the agent to evaluate a short MeTTa expression and report the result.
 
 - Mock answer: `(metta "(+ 2 2)") (send "The metta skill evaluated (+ 2 2) and returned 4.")`.
 - Checks: `(metta ...)` was invoked; the agent then issued a `(send ...)`. Semantic correctness of the MeTTa expression is not checked; the goal is to exercise the skill.
 
-### 18. test_skill_pin_slack_mock.py
+### 16. test_skill_pin_slack_mock.py
 
 Gives a multi-step task ("restarting servers alpha → beta → gamma, just finished alpha") and expects the agent to track progress with `pin`.
 
@@ -319,21 +305,21 @@ Gives a multi-step task ("restarting servers alpha → beta → gamma, just fini
 
 ## Working with git
 
-### 19. test_git_pull_public_slack_mock.py
+### 17. test_git_pull_public_slack_mock.py
 
 Agent clones a public repository over anonymous HTTPS, no token.
 
 - Mock answer: `(shell "rm -rf {TARGET_DIR} && git clone {remote} {TARGET_DIR}")`.
 - Checks: `.git/` appears, HEAD points to a real commit, ≥ 1 tracked file in HEAD, origin matches the expected remote URL (normalized, trailing `/` and `.git` ignored).
 
-### 20. test_git_local_commit_slack_mock.py
+### 18. test_git_local_commit_slack_mock.py
 
 Agent runs `git init`, `git add`, `git commit` locally inside the container.
 
 - Mock answer: chain of `(shell "git -C {TARGET_DIR} init") (shell "...write file...") (shell "git -C {TARGET_DIR} add -A") (shell "git -C {TARGET_DIR} commit -m 'add hello <run_id>'")`.
 - Checks: HEAD has at least one commit, commit subject contains the `run_id` (warning, not failure), the file is present in the tree.
 
-### 21. test_git_push_to_remote_slack_mock.py
+### 19. test_git_push_to_remote_slack_mock.py
 
 Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and pushes.
 
@@ -343,14 +329,14 @@ Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and p
 
 ## Multi-skill tests
 
-### 22. test_run_create_dirs_slack_mock.py
+### 20. test_run_create_dirs_slack_mock.py
 
 Agent writes `mkdirs.sh` and runs it. The script must create `test1`, `test2`, `test3` inside `/tmp/test_dirs/`.
 
 - Mock answer: `(write-file "{SCRIPT_PATH}" "#!/bin/bash\nmkdir -p .../test1 .../test2 .../test3\n") (shell "chmod +x {SCRIPT_PATH}") (shell "{SCRIPT_PATH}")`.
 - Checks: all three directories exist with fresh mtimes; agent invoked `(write-file ...)` referencing `mkdirs.sh`; agent invoked `(shell ...)` to run the script. Diagnostics print `wf=<count>, sh=<count>, perms=<...>` to make stalls obvious.
 
-### 23. test_memory_episode_slack_mock.py
+### 21. test_memory_episode_slack_mock.py
 
 Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, waits 5 seconds, then asks to recall when this happened.
 
@@ -358,7 +344,7 @@ Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, wai
 - Turn 2 mock answer: `(query "Barney tooth") (send "Barney the dog lost his first baby tooth on <YYYY-MM-DD>. The milestone is recorded in my notes.")`.
 - Checks (turn 1): `(remember ...)` was invoked whose argument contains `tooth` or `Barney`. Checks (turn 2): `(query ...)` or `(episodes ...)` was invoked; the reply contains at least one of `dog` / `tooth` / `lost`; the reply contains the captured seed date in `YYYY-MM-DD` format.
 
-### 24. test_skill_query_slack_mock.py
+### 22. test_skill_query_slack_mock.py
 
 Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for embeddings to settle, then ask the agent to recall it via `query` (embedding lookup, not timestamp lookup).
 
@@ -366,7 +352,7 @@ Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for 
 - Turn 2 mock answer: `(query "favorite color") (send "Your favorite color is azure-<run_id>.")`.
 - Checks (turn 1): `(remember ...)` carried the secret color. Checks (turn 2): `(query ...)` was invoked; the reply mentions the secret color verbatim.
 
-### 25. test_skill_episodes_slack_mock.py
+### 23. test_skill_episodes_slack_mock.py
 
 Two-turn flow: send a message tagged with a unique keyword (no `remember`), capture the timestamp, then ask the agent to use `episodes` (timestamp lookup, not `query`) to recall what was discussed at that earlier time.
 
@@ -374,7 +360,7 @@ Two-turn flow: send a message tagged with a unique keyword (no `remember`), capt
 - Turn 2 mock answer: `(episodes "<seed_ts>") (send "The unique keyword was <marker>.")`.
 - Checks (turn 1): the turn is recorded in `history.metta` with a timestamp. Checks (turn 2): `(episodes ...)` was invoked for the seed timestamp; the reply mentions the original marker.
 
-### 26. test_complex_weather_flow_slack_mock.py
+### 24. test_complex_weather_flow_slack_mock.py
 
 Four-step pipeline: search NY weather → write `w.txt` with the forecast → write `p.sh` extracting the first Celsius number into `t.txt` → run `p.sh`. Because the mock controls only the LLM dispatch (the network-bound `search` skill is not exercised), the mocked response provides the forecast text directly.
 

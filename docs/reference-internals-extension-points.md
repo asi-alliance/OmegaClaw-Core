@@ -11,17 +11,6 @@ Most common extension. Two edits:
 
 Full walkthrough: [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md).
 
-## Add a remote skill
-
-Same as above, but the body delegates to `src/agentverse.py`:
-
-```metta
-(= (my-remote-skill $arg)
-   (py-call (agentverse.my_remote_skill $arg)))
-```
-
-Full walkthrough: [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
-
 ## Add a channel
 
 Three touch points:

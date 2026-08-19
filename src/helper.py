@@ -26,8 +26,6 @@ STATIC_LLM_COMMANDS = {
     "search",
     "send",
     "shell",
-    "tavily-search",
-    "technical-analysis",
     "version",
     "websearch",
     "write-file",
