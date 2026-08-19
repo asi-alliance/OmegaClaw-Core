@@ -5,35 +5,57 @@ import os
 import sys
 import openai
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "python"))
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]                                            # .../OmegaClaw-Core
+_PETTA_PATH = Path(os.environ.get("PETTA_PATH", str(Path(__file__).resolve().parents[3])))  # .../PeTTa
+sys.path.insert(0, str(_PETTA_PATH / "python"))
+sys.path.insert(0, str(_REPO_ROOT))  # so "from src.logger import ..." etc. resolve
 import petta
 import time
 
 # --------------------------------------------------------------------
 # 0. Configuration:
 # --------------------------------------------------------------------
+MAX_TOOL_CALLS = 10
 PRINT_CALLS = False
-MAX_TOOL_OUTPUT_CHARS = 10000
+MAX_TOOL_OUTPUT_CHARS = 5000
 EPISODIC_TRACE_SIZE = 100
 MAX_FAST_STEPS = 50
-SLOW_STEP_DELAY = 60
+SLOW_STEP_DELAY = 10
 ERROR_RECOVERY_TIME = 1 #after how long to retry when exception occurs
-RETURN_VALUE_PRESERVE = 50
+RETURN_VALUE_PRESERVE = 0
 DEFAULT_DELAY = 0 #default delay added irregard of whether in slow mode
 MAX_TOKENS = 1000
 INIT_WAIT = 10
 MODEL = os.getenv("LLM_MODEL", "ggml-org/gemma-4-26B-A4B-it-GGUF:Q4_0")
 BASE_URL = os.getenv("BASE_URL", "http://192.168.64.1:2277/v1")
 API_KEY = os.getenv("AI_API_KEY", "dummy")
-PROMPT = open("./repos/OmegaClaw-Core/memory/prompt.txt").read().strip()
+PROMPT = open(str(_REPO_ROOT / "memory" / "prompt.txt")).read().strip()
 
 # --------------------------------------------------------------------
 # 1. MeTTa init:
 # --------------------------------------------------------------------
+# chdir to _PETTA_PATH so relative paths used by git-import! and library
+# resolution (./repos/OmegaClaw-Core etc.) resolve the same as running from ~/PeTTa.
+os.chdir(str(_PETTA_PATH))
 MeTTa = petta.PeTTa()
-MeTTa.load_metta_file("load.metta")
+# load_metta_file sets the MeTTa working_dir to the file's directory, which is
+# required for (library OmegaClaw-Core ...) to resolve repos/OmegaClaw-Core.
+# process_metta_string does not set working_dir, so we write a temp load file
+# in _PETTA_PATH and load_metta_file it instead.
+# git-import! asserts library_path/1 so (library OmegaClaw-Core ...) can resolve.
+_load_path = _PETTA_PATH / "_omegaclaw_load.metta"
+_load_path.write_text(
+    "!(import! &self (library lib_import))\n"
+    '!(git-import! "https://github.com/asi-alliance/OmegaClaw-Core.git")\n'
+    "!(import! &self (library OmegaClaw-Core lib_omegaclaw))\n"
+)
+MeTTa.load_metta_file(str(_load_path))
+_load_path.unlink(missing_ok=True)
+print(MeTTa.process_metta_string("!(initConfig)"))
 print(MeTTa.process_metta_string("!(initLoop)"))
 print(MeTTa.process_metta_string("!(initMemory)"))
+print(MeTTa.process_metta_string("!(initPlugins)"))
 print(MeTTa.process_metta_string("!(initChannels)"))
 
 # --------------------------------------------------------------------
@@ -67,7 +89,7 @@ def metta(sexpression):
     return ret
 
 def append_episode(content):
-    with open("./repos/OmegaClaw-Core/memory/history.metta", "a") as file:
+    with open(str(_REPO_ROOT / "memory" / "history.metta"), "a") as file:
         file.write("(\"" + get_current_time() + "\" " + content + ")\n")
 
 def slow_wait_for_input():
@@ -142,6 +164,7 @@ while True:
             response = client.chat.completions.create(model=MODEL, messages=selfprompt + recent_messages + temporary_message, tools=TOOLS, tool_choice="required", max_tokens=MAX_TOKENS)
             message = response.choices[0].message
             if message.tool_calls:
+                message.tool_calls = message.tool_calls[:MAX_TOOL_CALLS]
                 break
             temporary_message += [{"role": "user", "content": "Your previous response was invalid. Do not answer in plain text. Call at least one tool now."}]
         print(f"RESPONSE {response}\nFINISH_REASON {response.choices[0].finish_reason}\nUSAGE {response.usage}")
