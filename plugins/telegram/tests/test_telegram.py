@@ -307,22 +307,26 @@ def test_send_photo_dispatches_expected_aiogram_call():
 
 def test_admin_command_refuses_non_admin_allows_admin():
     """_purge_cmd (admin-only, private-DM-only) must refuse a non-admin and
-    take no destructive effect, and must proceed for an admin."""
+    take no destructive effect, and must proceed for an admin. The purge must go
+    through core's rag module: it owns the database location and caches the
+    collection handle, so purging around it targets the wrong directory and
+    leaves the agent holding a deleted collection."""
     ch = _new_channel(admin_ids=(42,))
     calls = {"deleted": False}
 
-    class FakeChromaClient:
-        def __init__(self, path=None):
-            pass
-
+    class FakeRagClient:
         def delete_collection(self, name):
+            assert name == "memories", name
             calls["deleted"] = True
 
-        def get_or_create_collection(self, name=None):
-            return SimpleNamespace()
-
-    fake_chromadb = SimpleNamespace(PersistentClient=FakeChromaClient)
-    sys.modules["chromadb"] = fake_chromadb
+    fake_rag = SimpleNamespace(
+        DB_PATH="/somewhere/else/chroma_db",
+        COLLECTION_NAME="memories",
+        _client=FakeRagClient(),
+        _collection=object(),
+        _get_collection=lambda: None,
+    )
+    sys.modules["rag"] = fake_rag
     try:
         non_admin = _fake_message(chat_type="private", user_id=999)
         assert ch._is_admin_dm(non_admin) is False
@@ -335,8 +339,40 @@ def test_admin_command_refuses_non_admin_allows_admin():
         assert ch._is_admin_dm(admin) is True
         asyncio.run(ch._purge_cmd(admin))
         assert calls["deleted"] is True, "admin command must proceed"
+        assert fake_rag._collection is None, "rag's cached handle must be dropped"
     finally:
-        del sys.modules["chromadb"]
+        del sys.modules["rag"]
+
+
+def test_pause_actually_gates_the_chat_it_names():
+    """/pause is an admin safety control. Chat ids arrive as ints from aiogram
+    and as strings from the command and the config, so a pause recorded in one
+    form must still be seen in the other."""
+    ch = _new_channel(admin_ids=(42,))
+    ch.allowed_chat_ids = {"-1001234567890"}
+    ch.allowed_chat_id = "-1001234567890"
+
+    admin_dm = _fake_message(chat_type="private", user_id=42,
+                              text="/pause -1001234567890")
+    asyncio.run(ch._pause_cmd(admin_dm))
+    assert ch._paused_chats, "the chat must be recorded as paused"
+    assert ch._is_paused(-1001234567890), "the int form aiogram delivers must match"
+
+    async def not_blocked(text):
+        return False
+    restore = _stub([(tm, "is_category_blocked", not_blocked)])
+    try:
+        ch.bot_username = "mybot"
+        ch.bot_id = 555
+        paused = _fake_message(chat_type="group", chat_id=-1001234567890,
+                               user_id=1001, text="@mybot hello")
+        asyncio.run(ch._on_message(paused))
+        assert len(ch._message_queue) == 0, "a paused chat must not reach the queue"
+    finally:
+        restore()
+
+    asyncio.run(ch._pause_cmd(admin_dm))
+    assert not ch._paused_chats, "a second /pause must unpause"
 
 
 def test_group_message_requires_tag_or_reply():
@@ -568,6 +604,7 @@ if __name__ == "__main__":
     test_inbound_ethics_block_prevents_queueing()
     test_send_photo_dispatches_expected_aiogram_call()
     test_admin_command_refuses_non_admin_allows_admin()
+    test_pause_actually_gates_the_chat_it_names()
     test_group_message_requires_tag_or_reply()
     test_dm_authorization_gates_non_admin_allows_admin()
     test_plugin_registration_exposes_comm_channel()

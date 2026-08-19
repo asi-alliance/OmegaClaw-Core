@@ -23,13 +23,13 @@ _DISTRIBUTION = {
 }
 
 # Imported on purpose without being declared. See requirements.txt for why.
-_ALLOWED_UNDECLARED = {"chromadb"}
+_ALLOWED_UNDECLARED = set()
 
 # Provided by core, not installable from here. Only what is actually imported:
 # if the plugin starts using another of core's modules, the test says so.
 # channels/config/plugin come from core's src/; auth and delivery_queue are
 # shared channel infrastructure that lives in core's channels/ folder.
-_CORE_MODULES = {"channels", "config", "plugin", "auth", "delivery_queue"}
+_CORE_MODULES = {"channels", "config", "plugin", "auth", "delivery_queue", "rag"}
 
 
 def _plugin_modules():

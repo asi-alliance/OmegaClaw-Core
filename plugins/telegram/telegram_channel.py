@@ -135,6 +135,13 @@ class _TelegramChannel:
                 normalized.add(value)
         return normalized
 
+    def _is_paused(self, chat_id):
+        """Whether a chat is currently paused. Chat ids reach this class as ints
+        from aiogram and as strings from /pause and the config file, so both
+        sides go through the same normalizer — comparing the two forms directly
+        never matches, which made /pause report success and do nothing."""
+        return self._normalize_chat_id(chat_id) in self._paused_chats
+
     def _is_allowed_chat(self, chat_id):
         if not self.restrict_to_config_chat:
             return True
@@ -343,7 +350,11 @@ class _TelegramChannel:
         args = message.text.split()
         if len(args) > 1:
             target_chat = args[1]
-            
+
+        target_chat = self._normalize_chat_id(target_chat)
+        if target_chat is None:
+            return await message.answer("❌ Could not work out which chat to pause.")
+
         if target_chat in self._paused_chats:
             self._paused_chats.remove(target_chat)
             await message.answer(f"▶️ Chat {target_chat} unpaused.")
@@ -366,10 +377,7 @@ class _TelegramChannel:
             return await message.answer("❌ Admin commands only work in direct messages.")
 
         try:
-            import chromadb
-            client = chromadb.PersistentClient(path="./chroma_db")
-            client.delete_collection("memories")
-            client.get_or_create_collection(name="memories")
+            _purge_long_term_memory()
             await message.answer("🗑️ Long-term memory purged successfully.")
         except Exception as e:
             await message.answer(f"❌ Failed to purge memory: {e}")
@@ -410,7 +418,7 @@ class _TelegramChannel:
         if message.text is None:
             return
         
-        if message.chat.id in self._paused_chats:
+        if self._is_paused(message.chat.id):
             return
 
         if not self._is_chat_authorized(message):
@@ -524,7 +532,7 @@ class _TelegramChannel:
 
     async def _on_photo(self, message: types.Message):
         """Handle photo messages."""
-        if message.chat.id in self._paused_chats:
+        if self._is_paused(message.chat.id):
             return
         if not self._is_chat_authorized(message):
             return
@@ -574,7 +582,7 @@ class _TelegramChannel:
 
     async def _on_document(self, message: types.Message):
         """Handle document (file) messages — PDF only."""
-        if message.chat.id in self._paused_chats:
+        if self._is_paused(message.chat.id):
             return
         if not self._is_chat_authorized(message):
             return
@@ -634,7 +642,7 @@ class _TelegramChannel:
 
     async def _on_audio(self, message: types.Message):
         """Handle voice notes and audio files — transcribe to text via Whisper."""
-        if message.chat.id in self._paused_chats:
+        if self._is_paused(message.chat.id):
             return
         if not self._is_chat_authorized(message):
             return
@@ -929,6 +937,24 @@ class _TelegramChannel:
                 raise
 
 _channel = _TelegramChannel()
+
+def _purge_long_term_memory():
+    """Drop and recreate the agent's long-term memory collection.
+
+    Goes through core's rag module rather than opening Chroma directly. rag owns
+    where the database lives — CHROMA_DB_PATH overrides it — so a hardcoded
+    relative path purges a different directory and still reports success. rag
+    also caches its collection handle, so the cache is dropped here; purging
+    behind its back leaves the agent querying a deleted collection until restart.
+    """
+    import rag
+
+    rag._get_collection()
+    rag._client.delete_collection(rag.COLLECTION_NAME)
+    rag._collection = None
+    rag._get_collection()
+    logging.info(f"Purged long-term memory collection at {rag.DB_PATH}")
+
 
 def _is_auth_command(msg):
     lower = msg.strip().lower()
