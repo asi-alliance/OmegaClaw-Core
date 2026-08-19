@@ -1,0 +1,19 @@
+# omegaclaw-telegram plugin dependencies.
+#
+# Everything the plugin imports is listed, including openai, PyYAML and requests,
+# which a core image already provides. Leaving those out made the plugin
+# installable only inside a core image, and the gap was invisible: the test
+# suites stub image generation, so a clean install passed every test and then
+# generate-image failed at runtime with "No module named 'requests'".
+#
+# One deliberate exception, enforced by tests/test_requirements.py: chromadb.
+# The /purge admin command opens core's own ./chroma_db, so it only means
+# anything inside a core install, which declares chromadb itself. Adding it here
+# would pull a heavy dependency for a command that cannot work standalone.
+Pillow>=10.0.0
+pypdf>=4.0.0
+aiogram>=3.0.0
+telegramify-markdown>=0.1.0
+openai>=1.0.0
+PyYAML>=6.0
+requests>=2.31.0
