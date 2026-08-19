@@ -1,14 +1,33 @@
 """Shared authenticated /memory-export command handling."""
 
+import os
 import secrets
 import threading
 import time
+from pathlib import Path
 
 import auth
+from config import config_get_by_key
 from src.logger import get_logger
-from src.memory_transfer import get_export_status, is_export_enabled, start_export_job
+from memory_portability import MemoryTransfer
 
 logger = get_logger(__name__)
+
+_TRANSFER_DIR = Path(os.environ.get("MEMORY_TRANSFER_DIR", "/memory-transfer"))
+
+_transfer = None
+
+def _get_transfer() -> MemoryTransfer:
+    global _transfer
+    if _transfer is None:
+        _transfer = MemoryTransfer(_TRANSFER_DIR)
+    return _transfer
+
+def start_export_job(component, on_complete=None):
+    return _get_transfer().start_export_job(component, on_complete=on_complete)
+
+def get_export_status(job_id):
+    return _get_transfer().get_export_status(job_id)
 
 _TOKEN_TTL_SECONDS = 60
 
@@ -18,8 +37,15 @@ _job_owners: dict[str, str] = {}
 
 _VALID_COMPONENTS = ("history", "ltm", "both")
 
+def is_export_enabled() -> bool:
+    value = os.environ.get("OMEGACLAW_memoryExportEnabled")
+    if value is None:
+        value = config_get_by_key("memoryExportEnabled", False)
+    return value is True or (
+        isinstance(value, str) and value.strip().lower() == "true"
+    )
+
 def is_export_command(text: str) -> bool:
-    """Return whether text is reserved for the memory-export control plane."""
     command = text.strip().split(None, 1)
     if not command:
         return False
@@ -27,12 +53,10 @@ def is_export_command(text: str) -> bool:
     return name == "/memory-export" or name.startswith("/memory-export@")
 
 def _command_arguments(text: str) -> str:
-    """Return arguments after the plain or Telegram-qualified command name."""
     parts = text.strip().split(None, 1)
     return parts[1].strip() if len(parts) == 2 else ""
 
 def _issue_token(owner_key: str, component: str) -> str:
-    """Generate and store an owner-scoped confirmation token."""
     token = secrets.token_hex(8)
     _pending_requests[owner_key] = (
         token,
@@ -46,15 +70,6 @@ def handle_export_command(
     owner_key: str = "default-owner",
     deliver_completion=lambda _message: None,
 ) -> str | None:
-    """
-    Parse and handle a /memory-export command from the authenticated owner.
-
-    Returns a reply string to send back to the owner, or None when policy
-    disables export. Callers must use is_export_command() to consume all
-    reserved control commands before they can reach the LLM.
-
-    text: the raw message text, e.g. "/memory-export history"
-    """
     stripped = text.strip()
 
     if not is_export_command(stripped):
@@ -89,7 +104,7 @@ def handle_export_command(
 def _handle_request(owner_key: str, component: str) -> str:
     with _token_lock:
         token = _issue_token(owner_key, component)
-    logger.info(f"memory_export_handler: issued confirmation token for component={component}")
+    logger.info(f"memory_export: issued confirmation token for component={component}")
     return (
         f"Export requested for: {component}\n"
         f"Confirm within {_TOKEN_TTL_SECONDS}s:\n"
@@ -120,10 +135,10 @@ def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
             ),
         )
     except Exception as exc:
-        logger.exception(f"memory_export_handler: failed to start export job: {exc}")
+        logger.exception(f"memory_export: failed to start export job: {exc}")
         return f"Export failed to start: {exc}"
 
-    logger.info(f"memory_export_handler: export job {job_id} started (component={component})")
+    logger.info(f"memory_export: export job {job_id} started (component={component})")
     with _token_lock:
         _job_owners[job_id] = owner_key
     return (

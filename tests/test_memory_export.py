@@ -8,27 +8,28 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-
 @pytest.fixture
 def handler(monkeypatch):
     auth = types.ModuleType("auth")
     auth.is_auth_enabled = lambda: True
     monkeypatch.setitem(sys.modules, "auth", auth)
-    logger = types.ModuleType("src.logger")
-    logger.get_logger = lambda name: __import__("logging").getLogger(name)
-    monkeypatch.setitem(sys.modules, "src.logger", logger)
-    transfer = types.ModuleType("src.memory_transfer")
-    transfer.is_export_enabled = lambda: True
-    transfer.start_export_job = lambda component, on_complete=None: "job-1"
-    transfer.get_export_status = lambda job_id: {"status": "unknown"}
-    monkeypatch.setitem(sys.modules, "src.memory_transfer", transfer)
+
+    logger_mod = types.ModuleType("src.logger")
+    logger_mod.get_logger = lambda name: __import__("logging").getLogger(name)
+    monkeypatch.setitem(sys.modules, "src.logger", logger_mod)
+
+    mp_mod = types.ModuleType("memory_portability")
+    mp_mod.MemoryTransfer = object
+    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
+
     spec = importlib.util.spec_from_file_location(
-        "memory_export_handler_under_test", REPO_ROOT / "channels" / "memory_export_handler.py"
+        "memory_export_under_test",
+        REPO_ROOT / "channels" / "memory_export.py",
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.is_export_enabled = lambda: True
     return module
-
 
 def test_export_command_requires_auth_and_policy(handler):
     handler.auth.is_auth_enabled = lambda: False
@@ -36,7 +37,6 @@ def test_export_command_requires_auth_and_policy(handler):
     handler.auth.is_auth_enabled = lambda: True
     handler.is_export_enabled = lambda: False
     assert handler.handle_export_command("/memory-export both") is None
-
 
 def test_confirmation_starts_only_the_requested_export(handler):
     started = []
@@ -46,7 +46,6 @@ def test_confirmation_starts_only_the_requested_export(handler):
     assert "Invalid token" in handler.handle_export_command("/memory-export confirm wrong")
     assert "job-1" in handler.handle_export_command(f"/memory-export confirm {token}")
     assert started == ["ltm"]
-
 
 def test_expired_and_other_owner_tokens_cannot_start_export(handler):
     token = handler.handle_export_command("/memory-export history", "owner-a").split()[-1]
@@ -58,7 +57,6 @@ def test_expired_and_other_owner_tokens_cannot_start_export(handler):
     assert "expired" in handler.handle_export_command(
         f"/memory-export confirm {token}", "owner-a"
     ).lower()
-
 
 def test_completion_and_status_are_limited_to_requesting_owner(handler):
     delivered = []
@@ -73,3 +71,18 @@ def test_completion_and_status_are_limited_to_requesting_owner(handler):
 
     assert "memory.tar.gz" in delivered[0]
     assert "unknown job ID" in handler.handle_export_command("/memory-export status job-1", "owner-b")
+
+def test_shared_dispatcher_consumes_control_commands(monkeypatch):
+    control = types.ModuleType("memory_export")
+    control.is_export_command = lambda text: text == "/memory-export both"
+    control.handle_export_command = lambda text, owner, deliver: "Export requested"
+    monkeypatch.setitem(sys.modules, "memory_export", control)
+
+    from src import channels
+
+    replies = []
+    assert channels.handle_control_message(
+        "/memory-export both", "telegram:chat:user", replies.append
+    )
+    assert replies == ["Export requested"]
+    assert not channels.handle_control_message("hello", "telegram:chat:user", replies.append)

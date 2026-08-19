@@ -11,7 +11,6 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
-from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -362,16 +361,9 @@ def _poll_channel(channel_id):
         state = _is_allowed_message(channel_id, user_id, text)
         display_name = _get_display_name(user_id)
         if state == "allow":
-            if is_export_command(text):
-                owner_key = f"slack:{channel_id}:{user_id}"
-                reply = handle_export_command(
-                    text,
-                    owner_key,
-                    lambda message, target=user_id: _send_export_reply(target, message),
-                )
-                if reply is not None:
-                    _send_export_reply(user_id, reply)
-            else:
+            owner_key = f"slack:{channel_id}:{user_id}"
+            deliver_reply = lambda message, target=user_id: _send_export_reply(target, message)
+            if not channels.handle_control_message(text, owner_key, deliver_reply):
                 _set_last(f"{display_name}: {text}")
         elif state == "auth_bound":
             send_message(f"Authentication successful for {display_name}.")

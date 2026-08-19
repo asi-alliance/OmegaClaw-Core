@@ -10,7 +10,6 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
-from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -182,16 +181,9 @@ def _ws_session():
                     state = _is_allowed_message(user_id, message)
                     if state == "allow":
                         name = _get_display_name(user_id)
-                        if is_export_command(message):
-                            owner_key = f"mattermost:{CHANNEL_ID}:{user_id}"
-                            reply = handle_export_command(
-                                message,
-                                owner_key,
-                                lambda text, target=user_id: _send_export_reply(target, text),
-                            )
-                            if reply is not None:
-                                _send_export_reply(user_id, reply)
-                        else:
+                        owner_key = f"mattermost:{CHANNEL_ID}:{user_id}"
+                        deliver_reply = lambda text, target=user_id: _send_export_reply(target, text)
+                        if not channels.handle_control_message(message, owner_key, deliver_reply):
                             _set_last(f"{name}: {message}")
                     elif state == "auth_bound":
                         name = _get_display_name(user_id)

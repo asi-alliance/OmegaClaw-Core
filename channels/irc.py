@@ -9,7 +9,6 @@ from src.logger import get_logger
 from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
-from memory_export_handler import handle_export_command, is_export_command
 
 logger = get_logger(__name__)
 
@@ -170,16 +169,9 @@ def _irc_session(channel, server, port, nick):
                         msg = trailing.split(" :", 1)[1]
                         state = _is_allowed_message(sender_nick, msg)
                         if state == "allow":
-                            if is_export_command(msg):
-                                owner_key = f"irc:{_normalize_nick(sender_nick)}"
-                                reply = handle_export_command(
-                                    msg,
-                                    owner_key,
-                                    lambda message, target=sender_nick: _send_export_reply(target, message),
-                                )
-                                if reply is not None:
-                                    _send_export_reply(sender_nick, reply)
-                            else:
+                            owner_key = f"irc:{_normalize_nick(sender_nick)}"
+                            deliver_reply = lambda message, target=sender_nick: _send_export_reply(target, message)
+                            if not channels.handle_control_message(msg, owner_key, deliver_reply):
                                 _set_last(f"{sender_nick}: {msg}")
                         elif state == "auth_bound":
                             send_message(f"Authentication successful for {sender_nick}.")
