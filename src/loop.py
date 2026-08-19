@@ -27,7 +27,7 @@ RETURN_VALUE_PRESERVE = 0
 DEFAULT_DELAY = 0 #default delay added irregard of whether in slow mode
 MAX_TOKENS = 1000
 INIT_WAIT = 10
-MODEL = os.getenv("LLM_MODEL", "ggml-org/gemma-4-26B-A4B-it-GGUF:Q4_0")
+MODEL = os.getenv("LLM_MODEL", "mlx-community/gemma-4-26b-a4b-it-4bit")
 BASE_URL = os.getenv("BASE_URL", "http://192.168.64.1:2277/v1")
 API_KEY = os.getenv("AI_API_KEY", "dummy")
 PROMPT = open(str(_REPO_ROOT / "memory" / "prompt.txt")).read().strip()
@@ -116,7 +116,7 @@ INOPS = { "metta": (lambda sexpression: "SUCCESS, RETURN: " + str(metta(sexpress
           "forget": (lambda timestamp_ltm: "SUCCESS, RETURN: " + run_metta("forget", timestamp_ltm), "Forget a particular LTM item via its timestamp, arg format: %Y-%m-%d %H:%M:%S"),
           "send": (lambda content: "SUCCESS, RETURN: " + run_metta("send", content), "To send a message to the user but keep yourself very brief."),
           "nop": (lambda: print("NOP") or "SUCCESS", "Perform no action if task is complete, do not re-send!"),
-          "search": (lambda content: "SUCCESS, RETURN: " + run_metta("search", content), "Search the internet for content."),
+          "websearch": (lambda content: "SUCCESS, RETURN: " + run_metta("websearch", content), "Search the internet for content."),
           "read-file": (lambda filename: "SUCCESS, RETURN: " + run_metta("read-file", filename), "Read a file."),
           "write-file": (lambda filename, content: "SUCCESS, RETURN: " + run_metta("write-file", filename, content), "Write content to a file, replacing its previous contents."),
           "append-file": (lambda filename, content: "SUCCESS, RETURN: " + run_metta("append-file", filename, content), "Append content to a file."),
