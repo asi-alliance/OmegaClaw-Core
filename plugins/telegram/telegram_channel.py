@@ -1065,16 +1065,35 @@ def is_search_disabled():
     return _channel.search_disabled
 
 def alert_ethics_violation(tool_name, text=None):
-    """Allow MeTTa to trigger an ethics alert DM to admins."""
-    if _channel.loop and _channel.bot:
-        for admin_id in _channel.admin_ids:
-            try:
-                fut = asyncio.run_coroutine_threadsafe(
-                    _channel.bot.send_message(chat_id=admin_id, text=f"🚨 Ethics Pass Triggered!\nAction Blocked: {tool_name} | With message: {text}"),
-                    _channel.loop
-                )
-            except Exception:
-                logging.error(f"Failed to send ethics alert to admin {admin_id} for tool {tool_name}")
+    """Allow MeTTa to trigger an ethics alert DM to admins.
+
+    An alert that quietly fails is worse than none, because silence reads as "no
+    blocks happened". Delivery runs on the bot's loop, so the outcome arrives in
+    a callback rather than as a raised exception, and a channel with no admins
+    configured says so instead of dropping the alert without a trace.
+    """
+    if not (_channel.loop and _channel.bot):
+        logging.error(f"Ethics alert for {tool_name} not sent: the bot is not running")
+        return
+
+    if not _channel.admin_ids:
+        logging.error(f"Ethics alert for {tool_name} not sent: no admin_ids are configured")
+        return
+
+    for admin_id in _channel.admin_ids:
+        def _log_outcome(fut, admin_id=admin_id):
+            exc = fut.exception()
+            if exc is not None:
+                logging.error(f"Failed to send ethics alert to admin {admin_id} for tool {tool_name}: {exc}")
+
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                _channel.bot.send_message(chat_id=admin_id, text=f"🚨 Ethics Pass Triggered!\nAction Blocked: {tool_name} | With message: {text}"),
+                _channel.loop
+            )
+            fut.add_done_callback(_log_outcome)
+        except Exception as e:
+            logging.error(f"Failed to schedule ethics alert to admin {admin_id} for tool {tool_name}: {e}")
 
 
 class TelegramChannel(channels.CommChannel):

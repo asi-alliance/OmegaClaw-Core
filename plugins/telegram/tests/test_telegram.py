@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import threading
+import time
 import types
 from types import SimpleNamespace
 
@@ -365,6 +366,47 @@ def test_destructive_admin_commands_clear_the_auth_handshake():
         restore()
 
 
+def test_ethics_alert_reports_when_it_cannot_be_delivered():
+    """A silent ethics alert reads as 'no blocks happened'. Both no-admin and
+    failed-delivery must leave a record."""
+    ch = tm._channel
+    saved = (ch.loop, ch.bot, list(ch.admin_ids))
+    records = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    handler = _Capture(level=logging.ERROR)
+    logging.getLogger().addHandler(handler)
+
+    loop = asyncio.new_event_loop()
+    thread = threading.Thread(target=loop.run_forever, daemon=True)
+    thread.start()
+    try:
+        class FailingBot:
+            async def send_message(self, chat_id, text):
+                raise RuntimeError("bot was blocked by the user")
+
+        ch.loop, ch.bot, ch.admin_ids = loop, FailingBot(), []
+        tm.alert_ethics_violation("send", "unsafe")
+        assert any("no admin_ids" in m for m in records), records
+
+        records.clear()
+        ch.admin_ids = [42]
+        tm.alert_ethics_violation("send", "unsafe")
+        for _ in range(100):
+            if any("blocked by the user" in m for m in records):
+                break
+            time.sleep(0.01)
+        assert any("blocked by the user" in m for m in records), records
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+        thread.join(timeout=2)
+        logging.getLogger().removeHandler(handler)
+        ch.loop, ch.bot, ch.admin_ids = saved
+
+
 def test_about_respects_the_allowed_chat_list():
     """/about answered in any chat regardless of restrict_to_config_chat, which
     is exactly what that setting exists to prevent."""
@@ -644,6 +686,7 @@ if __name__ == "__main__":
     test_pause_actually_gates_the_chat_it_names()
     test_destructive_admin_commands_clear_the_auth_handshake()
     test_about_respects_the_allowed_chat_list()
+    test_ethics_alert_reports_when_it_cannot_be_delivered()
     test_group_message_requires_tag_or_reply()
     test_dm_authorization_gates_non_admin_allows_admin()
     test_plugin_registration_exposes_comm_channel()
