@@ -69,12 +69,6 @@ SentenceTransformer(model_name)
 print("Model download complete.")
 PY
 
-ARG MEMORY_PORTABILITY_REPO=https://github.com/Bereket-Eshete/memory-portability-package.git
-ARG MEMORY_PORTABILITY_REF=v0.2.1
-RUN test -n "${MEMORY_PORTABILITY_REF}" \
- && python3 -m pip install --no-cache-dir --break-system-packages \
-    "git+${MEMORY_PORTABILITY_REPO}@${MEMORY_PORTABILITY_REF}"
-
 FROM builder AS versioned-source
 
 WORKDIR /omegaclaw-source

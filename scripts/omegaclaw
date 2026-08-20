@@ -309,7 +309,7 @@ def _choose_memory_transfer():
             continue
 
         while True:
-            enable = input("Enable authenticated memory export for this instance? [y/N]: ").strip().lower()
+            enable = input("Enable memory export for this instance? [y/N]: ").strip().lower()
             if enable in ("", "n", "no"):
                 return path, "0"
             if enable in ("y", "yes"):
@@ -540,7 +540,7 @@ help() {
     echo
     echo -e "Memory portability options:"
     echo -e "\t--memory-transfer-dir <absolute-path> mount host directory for memory export/import archives"
-    echo -e "\t--enable-memory-export enable authenticated memory export"
+    echo -e "\t--enable-memory-export enable memory export"
     echo -e "\t--memory-import <filename> restore archive from transfer directory before startup"
     echo -e "\t--memory-mode overwrite|append import mode (default: overwrite)"
     echo -e "\t--only-history restore history only"
@@ -576,7 +576,6 @@ options() {
     memory_import_mode="overwrite"
     memory_import_no_history=0
     memory_import_no_vector=0
-    memory_import_only_history=0
     memory_export_enabled=0
 
     if [[ "$#" -eq 0 ]]; then
@@ -637,7 +636,7 @@ options() {
                 shift
                 ;;
             --only-history)
-                memory_import_only_history=1
+                memory_import_no_vector=1
                 shift
                 ;;
             --version|-v) version; return 0;;
@@ -725,15 +724,13 @@ options() {
         return 1
     fi
 
-    if [[ "${memory_import_no_history}" == "1" &&
-          ( "${memory_import_no_vector}" == "1" || "${memory_import_only_history}" == "1" ) ]]; then
+    if [[ "${memory_import_no_history}" == "1" && "${memory_import_no_vector}" == "1" ]]; then
         echo "--no-history cannot be combined with --no-vector or --only-history" >&2
         return 1
     fi
     if [[ -z "${memory_import_file}" &&
           ( "${memory_import_no_history}" == "1" ||
-            "${memory_import_no_vector}" == "1" ||
-            "${memory_import_only_history}" == "1" ) ]]; then
+            "${memory_import_no_vector}" == "1" ) ]]; then
         echo "Import component flags require --memory-import" >&2
         return 1
     fi
@@ -745,15 +742,13 @@ options() {
 }
 
 start() {
-    docker rm -f omegaclaw 2>/dev/null || true
     docker pull "${image}" 2>/dev/null || true
 
     container_log_config_path=""
     log_config_volume=()
     memory_transfer_volume=()
     memory_import_env=()
-    memory_transfer_env=()
-    memory_export_env=()
+    memory_export_option=()
 
     if [ -n "${log_config_path}" ]; then
         if [ ! -f "${log_config_path}" ]; then
@@ -768,14 +763,16 @@ start() {
 
     if [ -n "${memory_transfer_dir}" ]; then
         memory_transfer_volume=(--volume "${memory_transfer_dir}:/memory-transfer")
-        memory_transfer_env=(
-            -e MEMORY_TRANSFER_MOUNTED=1
-            -e MEMORY_TRANSFER_DIR=/memory-transfer
-        )
+        if ! docker run --rm --user 65534:65534 --entrypoint /bin/sh \
+            --volume "${memory_transfer_dir}:/memory-transfer" "${image}" \
+            -c 'test -d /memory-transfer && test -w /memory-transfer'; then
+            echo "--memory-transfer-dir must be writable by container user 65534:65534" >&2
+            return 1
+        fi
     fi
 
     if [[ "${memory_export_enabled}" == "1" ]]; then
-        memory_export_env=(-e OMEGACLAW_memoryExportEnabled=true)
+        memory_export_option=("memoryExportEnabled=true")
     fi
 
     if [ -n "${memory_import_file}" ]; then
@@ -789,10 +786,9 @@ start() {
         if [[ "${memory_import_no_vector}" == "1" ]]; then
             memory_import_env+=(-e MEMORY_IMPORT_NO_VECTOR=1)
         fi
-        if [[ "${memory_import_only_history}" == "1" ]]; then
-            memory_import_env+=(-e MEMORY_IMPORT_ONLY_HISTORY=1)
-        fi
     fi
+
+    docker rm -f omegaclaw 2>/dev/null || true
 
     docker_cmd=(
         docker run -d -it
@@ -812,8 +808,6 @@ start() {
             -e "OMEGACLAW_OPENCLAW_TOKEN=${OMEGACLAW_OPENCLAW_TOKEN:-}"
             -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET"
             -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-0}"
-            ${memory_transfer_env[@]+"${memory_transfer_env[@]}"}
-            ${memory_export_env[@]+"${memory_export_env[@]}"}
             ${memory_import_env[@]+"${memory_import_env[@]}"}
             "$image"
             "commchannel=${commchannel}"
@@ -821,6 +815,7 @@ start() {
             "embeddingprovider=${embeddingprovider}"
             "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
             "memoryDirectory=\$MEMORY_DIR"
+            ${memory_export_option[@]+"${memory_export_option[@]}"}
     )
 
     if [ -n "${container_log_config_path}" ]; then

@@ -1,20 +1,17 @@
-"""Shared authenticated /memory-export command handling."""
+"""Shared /memory-export command handling."""
 
-from collections import deque
-import os
 import secrets
 import threading
 import time
 from pathlib import Path
 
-import auth
 from config import config_get_by_key
 from src.logger import get_logger
 from memory_portability import MemoryTransfer
 
 logger = get_logger(__name__)
 
-_TRANSFER_DIR = Path(os.environ.get("MEMORY_TRANSFER_DIR", "/memory-transfer"))
+_TRANSFER_DIR = Path("/memory-transfer")
 
 _transfer = None
 
@@ -28,14 +25,11 @@ _TOKEN_TTL_SECONDS = 60
 
 _request_lock = threading.Lock()
 _pending_requests: dict[str, tuple[str, str, float]] = {}
-_export_requests = deque()
 
 _VALID_COMPONENTS = ("history", "ltm", "both")
 
 def is_export_enabled() -> bool:
-    value = os.environ.get("OMEGACLAW_memoryExportEnabled")
-    if value is None:
-        value = config_get_by_key("memoryExportEnabled", False)
+    value = config_get_by_key("memoryExportEnabled", False)
     return value is True or (
         isinstance(value, str) and value.strip().lower() == "true"
     )
@@ -63,15 +57,12 @@ def _issue_token(owner_key: str, component: str) -> str:
 def handle_export_command(
     text: str,
     owner_key: str = "default-owner",
-    deliver_completion=lambda _message: None,
 ) -> str | None:
     stripped = text.strip()
 
     if not is_export_command(stripped):
         return None
 
-    if not auth.is_auth_enabled():
-        return None
     if not is_export_enabled():
         return None
 
@@ -84,7 +75,7 @@ def handle_export_command(
         return _handle_request(owner_key, sub)
 
     if sub == "confirm":
-        return _handle_confirm(owner_key, arg, deliver_completion)
+        return _handle_confirm(owner_key, arg)
 
     return (
         "Unknown /memory-export command. "
@@ -102,7 +93,7 @@ def _handle_request(owner_key: str, component: str) -> str:
         f"/memory-export confirm {token}"
     )
 
-def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
+def _handle_confirm(owner_key: str, token: str) -> str:
     if not token:
         return "Usage: /memory-export confirm <token>"
 
@@ -117,30 +108,18 @@ def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
         if not secrets.compare_digest(expected_token, token):
             return "Invalid token."
         del _pending_requests[owner_key]
-        _export_requests.append((component, deliver_completion))
-    return "Export queued. It will run in the next agent iteration."
-
-def process_pending_export() -> None:
-    with _request_lock:
-        if not _export_requests:
-            return
-        component, deliver_completion = _export_requests.popleft()
     try:
         result = _get_transfer().export(component)
-        reply = _format_export(result)
+        return _format_export(result)
     except Exception as exc:
         logger.exception(f"memory_export: export failed: {exc}")
-        reply = f"Memory export failed: {exc}"
-    try:
-        deliver_completion(reply)
-    except Exception:
-        logger.exception("memory_export: completion delivery failed")
+        return f"Memory export failed: {exc}"
 
 def _format_export(result: dict) -> str:
     return (
         "Memory export complete\n"
         f"File:     {result.get('filename')}\n"
         f"Size:     {result.get('size')} bytes\n"
-        f"SHA-256:  {result.get('checksum')}\n"
+        f"SHA-256:  {result.get('sha256', result.get('checksum'))}\n"
         f"Records:  {result.get('record_count')}"
     )

@@ -40,38 +40,26 @@ if [[ "${IMPORT_KB_ON_START}" == "1" ]]; then
   su nobody -s /bin/sh -c "${OMEGACLAW_DIR}/scripts/import_knowledge.sh"
 fi
 
-MEMORY_TRANSFER_DIR="${MEMORY_TRANSFER_DIR:-/memory-transfer}"
-export MEMORY_TRANSFER_DIR
-
-# Verify that the agent user can write the mounted transfer directory.
-if [[ "${MEMORY_TRANSFER_MOUNTED:-0}" == "1" ]]; then
-  su nobody -s /bin/sh -c 'test -d "$1" && test -w "$1"' sh "$MEMORY_TRANSFER_DIR" \
-    || { echo "Memory transfer directory is not writable by the agent user." >&2; exit 1; }
-fi
-
-# Recover an interrupted import before starting the agent.
-su nobody -s /bin/sh -c 'cd "$1" && exec python3 -m memory_portability recover' \
-  sh "$OMEGACLAW_DIR" \
+MEMORY_PORTABILITY_PYTHON='from memory_portability import MemoryTransfer; MemoryTransfer().recover()'
+export MEMORY_PORTABILITY_PYTHON
+su nobody -s /bin/sh -c 'exec python3 -c "$MEMORY_PORTABILITY_PYTHON"' \
   || { echo "Memory import recovery failed. Aborting startup." >&2; exit 1; }
+unset MEMORY_PORTABILITY_PYTHON
 
-# Validate the archive filename again at the container boundary.
 if [[ -n "${MEMORY_IMPORT_FILE:-}" ]]; then
-  if [[ ! "${MEMORY_IMPORT_FILE}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.gz$ ]]; then
-    echo "MEMORY_IMPORT_FILE must be a plain filename, not a path: ${MEMORY_IMPORT_FILE}" >&2
-    exit 1
-  fi
-  case "${MEMORY_IMPORT_MODE:-overwrite}" in
-    overwrite|append) ;;
-    *) echo "MEMORY_IMPORT_MODE must be overwrite or append" >&2; exit 1 ;;
-  esac
-  import_args=(--transfer-dir "$MEMORY_TRANSFER_DIR" --filename "${MEMORY_IMPORT_FILE}" --mode "${MEMORY_IMPORT_MODE:-overwrite}")
-  [[ "${MEMORY_IMPORT_NO_HISTORY:-0}" == "1" ]] && import_args+=(--no-history)
-  [[ "${MEMORY_IMPORT_NO_VECTOR:-0}" == "1" ]] && import_args+=(--no-vector)
-  [[ "${MEMORY_IMPORT_ONLY_HISTORY:-0}" == "1" ]] && import_args+=(--no-vector)
   echo "memory_portability: importing ${MEMORY_IMPORT_FILE}"
-  su nobody -s /bin/sh -c 'cd "$1" && shift && exec python3 -m memory_portability import "$@"' \
-    -- sh "$OMEGACLAW_DIR" "${import_args[@]}" \
+  MEMORY_PORTABILITY_PYTHON='import os
+from memory_portability import MemoryTransfer
+MemoryTransfer().import_archive(
+    os.environ["MEMORY_IMPORT_FILE"],
+    mode=os.environ.get("MEMORY_IMPORT_MODE", "overwrite"),
+    include_history=os.environ.get("MEMORY_IMPORT_NO_HISTORY") != "1",
+    include_vectors=os.environ.get("MEMORY_IMPORT_NO_VECTOR") != "1",
+)'
+  export MEMORY_PORTABILITY_PYTHON
+  su nobody -s /bin/sh -c 'exec python3 -c "$MEMORY_PORTABILITY_PYTHON"' \
     || { echo "Memory import failed. Aborting startup." >&2; exit 1; }
+  unset MEMORY_PORTABILITY_PYTHON
   echo "memory_portability: import complete"
 fi
 
@@ -79,9 +67,7 @@ fi
 SAFE_VARS="HOME USER PATH HOSTNAME TERM LANG LC_ALL \
   PYTHONDONTWRITEBYTECODE PYTHONUNBUFFERED \
   HF_HOME SENTENCE_TRANSFORMERS_HOME HF_HUB_OFFLINE TRANSFORMERS_OFFLINE \
-  EMBEDDING_PROVIDER \
-  OMEGACLAW_memoryExportEnabled \
-  OMEGACLAW_DIR MEMORY_DIR MEMORY_TRANSFER_DIR TEST_SERVER_IP"
+  OMEGACLAW_DIR MEMORY_DIR TEST_SERVER_IP"
 
 env_args=""
 for var in $SAFE_VARS; do
