@@ -21,8 +21,9 @@ The transfer directory must be writable by the container's agent user.
 
 ## Export
 
-In a private, authenticated supported chat, request one component and confirm
-the returned short-lived token:
+In a supported chat, request one component and confirm the returned short-lived
+token. When channel authentication is active, only the authenticated owner can
+use these commands. When it is disabled, normal channel access rules apply:
 
 ```text
 /memory-export history
@@ -31,9 +32,9 @@ the returned short-lived token:
 /memory-export confirm <token>
 ```
 
-The confirmed export runs in the next agent iteration. Completion is delivered
-only to the owner who started it and includes the filename, record count, size,
-and SHA-256.
+The confirmed export runs immediately in the channel harness. Completion is
+delivered to the requester and includes the filename, record count, size, and
+SHA-256.
 
 Archives contain selected persistent user memory only:
 
