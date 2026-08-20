@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import json
 import sys
 import time
 import types
@@ -32,10 +33,8 @@ def handler(monkeypatch):
     module.is_export_enabled = lambda: True
     return module
 
-def test_export_command_requires_auth_and_policy(handler):
-    handler.auth.is_auth_enabled = lambda: False
-    assert handler.handle_export_command("/memory-export both") is None
-    handler.auth.is_auth_enabled = lambda: True
+def test_export_command_requires_policy_but_not_auth(handler):
+    assert "Export requested" in handler.handle_export_command("/memory-export both")
     handler.is_export_enabled = lambda: False
     assert handler.handle_export_command("/memory-export both") is None
 
@@ -53,45 +52,54 @@ def test_expired_and_other_owner_tokens_cannot_start_export(handler):
         f"/memory-export confirm {token}", "owner-a"
     ).lower()
 
-def test_export_completion_is_delivered_after_loop_processing(handler):
-    delivered = []
+def test_confirmation_exports_immediately(handler):
     exported = []
     handler._get_transfer = lambda: types.SimpleNamespace(
         export=lambda component: exported.append(component) or {
             "filename": "memory.tar.gz",
             "size": 1,
-            "checksum": "abc",
+            "sha256": "abc",
             "record_count": 1,
         }
     )
-    token = handler.handle_export_command("/memory-export both", "owner-a", delivered.append).split()[-1]
-    delivered.append(
-        handler.handle_export_command(
-            f"/memory-export confirm {token}", "owner-a", delivered.append
-        )
-    )
-    assert delivered == ["Export queued. It will run in the next agent iteration."]
-    assert exported == []
-    handler.process_pending_export()
+    token = handler.handle_export_command("/memory-export both", "owner-a").split()[-1]
+    reply = handler.handle_export_command(f"/memory-export confirm {token}", "owner-a")
     assert exported == ["both"]
-    assert "memory.tar.gz" in delivered[-1]
+    assert "memory.tar.gz" in reply
+    assert "SHA-256:  abc" in reply
 
-def test_failed_completion_delivery_does_not_interrupt_loop(handler):
-    handler._get_transfer = lambda: types.SimpleNamespace(export=lambda _component: {})
-    token = handler.handle_export_command("/memory-export history").split()[-1]
+def test_websocket_ignores_memory_export(monkeypatch):
+    config = types.ModuleType("config")
+    config.config_get_by_key = lambda key, default=None: default
+    logger_mod = types.ModuleType("src.logger")
+    logger_mod.get_logger = lambda name: __import__("logging").getLogger(name)
+    control = types.ModuleType("memory_export")
+    control.is_export_command = lambda text: text.startswith("/memory-export")
+    channels = types.ModuleType("channels")
+    channels.CommChannel = object
+    channels.registerCommChannel = lambda *args: None
+    monkeypatch.setitem(sys.modules, "config", config)
+    monkeypatch.setitem(sys.modules, "src.logger", logger_mod)
+    monkeypatch.setitem(sys.modules, "memory_export", control)
+    monkeypatch.setitem(sys.modules, "channels", channels)
 
-    def fail_delivery(_message):
-        raise RuntimeError("send failed")
+    spec = importlib.util.spec_from_file_location(
+        "wschat_under_test", REPO_ROOT / "channels" / "wschat.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    received = []
+    module._enqueue_user_message = lambda *args: received.append(args)
 
-    handler.handle_export_command(f"/memory-export confirm {token}", deliver_completion=fail_delivery)
-    handler.process_pending_export()
+    module._handle_frame(json.dumps({
+        "type": "user_message", "seq": 1, "text": "/memory-export both"
+    }))
+    assert received == []
 
 def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     control = types.ModuleType("memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
-    control.handle_export_command = lambda text, owner, deliver: "Export requested"
-    processed = []
-    control.process_pending_export = lambda: processed.append(True)
+    control.handle_export_command = lambda text, owner: "Export requested"
     monkeypatch.setitem(sys.modules, "memory_export", control)
 
     monkeypatch.delitem(sys.modules, "channels", raising=False)
@@ -103,5 +111,3 @@ def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     )
     assert replies == ["Export requested"]
     assert not channels.handle_control_message("hello", "telegram:chat:user", replies.append)
-    channels.process_control_messages()
-    assert processed == [True]
