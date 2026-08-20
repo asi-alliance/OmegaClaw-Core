@@ -178,6 +178,29 @@ def test_photo_handler_buffers_image_and_queues_marker():
         restore()
 
 
+def test_captioned_photo_still_carries_the_image_marker():
+    """Captioning the photo with the question is the normal way to use this. The
+    marker is the agent's only sign an image is attached, so a caption must not
+    replace it - without it the agent replies that no image came through."""
+    ch = _new_channel()
+    ch.bot = FakeBot()
+    restore = _stub([
+        (mh, "sanitize_image", lambda raw: b"sanitized-jpeg"),
+        (mh, "image_to_data_uri", lambda img, mime: "data:image/jpeg;base64,AAAA"),
+        (mh, "set_pending_media", lambda media: None),
+    ])
+    try:
+        captioned = _fake_message(photo=[SimpleNamespace()], caption="what animal is this?")
+        asyncio.run(ch._on_photo(captioned))
+        assert len(ch._message_queue) == 1
+        _, display_text, _, payload = ch._message_queue[0]
+        assert "[image]" in display_text, display_text
+        assert "what animal is this?" in display_text, display_text
+        assert payload, "the image itself must still be attached"
+    finally:
+        restore()
+
+
 def test_pdf_handler_extracts_text():
     ch = _new_channel()
     ch.bot = FakeBot()
@@ -742,6 +765,7 @@ def test_admin_scan_collects_admin_ids():
 
 if __name__ == "__main__":
     test_photo_handler_buffers_image_and_queues_marker()
+    test_captioned_photo_still_carries_the_image_marker()
     test_pdf_handler_extracts_text()
     test_pdf_handler_rejects_non_pdf_document()
     test_voice_handler_transcribes_audio()

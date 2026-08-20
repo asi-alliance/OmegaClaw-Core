@@ -626,7 +626,12 @@ class _TelegramChannel:
             await self._send_block_notice(message, "Failed to process the image. Please try again.")
             return
 
-        display_text = f"{name}: {caption}" if caption else f"{name}: [image]"
+        # The marker has to survive a caption. Captioning the photo with the
+        # question is how people actually use this, and dropping [image] in that
+        # case left the agent with no sign anything was attached - it answered
+        # that no image came through while the image sat in the pending slot.
+        user_request = f" {caption}" if caption else ""
+        display_text = f"{name}: [image]{user_request}"
         with self.msg_lock:
             self._message_queue.append((chat_id, display_text, message.message_id, pending_media))
         logging.info("[IMGDBG] queued photo from %s chat=%s bytes=%d caption=%s", name, chat_id, len(image_bytes), bool(caption))
