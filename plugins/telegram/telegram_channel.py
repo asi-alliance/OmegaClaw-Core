@@ -49,12 +49,22 @@ auth, PendingMessages = _core_channel_infra()
 # here). The channel's logging.info/error calls route to whatever the host has
 # configured, matching the other plugin modules.
 
+def _plugin_file(name):
+    """Absolute path to a file shipped alongside this module."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+
+
 class _TelegramChannel:
     """Telegram bot channel with windowed batching and bot-tag gating using aiogram."""
 
     def __init__(self, config_path=None):
-        self.config_path = os.path.join(os.path.dirname(__file__), "telegram_profile.yaml")
-        self.policy_path = os.path.join(os.path.dirname(__file__), "policy.md")
+        # The files shipped here are defaults. A deployment points at its own
+        # with TG_PROFILE_PATH / TG_POLICY_PATH, which core resolves from the
+        # command line, an OMEGACLAW_-prefixed environment variable, or
+        # config.yaml - the same way it resolves TG_CHAT_ID. Mounting over the
+        # shipped paths still works and needs no configuration at all.
+        self.config_path = config_get_by_key("TG_PROFILE_PATH", _plugin_file("telegram_profile.yaml"))
+        self.policy_path = config_get_by_key("TG_POLICY_PATH", _plugin_file("policy.md"))
         self.running = False
         self.thread = None
         self.loop = None

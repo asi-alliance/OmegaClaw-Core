@@ -39,7 +39,13 @@ media skills are added with `add-skill`, not written into `src/skills.metta`.
 **2. Dependencies** are in `requirements.txt`; core's Dockerfile installs every
 `plugins/*/requirements.txt` automatically.
 
-**3. Fill in `telegram_profile.yaml`** — it ships permissive defaults that are
+**3. Point at your own config if you want to** — `TG_PROFILE_PATH` and
+`TG_POLICY_PATH` override where the plugin reads `telegram_profile.yaml` and
+`policy.md`, resolved by core from the command line, an `OMEGACLAW_`-prefixed
+environment variable, or `config.yaml`. The files shipped here are the defaults;
+mounting over them works too and needs no configuration.
+
+**4. Fill in `telegram_profile.yaml`** — it ships permissive defaults that are
 **not safe for production**. Set `admin_controls.admin_ids` to the Telegram user
 IDs allowed to run admin commands, and `telegram.allowed_chats` to the chat IDs
 the bot may operate in. Both are empty by default.
@@ -69,6 +75,8 @@ from a different path prefix than its API methods.
 | `VISION_MODEL` | no | Overrides the provider's default vision model |
 | `IMAGE_PROVIDER` | no | `OpenRouter` (default, FLUX) or `OpenAI` |
 | `IMAGE_MODEL` | no | Overrides the image provider's default model |
+| `TG_PROFILE_PATH` | no | Path to the channel profile, defaults to the shipped one |
+| `TG_POLICY_PATH` | no | Path to the user-facing policy text, defaults to the shipped one |
 
 Vision defaults to Anthropic because an OpenRouter account whose data policy
 excludes vision providers gets a 404 on every vision model while text and image

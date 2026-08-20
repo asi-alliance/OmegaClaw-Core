@@ -423,6 +423,37 @@ def test_about_respects_the_allowed_chat_list():
     assert inside._answers, "must answer in an allowed chat"
 
 
+def test_policy_and_profile_paths_are_configurable():
+    """A deployment must be able to ship its own policy text and profile without
+    editing the plugin. The files here are defaults, not fixed locations."""
+    overrides = {"TG_POLICY_PATH": "/somewhere/custom/policy.md",
+                 "TG_PROFILE_PATH": "/somewhere/custom/profile.yaml"}
+    restore = _stub([(tm, "config_get_by_key",
+                      lambda key, default=None: overrides.get(key, default))])
+    try:
+        ch = tm._TelegramChannel()
+        assert ch.policy_path == "/somewhere/custom/policy.md", ch.policy_path
+        assert ch.config_path == "/somewhere/custom/profile.yaml", ch.config_path
+    finally:
+        restore()
+
+    # Default: the files shipped next to the module.
+    ch = tm._TelegramChannel()
+    assert ch.policy_path.endswith("plugins/telegram/policy.md"), ch.policy_path
+    assert ch.config_path.endswith("plugins/telegram/telegram_profile.yaml"), ch.config_path
+
+
+def test_policy_sections_describe_what_the_bot_actually_does():
+    """policy.md is what users are told. It must not deny capabilities the
+    channel has - it used to claim the bot could not send files or media."""
+    ch = _new_channel()
+    combined = " ".join((ch.start_msg, ch.about_msg, ch.privacy_msg)).lower()
+    for denied in ("send files/media", "cannot send files"):
+        assert denied not in combined, f"policy still denies: {denied}"
+    for disclosed in ("moderation", "transcription", "vision"):
+        assert disclosed in combined, f"policy does not disclose: {disclosed}"
+
+
 def test_pause_actually_gates_the_chat_it_names():
     """/pause is an admin safety control. Chat ids arrive as ints from aiogram
     and as strings from the command and the config, so a pause recorded in one
@@ -684,6 +715,8 @@ if __name__ == "__main__":
     test_send_photo_dispatches_expected_aiogram_call()
     test_admin_command_refuses_non_admin_allows_admin()
     test_pause_actually_gates_the_chat_it_names()
+    test_policy_and_profile_paths_are_configurable()
+    test_policy_sections_describe_what_the_bot_actually_does()
     test_destructive_admin_commands_clear_the_auth_handshake()
     test_about_respects_the_allowed_chat_list()
     test_ethics_alert_reports_when_it_cannot_be_delivered()
