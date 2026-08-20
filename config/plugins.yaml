@@ -15,10 +15,6 @@
   loader: python
   location: "{REPO}/channels"
 
-- name: telegram
-  loader: python
-  location: "{REPO}/channels"
-
 - name: slack
   loader: python
   location: "{REPO}/channels"
@@ -62,3 +58,7 @@
 - name: openclaw
   loader: metta
   location: "{REPO}/plugins/openclaw"
+
+- name: telegram
+  loader: metta
+  location: "{REPO}/plugins/telegram"
