@@ -5,19 +5,19 @@
 ;; adds is registered here at load time, so core needs no telegram-specific
 ;; code of its own.
 
-;; A MeTTa plugin has to import the Python modules it py-calls into, the same
-;; way plugins/openclaw does. The channel module is NOT called telegram.py:
-;; import! appends the plugin folder to sys.path rather than prepending it, so a
-;; module named telegram would lose to the python-telegram-bot package whenever
-;; that happens to be installed.
-!(import! &self (library OmegaClaw-Core ./plugins/telegram/telegram_channel.py))
-!(import! &self (library OmegaClaw-Core ./plugins/telegram/media_handler.py))
+;; No import! of the .py files is needed: the loader puts this folder on
+;; sys.path, and py-call imports a module on first use. Keeping the plugin free
+;; of (library OmegaClaw-Core ./plugins/...) paths is what lets it live outside
+;; the core tree.
+;;
+;; The channel module is NOT called telegram.py. The plugin folder is appended
+;; to sys.path rather than prepended, so a module named telegram would lose to
+;; the python-telegram-bot package whenever that is installed.
 
-(= (pluginTelegramDir)
-   (joinPath ((projectRootDirectory) "plugins" "telegram")))
-
+; Ask the plugin's own module where its files are. Deriving the path from the
+; repository root instead would tie the plugin to living inside the core tree.
 (= (pluginTelegramPromptPath)
-   (joinPath ((pluginTelegramDir) "prompt.txt")))
+   (py-call (telegram_channel.prompt_path)))
 
 (= (loadOmegaClawPlugin)
    (progn

@@ -77,10 +77,25 @@ from a different path prefix than its API methods.
 | `IMAGE_MODEL` | no | Overrides the image provider's default model |
 | `TG_PROFILE_PATH` | no | Path to the channel profile, defaults to the shipped one |
 | `TG_POLICY_PATH` | no | Path to the user-facing policy text, defaults to the shipped one |
+| `TG_PROMPT_PATH` | no | Path to the prompt section, defaults to the shipped one |
 
 Vision defaults to Anthropic because an OpenRouter account whose data policy
 excludes vision providers gets a 404 on every vision model while text and image
 generation keep working.
+
+## Location
+
+The plugin does not have to live inside the core tree. It finds its own files
+relative to its module, and reaches core's Python only through modules core puts
+on the path, so `location` in `plugins.yaml` can be any absolute path:
+
+```yaml
+- name: telegram
+  loader: metta
+  location: "/opt/omegaclaw-telegram"
+```
+
+Verified by loading it from outside the repository with the in-tree copy removed.
 
 ## Tests
 

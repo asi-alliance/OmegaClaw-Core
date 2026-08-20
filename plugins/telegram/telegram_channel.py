@@ -54,6 +54,16 @@ def _plugin_file(name):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
 
 
+def prompt_path():
+    """Where the channel's prompt section lives, for the MeTTa side to read.
+
+    Resolved from this module's own location rather than from the repository
+    root, so the plugin works wherever it is checked out - including outside the
+    core tree, which is the point of it being a plugin.
+    """
+    return config_get_by_key("TG_PROMPT_PATH", _plugin_file("prompt.txt"))
+
+
 class _TelegramChannel:
     """Telegram bot channel built on aiogram.
 
