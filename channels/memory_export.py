@@ -10,7 +10,7 @@ from pathlib import Path
 import auth
 from config import config_get_by_key
 from src.logger import get_logger
-from import_knowledge.memory_portability import MemoryTransfer
+from memory_portability import MemoryTransfer
 
 logger = get_logger(__name__)
 
@@ -117,8 +117,6 @@ def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
         if not secrets.compare_digest(expected_token, token):
             return "Invalid token."
         del _pending_requests[owner_key]
-
-    with _request_lock:
         _export_requests.append((component, deliver_completion))
     return "Export queued. It will run in the next agent iteration."
 
@@ -133,7 +131,10 @@ def process_pending_export() -> None:
     except Exception as exc:
         logger.exception(f"memory_export: export failed: {exc}")
         reply = f"Memory export failed: {exc}"
-    deliver_completion(reply)
+    try:
+        deliver_completion(reply)
+    except Exception:
+        logger.exception("memory_export: completion delivery failed")
 
 def _format_export(result: dict) -> str:
     return (

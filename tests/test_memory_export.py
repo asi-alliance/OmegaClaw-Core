@@ -19,12 +19,9 @@ def handler(monkeypatch):
     logger_mod.get_logger = lambda name: __import__("logging").getLogger(name)
     monkeypatch.setitem(sys.modules, "src.logger", logger_mod)
 
-    import_knowledge = types.ModuleType("import_knowledge")
-    import_knowledge.__path__ = []
-    monkeypatch.setitem(sys.modules, "import_knowledge", import_knowledge)
-    mp_mod = types.ModuleType("import_knowledge.memory_portability")
+    mp_mod = types.ModuleType("memory_portability")
     mp_mod.MemoryTransfer = object
-    monkeypatch.setitem(sys.modules, "import_knowledge.memory_portability", mp_mod)
+    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
 
     spec = importlib.util.spec_from_file_location(
         "memory_export_under_test",
@@ -78,6 +75,16 @@ def test_export_completion_is_delivered_after_loop_processing(handler):
     handler.process_pending_export()
     assert exported == ["both"]
     assert "memory.tar.gz" in delivered[-1]
+
+def test_failed_completion_delivery_does_not_interrupt_loop(handler):
+    handler._get_transfer = lambda: types.SimpleNamespace(export=lambda _component: {})
+    token = handler.handle_export_command("/memory-export history").split()[-1]
+
+    def fail_delivery(_message):
+        raise RuntimeError("send failed")
+
+    handler.handle_export_command(f"/memory-export confirm {token}", deliver_completion=fail_delivery)
+    handler.process_pending_export()
 
 def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     control = types.ModuleType("memory_export")

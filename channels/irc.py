@@ -100,7 +100,6 @@ def _send_export_reply(nick, text):
     ):
         _send(f"PRIVMSG {target} :{line}")
 
-
 def _flush_outbox():
     try:
         _outbox.flush(_deliver_outbound, _ready_to_send)
