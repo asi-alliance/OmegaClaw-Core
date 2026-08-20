@@ -55,7 +55,12 @@ def _plugin_file(name):
 
 
 class _TelegramChannel:
-    """Telegram bot channel with windowed batching and bot-tag gating using aiogram."""
+    """Telegram bot channel built on aiogram.
+
+    Inbound messages that pass the gates are appended to one queue, and the agent
+    consumes them one per loop through get_last_message(). Replies are gated on
+    the bot being tagged or replied to, outside of direct messages.
+    """
 
     def __init__(self, config_path=None):
         # The files shipped here are defaults. A deployment points at its own
@@ -103,11 +108,9 @@ class _TelegramChannel:
         
         # Windowed batching state
         self._message_queue = []
-        self._reply_to_ids = {}
         self._reply_to_id = None
         self._paused_chats = set()
         self.search_disabled = False
-        self._ready_windows = []
         self._polling_task = None
         # Queue outbound messages instead of dropping them: the agent sends its
         # version banner right after the channel starts, before the polling
@@ -173,7 +176,6 @@ class _TelegramChannel:
                 config = yaml.safe_load(f)
             
             tg_cfg = config.get("telegram", {})
-            self.window_seconds = tg_cfg.get("batching", {}).get("window_seconds", 10)
             self.reply_only_on_tag = tg_cfg.get("reply_only_when_directly_tagged", True)
             self.reply_on_reply = tg_cfg.get("reply_on_reply_to_bot", True)
             self.dm_enabled = tg_cfg.get("dm_support", {}).get("enabled", False)
@@ -184,7 +186,9 @@ class _TelegramChannel:
             self.admin_ids = config.get("admin_controls", {}).get("admin_ids", [])
             self.reply_constraints = tg_cfg.get("reply_constraints", {})
 
-            logging.info(f"Loaded config from {config_path}: window={self.window_seconds}s, tag_only={self.reply_only_on_tag}")
+            logging.info(f"Loaded config from {config_path}: tag_only={self.reply_only_on_tag}, "
+                         f"dm={self.dm_enabled}, allowed_chats={len(self.allowed_chat_ids)}, "
+                         f"admins={len(self.admin_ids)}")
         except Exception as e:
             logging.error(f"Error loading config {config_path}: {e}")
 
