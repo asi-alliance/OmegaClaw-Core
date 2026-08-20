@@ -50,7 +50,7 @@ if [[ "${MEMORY_TRANSFER_MOUNTED:-0}" == "1" ]]; then
 fi
 
 # Recover an interrupted import before starting the agent.
-su nobody -s /bin/sh -c 'cd "$1" && exec python3 -m memory_portability recover' \
+su nobody -s /bin/sh -c 'cd "$1" && exec python3 -m import_knowledge.memory_portability recover' \
   sh "$OMEGACLAW_DIR" \
   || { echo "Memory import recovery failed. Aborting startup." >&2; exit 1; }
 
@@ -69,7 +69,7 @@ if [[ -n "${MEMORY_IMPORT_FILE:-}" ]]; then
   [[ "${MEMORY_IMPORT_NO_VECTOR:-0}" == "1" ]] && import_args+=(--no-vector)
   [[ "${MEMORY_IMPORT_ONLY_HISTORY:-0}" == "1" ]] && import_args+=(--no-vector)
   echo "memory_portability: importing ${MEMORY_IMPORT_FILE}"
-  su nobody -s /bin/sh -c 'cd "$1" && shift && exec python3 -m memory_portability import "$@"' \
+  su nobody -s /bin/sh -c 'cd "$1" && shift && exec python3 -m import_knowledge.memory_portability import "$@"' \
     -- sh "$OMEGACLAW_DIR" "${import_args[@]}" \
     || { echo "Memory import failed. Aborting startup." >&2; exit 1; }
   echo "memory_portability: import complete"

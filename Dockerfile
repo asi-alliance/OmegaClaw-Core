@@ -58,6 +58,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     --extra-index-url https://pypi.org/simple/ \
     torch==2.12.1 \
  && python3 -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
+
 # Pre-download the sentence-transformers model so runtime does not need network access.
 RUN mkdir -p "${HF_HOME}" "${SENTENCE_TRANSFORMERS_HOME}" \
  && python3 - <<PY
@@ -68,11 +69,11 @@ SentenceTransformer(model_name)
 print("Model download complete.")
 PY
 
-ARG MEMORY_PORTABILITY_REPO=https://github.com/Bereket-Eshete/memory-portability-package.git
-ARG MEMORY_PORTABILITY_REF=v0.2.0
-RUN test -n "${MEMORY_PORTABILITY_REF}" \
+ARG IMPORT_KNOWLEDGE_REPO=https://github.com/Bereket-Eshete/import-knowledge-package.git
+ARG IMPORT_KNOWLEDGE_REF=v0.2.1
+RUN test -n "${IMPORT_KNOWLEDGE_REF}" \
  && python3 -m pip install --no-cache-dir --break-system-packages \
-    "git+${MEMORY_PORTABILITY_REPO}@${MEMORY_PORTABILITY_REF}"
+    "git+${IMPORT_KNOWLEDGE_REPO}@${IMPORT_KNOWLEDGE_REF}"
 
 FROM builder AS versioned-source
 
