@@ -69,6 +69,7 @@ def test_reply_uses_the_chat_that_supplied_the_message(monkeypatch):
 
 def test_owner_binds_group_without_exposing_secret(monkeypatch):
     telegram = load_telegram(monkeypatch)
+    telegram._bot_username = "examplebot"
 
     # A secret sent in a group cannot establish an owner.
     assert telegram._is_allowed_message("group", "1", "group", "auth secret") == "ignore"
@@ -80,6 +81,22 @@ def test_owner_binds_group_without_exposing_secret(monkeypatch):
     assert telegram._is_allowed_message("group", "1", "group", "/bind@ExampleBot") == "group_bound"
     assert telegram._is_allowed_message("group", "2", "group", "hello") == "allow"
     assert telegram._is_allowed_message("other-group", "2", "group", "hello") == "ignore"
+
+
+def test_bind_command_targets_this_bot_only(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._bot_username = "examplebot"
+
+    assert telegram._is_bind_command("/bind")
+    assert telegram._is_bind_command("/authorize_group")
+
+    assert telegram._is_bind_command("/bind@ExampleBot")
+    assert telegram._is_bind_command("/BIND@examplebot")
+    assert telegram._is_bind_command("/authorize_group@ExampleBot")
+
+    assert not telegram._is_bind_command("/bind@AnotherBot")
+    assert not telegram._is_bind_command("/authorize_group@AnotherBot")
+    assert not telegram._is_bind_command("/binder@ExampleBot")
 
 
 def test_configured_chats_are_a_hard_boundary_when_auth_is_disabled(monkeypatch):

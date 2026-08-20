@@ -20,6 +20,7 @@ _active_chat_id = ""
 
 _bot_token = ""
 _api_base = ""
+_bot_username= ""
 _poll_timeout = 20
 _offset = None
 _connected = False
@@ -101,8 +102,16 @@ def _first_token(msg):
 
 def _is_bind_command(msg):
     # Handle Telegram's "/bind@YourBotName" form
-    token = _first_token(msg).split("@", 1)[0]
-    return token in _BIND_COMMANDS
+    token = _first_token(msg)
+    command, separator, target_username = token.partition("@")
+
+    if command not in _BIND_COMMANDS:
+        return False
+
+    if not separator:
+        return True
+
+    return bool(_bot_username) and target_username == _bot_username
 
 
 def _is_allowed_message(chat_id, user_id, chat_type, msg):
@@ -202,6 +211,18 @@ def _api_call(method, params=None, timeout=30, use_post=False):
 
     return payload.get("result")
 
+def _initialize_bot_identity():
+    global _bot_username
+
+    result = _api_call("getMe", timeout=10)
+    if not isinstance(result, dict):
+        raise RuntimeError("Telegram getMe returned an invalid response")
+
+    username = str(result.get("username", "")).strip().lstrip("@").lower()
+    if not username:
+        raise RuntimeError("Telegram getMe did not return the bot username")
+
+    _bot_username = username
 
 def _initialize_offset():
     global _offset
@@ -331,6 +352,8 @@ def start_telegram(chat_id="", allowed_chat_ids="", poll_timeout=20):
         logger.info(f"Starting adapter, admin-restricted to chats: {sorted(_admin_allowed_chats)}")
     else:
         logger.info("Starting adapter with no admin chat restriction")
+    
+    _initialize_bot_identity()
     _initialize_offset()
 
     t = threading.Thread(target=_poll_loop, daemon=True)
