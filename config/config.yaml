@@ -73,8 +73,12 @@ SL_CHANNEL_ID: ""
 SL_POLL_INTERVAL: 60
 
 # Telegram
-# Telegram chat ID. If empty, OmegaClaw auto-binds after first valid inbound auth/message.
+# Legacy single-chat allowlist. When set, only this chat is accepted.
 TG_CHAT_ID: ""
+# Optional additional comma-separated chat IDs. These are a hard
+# administrator boundary. With authentication enabled, the owner can still
+# bootstrap and use their private DM.
+TG_ALLOWED_CHAT_IDS: ""
 # Telegram polling timeout in seconds.
 TG_POLL_TIMEOUT: 20
 
