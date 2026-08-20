@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 # VISION_PROVIDER, override its model with VISION_MODEL.
 VISION_PROVIDERS = {
     "Anthropic": {
+        "route": "anthropic",
         "base_url": "https://api.anthropic.com/v1/",
         "key_env": "ANTHROPIC_API_KEY",
         "default_model": "claude-haiku-4-5-20251001",
     },
     "OpenRouter": {
+        "route": "openrouter",
         "base_url": "https://openrouter.ai/api/v1",
         "key_env": "OPENROUTER_API_KEY",
         "default_model": "anthropic/claude-haiku-4.5",
@@ -39,14 +41,19 @@ def _model():
 
 
 def _make_client():
-    """Create the vision client. Isolated so tests can stub it."""
+    """Create the vision client. Isolated so tests can stub it.
+
+    Behind the gateway proxy there is no key to read - the proxy holds it - so
+    the destination comes from gateway.upstream rather than the environment."""
     import openai
+    import gateway
     name, cfg = _config()
-    api_key = os.environ.get(cfg["key_env"])
+    base_url, api_key = gateway.upstream(cfg["route"], cfg["base_url"], cfg["key_env"])
     if not api_key:
         raise RuntimeError(
-            f"vision provider {name} is not available (set {cfg['key_env']})")
-    return openai.OpenAI(api_key=api_key, base_url=cfg["base_url"])
+            f"vision provider {name} is not available (set {cfg['key_env']}, "
+            "or run behind the gateway proxy)")
+    return openai.OpenAI(api_key=api_key, base_url=base_url)
 
 
 def vision_chat(image_parts, prompt, max_tokens=1024):

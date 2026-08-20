@@ -60,10 +60,16 @@ sh run.sh run.metta commchannel=telegram provider=OpenRouter \
 `TG_CHAT_ID` is a run argument; `TG_BOT_TOKEN` is read from the environment. Run
 only one instance per bot token — a second makes Telegram reject both.
 
-When `GATEWAY_URL` is set the bot talks to the proxy instead of api.telegram.org
-and `TG_BOT_TOKEN` stays in the proxy, out of the agent's environment. Media
-downloads use a second route, `/telegram-file/`, because Telegram serves files
-from a different path prefix than its API methods.
+When `GATEWAY_URL` is set every outbound call goes to that proxy, which holds the
+credentials, and none of the keys below need to be in the agent's environment —
+the container entrypoint scrubs them precisely so they are not. Telegram uses
+two routes, `/telegram/` for API methods and `/telegram-file/` for downloads,
+because Telegram serves files from a different path prefix. Vision, image
+generation, transcription and moderation use `/anthropic/`, `/openrouter/` and
+`/openai/`.
+
+The keys in the table below are what a **direct** run needs. Behind the proxy
+they belong to the proxy, not here.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |

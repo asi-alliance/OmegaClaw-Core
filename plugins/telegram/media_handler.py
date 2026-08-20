@@ -168,13 +168,15 @@ def transcribe_audio(file_bytes, filename, model="openai/whisper-large-v3", max_
         if len(file_bytes) > max_bytes:
             return f"[AUDIO TRANSCRIPT: {filename}]\n[Audio too large to transcribe]"
 
-        import os, io, openai
+        import io, openai
+        import gateway
 
-        api_key = os.environ.get("OPENROUTER_API_KEY")
+        base_url, api_key = gateway.upstream(
+            "openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY")
         if not api_key:
             return f"[AUDIO TRANSCRIPT: {filename}]\n[Could not transcribe: OPENROUTER_API_KEY is not set]"
 
-        client = openai.OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1",)
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
         audio_file = io.BytesIO(file_bytes)
         audio_file.name = filename
         kwargs = { "model": model, "file": audio_file,}
@@ -205,12 +207,15 @@ def transcribe_audio(file_bytes, filename, model="openai/whisper-large-v3", max_
 IMAGE_PROVIDERS = {
     "OpenRouter": {
         "style": "openrouter",
-        "url": "https://openrouter.ai/api/v1/images",
+        "route": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "path": "images",
         "key_env": "OPENROUTER_API_KEY",
         "default_model": "black-forest-labs/flux.2-pro",
     },
     "OpenAI": {
         "style": "openai_sdk",
+        "route": "openai",
         "base_url": "https://api.openai.com/v1",
         "key_env": "OPENAI_API_KEY",
         "default_model": "gpt-image-1",
@@ -222,10 +227,11 @@ def _generate_image_bytes(prompt):
     """Generate an image for `prompt` via the configured image provider.
     Returns raw image bytes, or None on any failure (never raises)."""
     import os
+    import gateway
     provider_name = os.environ.get("IMAGE_PROVIDER", "OpenRouter")
     cfg = IMAGE_PROVIDERS.get(provider_name) or IMAGE_PROVIDERS["OpenRouter"]
     model = os.environ.get("IMAGE_MODEL", cfg["default_model"])
-    api_key = os.environ.get(cfg["key_env"])
+    base_url, api_key = gateway.upstream(cfg["route"], cfg["base_url"], cfg["key_env"])
     if not api_key:
         logger.error(f"Image generation: {cfg['key_env']} not set for provider {provider_name}")
         return None
@@ -233,7 +239,7 @@ def _generate_image_bytes(prompt):
         if cfg["style"] == "openrouter":
             import requests
             resp = requests.post(
-                cfg["url"],
+                f"{base_url.rstrip('/')}/{cfg['path']}",
                 headers={"Authorization": f"Bearer {api_key}",
                          "Content-Type": "application/json"},
                 json={"model": model, "prompt": prompt},
@@ -243,7 +249,7 @@ def _generate_image_bytes(prompt):
             b64 = resp.json()["data"][0]["b64_json"]
         elif cfg["style"] == "openai_sdk":
             import openai
-            client = openai.OpenAI(api_key=api_key, base_url=cfg.get("base_url"))
+            client = openai.OpenAI(api_key=api_key, base_url=base_url)
             resp = client.images.generate(model=model, prompt=prompt)
             b64 = resp.data[0].b64_json
         else:

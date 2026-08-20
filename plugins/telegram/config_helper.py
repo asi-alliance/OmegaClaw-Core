@@ -20,7 +20,10 @@ def _get_openai_client():
     can stub it."""
     global _openai_client
     if _openai_client is None:
-        _openai_client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        import gateway
+        base_url, api_key = gateway.upstream(
+            "openai", "https://api.openai.com/v1", "OPENAI_API_KEY")
+        _openai_client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
     return _openai_client
 
 def _load_config():
