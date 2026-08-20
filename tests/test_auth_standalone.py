@@ -87,6 +87,23 @@ def test_saved_owner_blocks_auth_secret_reuse_after_restart(monkeypatch, tmp_pat
     assert owner_process.authenticate_channel_user("IRC", "owner") == "allow"
 
 
+def test_saved_owner_cannot_be_replaced_by_a_reused_secret(monkeypatch, tmp_path):
+    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "one-time-secret")
+
+    first_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(first_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert first_process.authenticate_channel_user(
+        "TELEGRAM", "owner", "one-time-secret"
+    ) == "auth_bound"
+
+    restarted_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(restarted_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert restarted_process.authenticate_channel_user(
+        "TELEGRAM", "attacker", "one-time-secret"
+    ) == "ignore"
+    assert restarted_process.get_channel_authenticated_user_id("TELEGRAM") == "owner"
+
+
 def test_plain_message_does_not_verify_a_token(monkeypatch):
     auth = load_auth_module(monkeypatch)
     monkeypatch.setattr(

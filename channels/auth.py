@@ -124,49 +124,37 @@ def get_channel_saved_user_id(channel_identifier, user_id):
         logger.warning(f"[{channel_identifier}] Warning: a user was already validated, ignoring")
         return False
 
-    channel_identifier = str(channel_identifier or "").strip()
-    user_id = str(user_id or "").strip()
-    if not user_id:
+    # The first persisted record is the owner.  Do not scan later records
+    # looking for another matching user: older installations may contain
+    # accidental duplicate records, but they must not create extra owners.
+    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
+    if saved_user_id != str(user_id or "").strip():
         return False
-    try:
-        path = _channel_auth_user_path()
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    record = json.loads(line)
-                    saved_channel_identifier = str(record.get("channel_identifier", "")).strip()
-                    saved_user_id = str(record.get("user_id", "")).strip()
-                except (AttributeError, json.JSONDecodeError) as e:
-                    logger.warning(f"Skipping malformed channel authenticated user record: {e}")
-                    continue
-                if saved_channel_identifier == channel_identifier and saved_user_id == user_id:
-                    _user_ID_processed = True
-                    return True
-    except FileNotFoundError:
-        return False
-    except Exception as e:
-        raise RuntimeError("Failed to read channel authenticated user records") from e
-    return False
+
+    _user_ID_processed = True
+    return True
 
 
 def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
-    # A token is accepted only when it came from an explicit auth command.
-    # Otherwise see if there was a prior session with the user-id and channel.
+    channel_identifier = str(channel_identifier or "").strip()
+    user_id = str(user_id or "").strip()
+
+    # A persisted owner always wins over a reusable secret. This prevents a
+    # restart from allowing someone else who knows the secret to replace the
+    # original owner.
+    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
+    if saved_user_id is not None:
+        return "allow" if saved_user_id == user_id else "ignore"
+
+    # The secret can establish an owner only before an owner has been saved.
     if auth_candidate is not None and verify_token(auth_candidate):
+        label = channel_identifier.upper()
         if store_channel_authenticated_user_id(channel_identifier, user_id):
-            label = str(channel_identifier).upper()
             logger.info(f"[{label}] Saved authenticated user ID")
             return "auth_bound"
-        else:
-            label = str(channel_identifier).upper()
-            logger.error(f"[{label}] ERROR -- Unable to save user ID")
-            return "ignore"
-    elif get_channel_saved_user_id(channel_identifier, user_id):
-        label = str(channel_identifier).upper()
-        logger.info(f"[{label}] Verified previously validated user ID")
-        return "allow"
-    else:
-        return "ignore"
+        logger.error(f"[{label}] ERROR -- Unable to save user ID")
+
+    return "ignore"
 
 
 def get_channel_authenticated_user_id(channel_identifier):

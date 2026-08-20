@@ -25,7 +25,8 @@ _offset = None
 _connected = False
 
 # --- Admin allowlist (review point #8) --------------------------------
-# Purely a chat-level gate, checked before any owner/group logic runs.
+# A chat-level administrator boundary.  The initial owner-authentication DM
+# and the persisted owner's DM are intentionally exempt when auth is enabled.
 # TG_CHAT_ID is kept for backwards compatibility (single chat);
 # TG_ALLOWED_CHAT_IDS is new and accepts a comma-separated list. Empty
 # means "no admin restriction configured".
@@ -96,7 +97,8 @@ def send_message(text, target_chat=None):
 #
 # Layered, outer to inner:
 #   1. Admin allowlist (TG_CHAT_ID / TG_ALLOWED_CHAT_IDS) -- chats outside
-#      it are always ignored, auth or no auth.
+#      it are ignored, except for private owner bootstrap/owner DMs when
+#      authentication is enabled.
 #   2. If auth is disabled: allowlisted chats are trusted outright; with no
 #      allowlist at all, fall back to the legacy single-chat auto-bind.
 #   3. If auth is enabled: nothing is allowed until an owner exists. The
@@ -145,12 +147,11 @@ def _is_bind_command(msg):
 def _is_allowed_message(chat_id, user_id, chat_type, msg):
     global _auto_bound_chat
 
-    if _admin_allowed_chats and chat_id not in _admin_allowed_chats:
-        return "ignore"
+    auth_enabled = auth.is_auth_enabled()
 
-    if not auth.is_auth_enabled():
+    if not auth_enabled:
         if _admin_allowed_chats:
-            return "allow"
+            return "allow" if chat_id in _admin_allowed_chats else "ignore"
         with _state_lock:
             if _auto_bound_chat and chat_id != _auto_bound_chat:
                 return "ignore"
@@ -160,11 +161,29 @@ def _is_allowed_message(chat_id, user_id, chat_type, msg):
 
     owner_id = auth.get_channel_authenticated_user_id("TELEGRAM")
 
+    is_owner_bootstrap = (
+        owner_id is None
+        and chat_type == "private"
+        and _is_auth_command(msg)
+    )
+    is_owner_private_chat = (
+        owner_id is not None
+        and chat_type == "private"
+        and user_id == owner_id
+    )
+
+    if (
+        _admin_allowed_chats
+        and chat_id not in _admin_allowed_chats
+        and not is_owner_bootstrap
+        and not is_owner_private_chat
+    ):
+        return "ignore"
+
     if owner_id is None:
-        # The reusable secret must never be exposed in a group.  Establish
-        # the Telegram owner from a direct message only; that owner can then
-        # open groups using /bind, which relies on their Telegram user id.
-        if chat_type == "private" and _is_auth_command(msg):
+        # The reusable secret is accepted only in a private DM. The owner can
+        # then open groups using /bind, which relies on Telegram user id.
+        if is_owner_bootstrap:
             candidate = _parse_auth_candidate(msg)
             return auth.authenticate_channel_user("TELEGRAM", user_id, candidate)
         return "ignore"

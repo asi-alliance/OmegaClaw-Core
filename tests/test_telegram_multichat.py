@@ -91,3 +91,12 @@ def test_configured_chats_are_a_hard_boundary_when_auth_is_disabled(monkeypatch)
     assert telegram._is_allowed_message("legacy-chat", "1", "private", "hello") == "allow"
     assert telegram._is_allowed_message("group-a", "2", "group", "hello") == "allow"
     assert telegram._is_allowed_message("unlisted", "3", "group", "hello") == "ignore"
+
+
+def test_allowlist_still_permits_owner_dm_bootstrap(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._admin_allowed_chats = {"approved-group"}
+
+    assert telegram._is_allowed_message("owner-dm", "1", "private", "auth secret") == "auth_bound"
+    assert telegram._is_allowed_message("owner-dm", "1", "private", "hello") == "allow"
+    assert telegram._is_allowed_message("unlisted-group", "2", "group", "hello") == "ignore"

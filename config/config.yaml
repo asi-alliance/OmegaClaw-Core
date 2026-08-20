@@ -76,7 +76,8 @@ SL_POLL_INTERVAL: 60
 # Legacy single-chat allowlist. When set, only this chat is accepted.
 TG_CHAT_ID: ""
 # Optional additional comma-separated chat IDs. These are a hard
-# administrator boundary, including when user authentication is disabled.
+# administrator boundary. With authentication enabled, the owner can still
+# bootstrap and use their private DM.
 TG_ALLOWED_CHAT_IDS: ""
 # Telegram polling timeout in seconds.
 TG_POLL_TIMEOUT: 20
