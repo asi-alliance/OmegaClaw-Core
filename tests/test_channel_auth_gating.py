@@ -24,6 +24,8 @@ def test_unbound_plain_message_is_not_used_as_auth_token(monkeypatch, module_nam
     auth.is_auth_enabled = lambda: True
     auth.get_channel_saved_user_id = lambda *args: False
     auth.get_channel_saved_group_id = lambda *args: False
+    auth.get_channel_authenticated_user_id = lambda *args: None
+    auth.authorize_channel_group = lambda *args: "ignore"
     calls = []
 
     def authenticate_channel_user(*args):

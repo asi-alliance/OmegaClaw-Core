@@ -24,6 +24,29 @@ _poll_timeout = 20
 _offset = None
 _connected = False
 
+# --- Admin allowlist (review point #8) --------------------------------
+# Purely a chat-level gate, checked before any owner/group logic runs.
+# TG_CHAT_ID is kept for backwards compatibility (single chat);
+# TG_ALLOWED_CHAT_IDS is new and accepts a comma-separated list. Empty
+# means "no admin restriction configured".
+_admin_allowed_chats = set()
+
+# Legacy no-auth fallback: first chat to talk wins. Only used when auth is
+# disabled AND no admin allowlist is configured, preserving the original
+# single-chat auto-bind behavior for existing no-auth deployments.
+_auto_bound_chat = ""
+
+_BIND_COMMANDS = ("/bind", "/authorize_group")
+
+
+# ---------------------------------------------------------------------------
+# Multi-chat routing (review point #9).
+#
+# Pure plumbing: remembers which chat each inbound message came from, and
+# lets replies target that same chat. Has no knowledge of authorization --
+# it only ever queues/sends what _is_allowed_message() has already approved.
+# ---------------------------------------------------------------------------
+
 def _enqueue_message(msg, chat_id):
     with _msg_lock:
         _inbox.append((str(chat_id), str(msg)))
@@ -40,6 +63,56 @@ def getLastMessage():
     return message
 
 
+def send_message(text, target_chat=None):
+    text = str(text).replace("\\n", "\n").replace("\r", "")
+    if not text:
+        return
+
+    with _state_lock:
+        target_chat = str(target_chat or _active_chat_id).strip()
+
+    if not _connected or not target_chat:
+        return
+
+    max_len = 3900
+    for i in range(0, len(text), max_len):
+        chunk = text[i:i + max_len]
+        if not chunk:
+            continue
+        try:
+            _api_call(
+                "sendMessage",
+                {"chat_id": target_chat, "text": chunk},
+                timeout=15,
+                use_post=True,
+            )
+        except Exception as exc:
+            logger.exception(f"Send failed: {exc}")
+            return
+
+
+# ---------------------------------------------------------------------------
+# Authorization.
+#
+# Layered, outer to inner:
+#   1. Admin allowlist (TG_CHAT_ID / TG_ALLOWED_CHAT_IDS) -- chats outside
+#      it are always ignored, auth or no auth.
+#   2. If auth is disabled: allowlisted chats are trusted outright; with no
+#      allowlist at all, fall back to the legacy single-chat auto-bind.
+#   3. If auth is enabled: nothing is allowed until an owner exists. The
+#      owner is established exactly once via "auth <secret>" -- reusing
+#      auth.authenticate_channel_user(), the SAME function IRC/Slack/
+#      Mattermost use, keyed as "TELEGRAM". This is a deliberate reuse, not
+#      a parallel system (review point #2).
+#   4. Once an owner exists:
+#        - Private chats (DMs): owner only, forever. No other user can ever
+#          be allowed in the owner's DM (review point #6).
+#        - Group chats: open to every member once authorized. Before that,
+#          only the owner's own "/bind" (or "/authorize_group") message
+#          opens it -- verified by sender user_id, never by the secret
+#          (review point #3, #4, #5).
+# ---------------------------------------------------------------------------
+
 def _parse_auth_candidate(msg):
     text = msg.strip()
     lower = text.lower()
@@ -48,6 +121,65 @@ def _parse_auth_candidate(msg):
     if lower.startswith("/auth "):
         return text[6:].strip()
     return text
+
+
+def _is_auth_command(msg):
+    lower = msg.strip().lower()
+    return lower.startswith("auth ") or lower.startswith("/auth ")
+
+
+def _first_token(msg):
+    stripped = msg.strip()
+    if not stripped:
+        return ""
+    return stripped.split(None, 1)[0].lower()
+
+
+def _is_bind_command(msg):
+    # Handle Telegram's "/bind@YourBotName" form, sent automatically by
+    # clients when a group has more than one bot in it.
+    token = _first_token(msg).split("@", 1)[0]
+    return token in _BIND_COMMANDS
+
+
+def _is_allowed_message(chat_id, user_id, chat_type, msg):
+    global _auto_bound_chat
+
+    if _admin_allowed_chats and chat_id not in _admin_allowed_chats:
+        return "ignore"
+
+    if not auth.is_auth_enabled():
+        if _admin_allowed_chats:
+            return "allow"
+        with _state_lock:
+            if _auto_bound_chat and chat_id != _auto_bound_chat:
+                return "ignore"
+            if not _auto_bound_chat:
+                _auto_bound_chat = chat_id
+        return "allow"
+
+    owner_id = auth.get_channel_authenticated_user_id("TELEGRAM")
+
+    if owner_id is None:
+        # The reusable secret must never be exposed in a group.  Establish
+        # the Telegram owner from a direct message only; that owner can then
+        # open groups using /bind, which relies on their Telegram user id.
+        if chat_type == "private" and _is_auth_command(msg):
+            candidate = _parse_auth_candidate(msg)
+            return auth.authenticate_channel_user("TELEGRAM", user_id, candidate)
+        return "ignore"
+
+    if chat_type == "private":
+        return "allow" if user_id == owner_id else "ignore"
+
+    # Anything that isn't "private" is a group/supergroup chat.
+    if auth.get_channel_saved_group_id("TELEGRAM", chat_id):
+        return "allow"
+
+    if user_id == owner_id and _is_bind_command(msg):
+        return auth.authorize_channel_group("TELEGRAM", chat_id, user_id)
+
+    return "ignore"
 
 
 def _display_name(user, chat):
@@ -111,28 +243,6 @@ def _initialize_offset():
             _offset = max_update + 1
 
 
-def _is_auth_command(msg):
-    lower = msg.strip().lower()
-    return lower.startswith("auth ") or lower.startswith("/auth ")
-
-
-def _is_allowed_message(chat_id, _user_id, msg):
-    """Trust an entire chat after one explicit shared-secret authentication."""
-    if not auth.is_auth_enabled():
-        return "allow"
-
-    # The chat ID is deliberately stored as the authorization subject. Once a
-    # trusted user authenticates a group, all present and future members of
-    # that group may use the bot. Other chats remain independently protected.
-    if auth.get_channel_saved_group_id("TELEGRAM", chat_id):
-        return "allow"
-
-    candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
-    if candidate is None:
-        return "ignore"
-    return auth.authenticate_channel_group("TELEGRAM", chat_id, candidate)
-
-
 def _poll_loop():
     global _connected, _offset
     logger.info("Polling started")
@@ -166,15 +276,26 @@ def _poll_loop():
                 user = message.get("from") or {}
                 chat_id = str(chat.get("id", "")).strip()
                 user_id = str(user.get("id", "")).strip()
+                chat_type = str(chat.get("type", "")).strip()
                 if not chat_id or not user_id:
                     continue
 
-                state = _is_allowed_message(chat_id, user_id, text)
+                state = _is_allowed_message(chat_id, user_id, chat_type, text)
                 display_name = _display_name(user, chat)
+
                 if state == "allow":
                     _enqueue_message(f"{display_name}: {text}", chat_id)
                 elif state == "auth_bound":
-                    send_message(f"Authentication successful for {display_name}.", chat_id)
+                    send_message(
+                        f"Authentication successful. {display_name} is now the bot owner. "
+                        "Send /bind in a group to open it to everyone there.",
+                        chat_id,
+                    )
+                elif state == "group_bound":
+                    send_message(
+                        "This group is now authorized. All members can talk to the bot here.",
+                        chat_id,
+                    )
         except Exception as exc:
             _connected = False
             logger.warning(f"Poll error: {exc}")
@@ -184,8 +305,21 @@ def _poll_loop():
     logger.info("Polling stopped")
 
 
-def start_telegram(chat_id="", poll_timeout=20):
-    global _running, _bot_token, _api_base, _poll_timeout, _offset, _connected, _active_chat_id
+def _parse_admin_allowed_chats(chat_id_config, allowed_config):
+    ids = set()
+    single = str(chat_id_config or "").strip()
+    if single:
+        ids.add(single)
+    for part in str(allowed_config or "").split(","):
+        part = part.strip()
+        if part:
+            ids.add(part)
+    return ids
+
+
+def start_telegram(chat_id="", allowed_chat_ids="", poll_timeout=20):
+    global _running, _bot_token, _api_base, _poll_timeout, _offset, _connected
+    global _active_chat_id, _admin_allowed_chats, _auto_bound_chat
 
     proxy = auth.get_proxy_url()
     if proxy:
@@ -197,8 +331,9 @@ def start_telegram(chat_id="", poll_timeout=20):
             raise ValueError("TG_BOT_TOKEN is required")
         _api_base = f"https://api.telegram.org/bot{_bot_token}"
 
-    if str(chat_id).strip():
-        logger.warning("TG_CHAT_ID is ignored by multi-chat Telegram mode")
+    _admin_allowed_chats = _parse_admin_allowed_chats(chat_id, allowed_chat_ids)
+    _auto_bound_chat = ""
+
     with _msg_lock:
         _inbox.clear()
     with _state_lock:
@@ -213,7 +348,10 @@ def start_telegram(chat_id="", poll_timeout=20):
     _offset = None
     _running = True
     _connected = False
-    logger.info("Starting adapter in multi-chat mode")
+    if _admin_allowed_chats:
+        logger.info(f"Starting adapter, admin-restricted to chats: {sorted(_admin_allowed_chats)}")
+    else:
+        logger.info("Starting adapter with no admin chat restriction")
     _initialize_offset()
 
     t = threading.Thread(target=_poll_loop, daemon=True)
@@ -226,33 +364,6 @@ def stop_telegram():
     _running = False
 
 
-def send_message(text, target_chat=None):
-    text = str(text).replace("\\n", "\n").replace("\r", "")
-    if not text:
-        return
-
-    with _state_lock:
-        target_chat = str(target_chat or _active_chat_id).strip()
-
-    if not _connected or not target_chat:
-        return
-
-    max_len = 3900
-    for i in range(0, len(text), max_len):
-        chunk = text[i:i + max_len]
-        if not chunk:
-            continue
-        try:
-            _api_call(
-                "sendMessage",
-                {"chat_id": target_chat, "text": chunk},
-                timeout=15,
-                use_post=True,
-            )
-        except Exception as exc:
-            logger.exception(f"Send failed: {exc}")
-            return
-
 class TelegramChannel(channels.CommChannel):
 
     def __init__(self):
@@ -260,8 +371,9 @@ class TelegramChannel(channels.CommChannel):
 
     def start(self) -> None:
         chat_id = config_get_by_key("TG_CHAT_ID", "")
+        allowed_chat_ids = config_get_by_key("TG_ALLOWED_CHAT_IDS", "")
         poll_timeout = int(config_get_by_key("TG_POLL_TIMEOUT", 20))
-        start_telegram(chat_id, poll_timeout)
+        start_telegram(chat_id, allowed_chat_ids, poll_timeout)
 
     def stop(self) -> None:
         stop_telegram()
@@ -271,6 +383,7 @@ class TelegramChannel(channels.CommChannel):
 
     def send(self, message: str) -> None:
         send_message(message)
+
 
 def loadOmegaClawPlugin():
     channels.registerCommChannel("telegram", TelegramChannel())

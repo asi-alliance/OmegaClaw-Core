@@ -23,7 +23,8 @@ _user_ID_processed = False
 def get_proxy_url():
     global _proxy_url
     if _proxy_url is None:
-        _proxy_url = config_get_by_key("GATEWAY_URL", "").rstrip("/")
+        configured_url = config_get_by_key("GATEWAY_URL", "")
+        _proxy_url = str(configured_url or "").strip().rstrip("/")
     return _proxy_url
 
 
@@ -73,9 +74,17 @@ def _channel_auth_user_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_USER_FILE)
 
 
-def _channel_auth_group_path():
-    return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
-
+# ---------------------------------------------------------------------------
+# Single-user (owner) authentication.
+#
+# UNCHANGED from the original implementation, byte for byte. IRC, Slack and
+# Mattermost depend on this exact behavior (including the single-use
+# _user_ID_processed guard). Telegram now ALSO calls into this same code
+# path (see authenticate_channel_user usage in channels/telegram.py) rather
+# than duplicating it -- this is the fix for review point #2: Telegram no
+# longer has a parallel "chat-based" identity system, it uses the one owner
+# identity every other channel uses.
+# ---------------------------------------------------------------------------
 
 def store_channel_authenticated_user_id(channel_identifier, user_id):
     # For any single run of OmegaClaw, allow only a single save of a user-id or verification
@@ -89,7 +98,7 @@ def store_channel_authenticated_user_id(channel_identifier, user_id):
     user_id = str(user_id or "").strip()
     if not user_id:
         raise ValueError("user_id is required")
-    
+
     """Record an authenticated channel user ID in the memory directory."""
     payload = {
         "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -108,11 +117,74 @@ def store_channel_authenticated_user_id(channel_identifier, user_id):
     return True
 
 
+def get_channel_saved_user_id(channel_identifier, user_id):
+    # For any single run of OmegaClaw, allow only a single save of a user-id or verification
+    global _user_ID_processed
+    if _user_ID_processed:
+        logger.warning(f"[{channel_identifier}] Warning: a user was already validated, ignoring")
+        return False
+
+    channel_identifier = str(channel_identifier or "").strip()
+    user_id = str(user_id or "").strip()
+    if not user_id:
+        return False
+    try:
+        path = _channel_auth_user_path()
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    record = json.loads(line)
+                    saved_channel_identifier = str(record.get("channel_identifier", "")).strip()
+                    saved_user_id = str(record.get("user_id", "")).strip()
+                except (AttributeError, json.JSONDecodeError) as e:
+                    logger.warning(f"Skipping malformed channel authenticated user record: {e}")
+                    continue
+                if saved_channel_identifier == channel_identifier and saved_user_id == user_id:
+                    _user_ID_processed = True
+                    return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        raise RuntimeError("Failed to read channel authenticated user records") from e
+    return False
+
+
+def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
+    # A token is accepted only when it came from an explicit auth command.
+    # Otherwise see if there was a prior session with the user-id and channel.
+    if auth_candidate is not None and verify_token(auth_candidate):
+        if store_channel_authenticated_user_id(channel_identifier, user_id):
+            label = str(channel_identifier).upper()
+            logger.info(f"[{label}] Saved authenticated user ID")
+            return "auth_bound"
+        else:
+            label = str(channel_identifier).upper()
+            logger.error(f"[{label}] ERROR -- Unable to save user ID")
+            return "ignore"
+    elif get_channel_saved_user_id(channel_identifier, user_id):
+        label = str(channel_identifier).upper()
+        logger.info(f"[{label}] Verified previously validated user ID")
+        return "allow"
+    else:
+        return "ignore"
+
+
 def get_channel_authenticated_user_id(channel_identifier):
-    """Return the first owner persisted for a channel, if one exists."""
+    """
+    Read-only owner lookup. Returns the persisted owner user_id for a
+    channel, or None if no owner has authenticated yet.
+
+    This is intentionally separate from get_channel_saved_user_id() above:
+    that function is single-use per process (it flips _user_ID_processed
+    and refuses to check again), which is fine for its original purpose
+    but wrong for Telegram's /bind flow, which needs to ask "who is the
+    owner?" repeatedly for the life of the process without ever mutating
+    state or tripping that guard. Never writes, never touches
+    _user_ID_processed.
+    """
     channel_identifier = str(channel_identifier or "").strip()
     if not channel_identifier:
-        raise ValueError("channel_identifier is required")
+        return None
     try:
         path = _channel_auth_user_path()
         with open(path, "r", encoding="utf-8") as f:
@@ -133,38 +205,26 @@ def get_channel_authenticated_user_id(channel_identifier):
     return None
 
 
-def get_channel_saved_user_id(channel_identifier, user_id):
-    global _user_ID_processed
-    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
-    if saved_user_id != str(user_id or "").strip():
-        return False
-    _user_ID_processed = True
-    return True
+# ---------------------------------------------------------------------------
+# Telegram-only group authorization (NEW).
+#
+# Fixes review point #3: the shared secret is NEVER sent or checked inside
+# a group. It is only ever used once, to establish the DM owner (via
+# authenticate_channel_user above). Opening a group is purely an identity
+# check -- does the /bind sender's user_id match the persisted owner? --
+# never a credential check. Stored in its own file so this can never read,
+# write, or otherwise influence authenticated-user.json.
+# ---------------------------------------------------------------------------
+
+def _channel_auth_group_path():
+    return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
 
 
-def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
-    # A persisted owner takes precedence over the reusable startup secret,
-    # including after a process restart.
-    saved_user_id = get_channel_authenticated_user_id(channel_identifier)
-    if saved_user_id is not None:
-        return "allow" if saved_user_id == str(user_id or "").strip() else "ignore"
-
-    # A token is accepted only when it came from an explicit auth command.
-    if auth_candidate is not None and verify_token(auth_candidate):
-        if store_channel_authenticated_user_id(channel_identifier, user_id):
-            label = str(channel_identifier).upper()
-            logger.info(f"[{label}] Saved authenticated user ID")
-            return "auth_bound"
-        else:
-            logger.error(f"[{label}] ERROR -- Unable to save user ID")
-            return "ignore"
-    return "ignore"
-
-
-def store_channel_authenticated_group_id(channel_identifier, group_id):
-    """Persist a trusted group without changing single-user channel auth."""
+def store_channel_authenticated_group_id(channel_identifier, group_id, authorized_by_user_id):
+    """Persist a trusted group. Never touches the single-user auth file."""
     channel_identifier = str(channel_identifier or "").strip()
     group_id = str(group_id or "").strip()
+    authorized_by_user_id = str(authorized_by_user_id or "").strip()
     if not channel_identifier:
         raise ValueError("channel_identifier is required")
     if not group_id:
@@ -174,6 +234,7 @@ def store_channel_authenticated_group_id(channel_identifier, group_id):
         "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "channel_identifier": channel_identifier,
         "group_id": group_id,
+        "authorized_by": authorized_by_user_id,
     }
     path = _channel_auth_group_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -187,7 +248,7 @@ def store_channel_authenticated_group_id(channel_identifier, group_id):
 
 
 def get_channel_saved_group_id(channel_identifier, group_id):
-    """Return whether a group has already been trusted for this channel."""
+    """Return whether a group has already been authorized for this channel."""
     channel_identifier = str(channel_identifier or "").strip()
     group_id = str(group_id or "").strip()
     if not channel_identifier or not group_id:
@@ -211,12 +272,27 @@ def get_channel_saved_group_id(channel_identifier, group_id):
     return False
 
 
-def authenticate_channel_group(channel_identifier, group_id, auth_candidate=None):
-    """Trust one chat after an explicit shared-secret authentication."""
+def authorize_channel_group(channel_identifier, group_id, requester_user_id):
+    """
+    Open a group chat to all its members -- but ONLY when requester_user_id
+    matches the persisted owner for this channel (see
+    get_channel_authenticated_user_id). The shared secret plays no role
+    here at all; this is a pure identity check on the /bind sender.
+    """
     if get_channel_saved_group_id(channel_identifier, group_id):
         return "allow"
-    if auth_candidate is not None and verify_token(auth_candidate):
-        if store_channel_authenticated_group_id(channel_identifier, group_id):
-            logger.info(f"[{str(channel_identifier).upper()}] Saved authenticated group ID")
-            return "auth_bound"
+
+    owner_id = get_channel_authenticated_user_id(channel_identifier)
+    if owner_id is None:
+        # No owner has authenticated yet -- nobody can open groups.
+        return "ignore"
+
+    if str(requester_user_id or "").strip() != owner_id:
+        return "ignore"
+
+    if store_channel_authenticated_group_id(channel_identifier, group_id, owner_id):
+        logger.info(f"[{str(channel_identifier).upper()}] Saved authorized group ID")
+        return "group_bound"
+
+    logger.error(f"[{str(channel_identifier).upper()}] ERROR -- Unable to save group ID")
     return "ignore"
