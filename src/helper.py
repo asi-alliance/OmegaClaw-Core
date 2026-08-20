@@ -9,10 +9,8 @@ from tempfile import TemporaryDirectory
 
 try:
     from src.logger import get_logger
-    from src.memory_gateway import history_path
 except ModuleNotFoundError:  # running this file directly as a script
     from logger import get_logger
-    from memory_gateway import history_path
 
 logger = get_logger(__name__)
 
@@ -65,7 +63,7 @@ def extract_timestamp(line):
 
 def around_time(needle_time_str, k):
     needle_time_str = needle_time_str.replace(r'\"', '').replace('"', '').strip()
-    filename = history_path()
+    filename = "repos/OmegaClaw-Core/memory/history.metta"
     target = datetime.strptime(needle_time_str, "%Y-%m-%d %H:%M:%S")
     best_lineno = None
     best_line = None

@@ -22,7 +22,6 @@
 !(import! &self (library OmegaClaw-Core ./src/fileio.py))
 !(import! &self (library OmegaClaw-Core ./src/skills))
 !(import! &self (library OmegaClaw-Core ./src/websearch.py))
-!(import! &self (library OmegaClaw-Core ./src/memory_gateway.py))
 !(import! &self (library OmegaClaw-Core ./src/memory))
 !(import! &self (library OmegaClaw-Core ./src/context))
 !(import! &self (library OmegaClaw-Core ./src/loop))
