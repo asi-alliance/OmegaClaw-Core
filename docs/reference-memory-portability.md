@@ -29,11 +29,11 @@ the returned short-lived token:
 /memory-export ltm
 /memory-export both
 /memory-export confirm <token>
-/memory-export status <job-id>
 ```
 
-The export runs in the background. Completion is delivered only to the owner
-who started it and includes the filename, record count, size, and SHA-256.
+The confirmed export runs in the next agent iteration. Completion is delivered
+only to the owner who started it and includes the filename, record count, size,
+and SHA-256.
 
 Archives contain selected persistent user memory only:
 

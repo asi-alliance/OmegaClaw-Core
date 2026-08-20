@@ -68,6 +68,7 @@
                                (commChannelSend (version))
                                (llmProviderStart (provider)))
                         (change-state! &loops (- (get-state &loops) 1)))
+          (py-call (channels.process_control_messages))
           (let $prompt (getContext)
                (progn (log INFO "loop" (---------iteration $k))
                       (heartbeat $k)

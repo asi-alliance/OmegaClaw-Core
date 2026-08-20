@@ -1,5 +1,6 @@
 """Shared authenticated /memory-export command handling."""
 
+from collections import deque
 import os
 import secrets
 import threading
@@ -9,7 +10,7 @@ from pathlib import Path
 import auth
 from config import config_get_by_key
 from src.logger import get_logger
-from memory_portability import MemoryTransfer
+from import_knowledge.memory_portability import MemoryTransfer
 
 logger = get_logger(__name__)
 
@@ -23,17 +24,11 @@ def _get_transfer() -> MemoryTransfer:
         _transfer = MemoryTransfer(_TRANSFER_DIR)
     return _transfer
 
-def start_export_job(component, on_complete=None):
-    return _get_transfer().start_export_job(component, on_complete=on_complete)
-
-def get_export_status(job_id):
-    return _get_transfer().get_export_status(job_id)
-
 _TOKEN_TTL_SECONDS = 60
 
-_token_lock = threading.Lock()
+_request_lock = threading.Lock()
 _pending_requests: dict[str, tuple[str, str, float]] = {}
-_job_owners: dict[str, str] = {}
+_export_requests = deque()
 
 _VALID_COMPONENTS = ("history", "ltm", "both")
 
@@ -91,18 +86,14 @@ def handle_export_command(
     if sub == "confirm":
         return _handle_confirm(owner_key, arg, deliver_completion)
 
-    if sub == "status":
-        return _handle_status(owner_key, arg)
-
     return (
         "Unknown /memory-export command. "
         "Use: /memory-export history|ltm|both  or  "
-        "/memory-export confirm <token>  or  "
-        "/memory-export status <job-id>"
+        "/memory-export confirm <token>"
     )
 
 def _handle_request(owner_key: str, component: str) -> str:
-    with _token_lock:
+    with _request_lock:
         token = _issue_token(owner_key, component)
     logger.info(f"memory_export: issued confirmation token for component={component}")
     return (
@@ -115,7 +106,7 @@ def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
     if not token:
         return "Usage: /memory-export confirm <token>"
 
-    with _token_lock:
+    with _request_lock:
         pending = _pending_requests.get(owner_key)
         if pending is None:
             return "No pending export request. Start with /memory-export history|ltm|both"
@@ -127,60 +118,28 @@ def _handle_confirm(owner_key: str, token: str, deliver_completion) -> str:
             return "Invalid token."
         del _pending_requests[owner_key]
 
+    with _request_lock:
+        _export_requests.append((component, deliver_completion))
+    return "Export queued. It will run in the next agent iteration."
+
+def process_pending_export() -> None:
+    with _request_lock:
+        if not _export_requests:
+            return
+        component, deliver_completion = _export_requests.popleft()
     try:
-        job_id = start_export_job(
-            component,
-            lambda completed_job_id, status: deliver_completion(
-                _format_completion(completed_job_id, status)
-            ),
-        )
+        result = _get_transfer().export(component)
+        reply = _format_export(result)
     except Exception as exc:
-        logger.exception(f"memory_export: failed to start export job: {exc}")
-        return f"Export failed to start: {exc}"
+        logger.exception(f"memory_export: export failed: {exc}")
+        reply = f"Memory export failed: {exc}"
+    deliver_completion(reply)
 
-    logger.info(f"memory_export: export job {job_id} started (component={component})")
-    with _token_lock:
-        _job_owners[job_id] = owner_key
+def _format_export(result: dict) -> str:
     return (
-        f"Export started. Job ID: {job_id}\n"
-        f"Check progress: /memory-export status {job_id}"
+        "Memory export complete\n"
+        f"File:     {result.get('filename')}\n"
+        f"Size:     {result.get('size')} bytes\n"
+        f"SHA-256:  {result.get('checksum')}\n"
+        f"Records:  {result.get('record_count')}"
     )
-
-def _handle_status(owner_key: str, job_id: str) -> str:
-    if not job_id:
-        return "Usage: /memory-export status <job-id>"
-
-    with _token_lock:
-        if _job_owners.get(job_id) != owner_key:
-            return f"Export {job_id}: unknown job ID"
-
-    status = get_export_status(job_id)
-    state = status.get("status", "unknown")
-
-    if state == "running":
-        return f"Export {job_id}: running…"
-
-    if state == "done":
-        return (
-            f"Export {job_id}: done\n"
-            f"File:     {status.get('filename')}\n"
-            f"Size:     {status.get('size')} bytes\n"
-            f"SHA-256:  {status.get('checksum')}\n"
-            f"Records:  {status.get('record_count')}"
-        )
-
-    if state == "failed":
-        return f"Export {job_id}: failed — {status.get('error')}"
-
-    return f"Export {job_id}: unknown job ID"
-
-def _format_completion(job_id: str, status: dict) -> str:
-    if status.get("status") == "done":
-        return (
-            f"Export {job_id}: done\n"
-            f"File:     {status.get('filename')}\n"
-            f"Size:     {status.get('size')} bytes\n"
-            f"SHA-256:  {status.get('checksum')}\n"
-            f"Records:  {status.get('record_count')}"
-        )
-    return f"Export {job_id}: failed — {status.get('error')}"

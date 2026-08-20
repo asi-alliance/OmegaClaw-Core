@@ -1,3 +1,4 @@
+import importlib
 import importlib.util
 import sys
 import time
@@ -18,9 +19,12 @@ def handler(monkeypatch):
     logger_mod.get_logger = lambda name: __import__("logging").getLogger(name)
     monkeypatch.setitem(sys.modules, "src.logger", logger_mod)
 
-    mp_mod = types.ModuleType("memory_portability")
+    import_knowledge = types.ModuleType("import_knowledge")
+    import_knowledge.__path__ = []
+    monkeypatch.setitem(sys.modules, "import_knowledge", import_knowledge)
+    mp_mod = types.ModuleType("import_knowledge.memory_portability")
     mp_mod.MemoryTransfer = object
-    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
+    monkeypatch.setitem(sys.modules, "import_knowledge.memory_portability", mp_mod)
 
     spec = importlib.util.spec_from_file_location(
         "memory_export_under_test",
@@ -38,17 +42,11 @@ def test_export_command_requires_auth_and_policy(handler):
     handler.is_export_enabled = lambda: False
     assert handler.handle_export_command("/memory-export both") is None
 
-def test_confirmation_starts_only_the_requested_export(handler):
-    started = []
-    handler.start_export_job = lambda component, on_complete: started.append(component) or "job-1"
-    token = handler.handle_export_command("/memory-export ltm").split()[-1]
-
-    assert "Invalid token" in handler.handle_export_command("/memory-export confirm wrong")
-    assert "job-1" in handler.handle_export_command(f"/memory-export confirm {token}")
-    assert started == ["ltm"]
-
 def test_expired_and_other_owner_tokens_cannot_start_export(handler):
     token = handler.handle_export_command("/memory-export history", "owner-a").split()[-1]
+    assert "Invalid token" in handler.handle_export_command(
+        "/memory-export confirm wrong", "owner-a"
+    )
     assert "No pending export" in handler.handle_export_command(
         f"/memory-export confirm {token}", "owner-b"
     )
@@ -58,27 +56,39 @@ def test_expired_and_other_owner_tokens_cannot_start_export(handler):
         f"/memory-export confirm {token}", "owner-a"
     ).lower()
 
-def test_completion_and_status_are_limited_to_requesting_owner(handler):
+def test_export_completion_is_delivered_after_loop_processing(handler):
     delivered = []
-
-    def start_job(component, callback):
-        callback("job-1", {"status": "done", "filename": "memory.tar.gz"})
-        return "job-1"
-
-    handler.start_export_job = start_job
+    exported = []
+    handler._get_transfer = lambda: types.SimpleNamespace(
+        export=lambda component: exported.append(component) or {
+            "filename": "memory.tar.gz",
+            "size": 1,
+            "checksum": "abc",
+            "record_count": 1,
+        }
+    )
     token = handler.handle_export_command("/memory-export both", "owner-a", delivered.append).split()[-1]
-    handler.handle_export_command(f"/memory-export confirm {token}", "owner-a", delivered.append)
-
-    assert "memory.tar.gz" in delivered[0]
-    assert "unknown job ID" in handler.handle_export_command("/memory-export status job-1", "owner-b")
+    delivered.append(
+        handler.handle_export_command(
+            f"/memory-export confirm {token}", "owner-a", delivered.append
+        )
+    )
+    assert delivered == ["Export queued. It will run in the next agent iteration."]
+    assert exported == []
+    handler.process_pending_export()
+    assert exported == ["both"]
+    assert "memory.tar.gz" in delivered[-1]
 
 def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     control = types.ModuleType("memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
     control.handle_export_command = lambda text, owner, deliver: "Export requested"
+    processed = []
+    control.process_pending_export = lambda: processed.append(True)
     monkeypatch.setitem(sys.modules, "memory_export", control)
 
-    from src import channels
+    monkeypatch.delitem(sys.modules, "channels", raising=False)
+    channels = importlib.import_module("channels")
 
     replies = []
     assert channels.handle_control_message(
@@ -86,3 +96,5 @@ def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     )
     assert replies == ["Export requested"]
     assert not channels.handle_control_message("hello", "telegram:chat:user", replies.append)
+    channels.process_control_messages()
+    assert processed == [True]

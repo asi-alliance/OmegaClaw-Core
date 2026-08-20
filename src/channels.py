@@ -18,6 +18,10 @@ def handle_control_message(text: str, owner_key: str, deliver_reply) -> bool:
         deliver_reply(reply)
     return True
 
+def process_control_messages() -> None:
+    from memory_export import process_pending_export
+    process_pending_export()
+
 class CommChannel:
     """Communication channel implementation"""
 
