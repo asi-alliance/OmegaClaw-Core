@@ -189,8 +189,28 @@ class _TelegramChannel:
             logging.info(f"Loaded config from {config_path}: tag_only={self.reply_only_on_tag}, "
                          f"dm={self.dm_enabled}, allowed_chats={len(self.allowed_chat_ids)}, "
                          f"admins={len(self.admin_ids)}")
+            self._warn_about_open_defaults()
         except Exception as e:
             logging.error(f"Error loading config {config_path}: {e}")
+
+    def _warn_about_open_defaults(self):
+        """Say so when the shipped defaults leave the channel wide open.
+
+        restrict_to_config_chat with an empty allowed_chats does not restrict
+        anything - the check passes every chat - so an operator who set the flag
+        and left the list blank believes the bot is locked to their group when it
+        will answer in any group it is added to. An empty admin list means no one
+        can run the admin commands or receive an ethics alert.
+        """
+        if self.restrict_to_config_chat and not self.allowed_chat_ids:
+            logging.warning(
+                "telegram: restrict_to_config_chat is on but allowed_chats is empty, "
+                "so the bot will reply in ANY chat it is added to. List the chat ids "
+                "it should be limited to.")
+        if not self.admin_ids:
+            logging.warning(
+                "telegram: no admin_ids are configured, so the admin commands are "
+                "unusable and ethics alerts have nowhere to go.")
 
     def load_policies(self):
         """Load and parse policy sections from a markdown file."""

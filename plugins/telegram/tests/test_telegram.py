@@ -454,6 +454,41 @@ def test_policy_sections_describe_what_the_bot_actually_does():
         assert disclosed in combined, f"policy does not disclose: {disclosed}"
 
 
+def test_open_defaults_are_warned_about():
+    """restrict_to_config_chat with an empty allowed_chats restricts nothing, so
+    an operator who sets the flag and leaves the list blank must be told."""
+    records = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    handler = _Capture(level=logging.WARNING)
+    logging.getLogger().addHandler(handler)
+    try:
+        ch = _new_channel()
+        ch.restrict_to_config_chat = True
+        ch.allowed_chat_ids = set()
+        ch.admin_ids = []
+        records.clear()
+        ch._warn_about_open_defaults()
+        assert any("ANY chat" in m for m in records), records
+        assert any("no admin_ids" in m for m in records), records
+
+        # Configured properly: nothing to warn about.
+        ch.allowed_chat_ids = {"-1001234567890"}
+        ch.admin_ids = [42]
+        records.clear()
+        ch._warn_about_open_defaults()
+        assert not records, records
+
+        # The open default really does let any chat through.
+        ch.allowed_chat_ids = set()
+        assert ch._is_allowed_chat(-1009999999999) is True
+    finally:
+        logging.getLogger().removeHandler(handler)
+
+
 def test_pause_actually_gates_the_chat_it_names():
     """/pause is an admin safety control. Chat ids arrive as ints from aiogram
     and as strings from the command and the config, so a pause recorded in one
@@ -715,6 +750,7 @@ if __name__ == "__main__":
     test_send_photo_dispatches_expected_aiogram_call()
     test_admin_command_refuses_non_admin_allows_admin()
     test_pause_actually_gates_the_chat_it_names()
+    test_open_defaults_are_warned_about()
     test_policy_and_profile_paths_are_configurable()
     test_policy_sections_describe_what_the_bot_actually_does()
     test_destructive_admin_commands_clear_the_auth_handshake()
