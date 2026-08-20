@@ -76,15 +76,6 @@ def _channel_auth_user_path():
 
 # ---------------------------------------------------------------------------
 # Single-user (owner) authentication.
-#
-# UNCHANGED from the original implementation, byte for byte. IRC, Slack and
-# Mattermost depend on this exact behavior (including the single-use
-# _user_ID_processed guard). Telegram now ALSO calls into this same code
-# path (see authenticate_channel_user usage in channels/telegram.py) rather
-# than duplicating it -- this is the fix for review point #2: Telegram no
-# longer has a parallel "chat-based" identity system, it uses the one owner
-# identity every other channel uses.
-# ---------------------------------------------------------------------------
 
 def store_channel_authenticated_user_id(channel_identifier, user_id):
     # For any single run of OmegaClaw, allow only a single save of a user-id or verification
@@ -125,8 +116,6 @@ def get_channel_saved_user_id(channel_identifier, user_id):
         return False
 
     # The first persisted record is the owner.  Do not scan later records
-    # looking for another matching user: older installations may contain
-    # accidental duplicate records, but they must not create extra owners.
     saved_user_id = get_channel_authenticated_user_id(channel_identifier)
     if saved_user_id != str(user_id or "").strip():
         return False
@@ -139,9 +128,7 @@ def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
     channel_identifier = str(channel_identifier or "").strip()
     user_id = str(user_id or "").strip()
 
-    # A persisted owner always wins over a reusable secret. This prevents a
-    # restart from allowing someone else who knows the secret to replace the
-    # original owner.
+    # A persisted owner always wins over a reusable secret. 
     saved_user_id = get_channel_authenticated_user_id(channel_identifier)
     if saved_user_id is not None:
         return "allow" if saved_user_id == user_id else "ignore"
@@ -161,14 +148,6 @@ def get_channel_authenticated_user_id(channel_identifier):
     """
     Read-only owner lookup. Returns the persisted owner user_id for a
     channel, or None if no owner has authenticated yet.
-
-    This is intentionally separate from get_channel_saved_user_id() above:
-    that function is single-use per process (it flips _user_ID_processed
-    and refuses to check again), which is fine for its original purpose
-    but wrong for Telegram's /bind flow, which needs to ask "who is the
-    owner?" repeatedly for the life of the process without ever mutating
-    state or tripping that guard. Never writes, never touches
-    _user_ID_processed.
     """
     channel_identifier = str(channel_identifier or "").strip()
     if not channel_identifier:
@@ -194,15 +173,7 @@ def get_channel_authenticated_user_id(channel_identifier):
 
 
 # ---------------------------------------------------------------------------
-# Telegram-only group authorization (NEW).
-#
-# Fixes review point #3: the shared secret is NEVER sent or checked inside
-# a group. It is only ever used once, to establish the DM owner (via
-# authenticate_channel_user above). Opening a group is purely an identity
-# check -- does the /bind sender's user_id match the persisted owner? --
-# never a credential check. Stored in its own file so this can never read,
-# write, or otherwise influence authenticated-user.json.
-# ---------------------------------------------------------------------------
+# Telegram-only group authorization.
 
 def _channel_auth_group_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
@@ -263,9 +234,7 @@ def get_channel_saved_group_id(channel_identifier, group_id):
 def authorize_channel_group(channel_identifier, group_id, requester_user_id):
     """
     Open a group chat to all its members -- but ONLY when requester_user_id
-    matches the persisted owner for this channel (see
-    get_channel_authenticated_user_id). The shared secret plays no role
-    here at all; this is a pure identity check on the /bind sender.
+    matches the persisted owner for this channel
     """
     if get_channel_saved_group_id(channel_identifier, group_id):
         return "allow"

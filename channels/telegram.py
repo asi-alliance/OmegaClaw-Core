@@ -23,30 +23,12 @@ _api_base = ""
 _poll_timeout = 20
 _offset = None
 _connected = False
-
-# --- Admin allowlist (review point #8) --------------------------------
-# A chat-level administrator boundary.  The initial owner-authentication DM
-# and the persisted owner's DM are intentionally exempt when auth is enabled.
-# TG_CHAT_ID is kept for backwards compatibility (single chat);
-# TG_ALLOWED_CHAT_IDS is new and accepts a comma-separated list. Empty
-# means "no admin restriction configured".
 _admin_allowed_chats = set()
 
-# Legacy no-auth fallback: first chat to talk wins. Only used when auth is
-# disabled AND no admin allowlist is configured, preserving the original
-# single-chat auto-bind behavior for existing no-auth deployments.
 _auto_bound_chat = ""
 
 _BIND_COMMANDS = ("/bind", "/authorize_group")
 
-
-# ---------------------------------------------------------------------------
-# Multi-chat routing (review point #9).
-#
-# Pure plumbing: remembers which chat each inbound message came from, and
-# lets replies target that same chat. Has no knowledge of authorization --
-# it only ever queues/sends what _is_allowed_message() has already approved.
-# ---------------------------------------------------------------------------
 
 def _enqueue_message(msg, chat_id):
     with _msg_lock:
@@ -94,26 +76,6 @@ def send_message(text, target_chat=None):
 
 # ---------------------------------------------------------------------------
 # Authorization.
-#
-# Layered, outer to inner:
-#   1. Admin allowlist (TG_CHAT_ID / TG_ALLOWED_CHAT_IDS) -- chats outside
-#      it are ignored, except for private owner bootstrap/owner DMs when
-#      authentication is enabled.
-#   2. If auth is disabled: allowlisted chats are trusted outright; with no
-#      allowlist at all, fall back to the legacy single-chat auto-bind.
-#   3. If auth is enabled: nothing is allowed until an owner exists. The
-#      owner is established exactly once via "auth <secret>" -- reusing
-#      auth.authenticate_channel_user(), the SAME function IRC/Slack/
-#      Mattermost use, keyed as "TELEGRAM". This is a deliberate reuse, not
-#      a parallel system (review point #2).
-#   4. Once an owner exists:
-#        - Private chats (DMs): owner only, forever. No other user can ever
-#          be allowed in the owner's DM (review point #6).
-#        - Group chats: open to every member once authorized. Before that,
-#          only the owner's own "/bind" (or "/authorize_group") message
-#          opens it -- verified by sender user_id, never by the secret
-#          (review point #3, #4, #5).
-# ---------------------------------------------------------------------------
 
 def _parse_auth_candidate(msg):
     text = msg.strip()
@@ -138,8 +100,7 @@ def _first_token(msg):
 
 
 def _is_bind_command(msg):
-    # Handle Telegram's "/bind@YourBotName" form, sent automatically by
-    # clients when a group has more than one bot in it.
+    # Handle Telegram's "/bind@YourBotName" form
     token = _first_token(msg).split("@", 1)[0]
     return token in _BIND_COMMANDS
 
@@ -182,7 +143,6 @@ def _is_allowed_message(chat_id, user_id, chat_type, msg):
 
     if owner_id is None:
         # The reusable secret is accepted only in a private DM. The owner can
-        # then open groups using /bind, which relies on Telegram user id.
         if is_owner_bootstrap:
             candidate = _parse_auth_candidate(msg)
             return auth.authenticate_channel_user("TELEGRAM", user_id, candidate)
