@@ -694,8 +694,8 @@ options() {
             echo "--memory-transfer-dir must be an absolute path: ${memory_transfer_dir}" >&2
             return 1
         fi
-        if [[ ! -d "${memory_transfer_dir}" ]]; then
-            echo "--memory-transfer-dir does not exist: ${memory_transfer_dir}" >&2
+        if ! mkdir -p "${memory_transfer_dir}"; then
+            echo "Could not create --memory-transfer-dir: ${memory_transfer_dir}" >&2
             return 1
         fi
         if [[ ! -w "${memory_transfer_dir}" ]]; then

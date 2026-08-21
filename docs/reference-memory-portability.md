@@ -6,9 +6,9 @@ workflow, not an LLM skill.
 
 ## Setup
 
-Choose an absolute host directory for archives. The launcher mounts it at the
-fixed container path `/memory-transfer`; the agent never accepts arbitrary
-runtime export paths.
+Choose an absolute host directory for archives. The launcher creates it when
+needed and mounts it at the fixed container path `/memory-transfer`; the agent
+never accepts arbitrary runtime export paths.
 
 ```sh
 scripts/omegaclaw start -p OpenAI -t telegram \
