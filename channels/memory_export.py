@@ -8,7 +8,6 @@ from pathlib import Path
 
 from config import config_get_by_key
 from src.logger import get_logger
-from memory_portability import MemoryTransfer
 
 logger = get_logger(__name__)
 
@@ -16,13 +15,18 @@ _TRANSFER_DIR = Path("/memory-transfer")
 
 _transfer = None
 
-def _get_transfer() -> MemoryTransfer:
+def _get_transfer():
     global _transfer
     if _transfer is None:
+        # Keep the runtime package optional while channel modules are imported.
+        # The Docker image installs it, but lightweight CI/unit environments do
+        # not need it unless an export is actually executed.
+        from memory_portability import MemoryTransfer
+
         embedding_provider = str(config_get_by_key("embeddingprovider", "Local")).strip()
         if embedding_provider.casefold() not in {"local", "openai"}:
             raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
-        
+
         os.environ["EMBEDDING_PROVIDER"] = embedding_provider
         _transfer = MemoryTransfer(_TRANSFER_DIR)
     return _transfer

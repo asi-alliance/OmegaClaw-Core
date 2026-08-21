@@ -21,9 +21,7 @@ def handler(monkeypatch):
     logger_mod.get_logger = lambda name: __import__("logging").getLogger(name)
     monkeypatch.setitem(sys.modules, "src.logger", logger_mod)
 
-    mp_mod = types.ModuleType("memory_portability")
-    mp_mod.MemoryTransfer = object
-    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
+    monkeypatch.delitem(sys.modules, "memory_portability", raising=False)
 
     spec = importlib.util.spec_from_file_location(
         "memory_export_under_test",
@@ -38,6 +36,10 @@ def test_export_command_requires_policy_but_not_auth(handler):
     assert "Export requested" in handler.handle_export_command("/memory-export both")
     handler.is_export_enabled = lambda: False
     assert handler.handle_export_command("/memory-export both") is None
+
+def test_module_import_does_not_require_memory_portability(handler):
+    assert "memory_portability" not in sys.modules
+    assert handler.is_export_command("/memory-export both")
 
 def test_expired_and_other_owner_tokens_cannot_start_export(handler):
     token = handler.handle_export_command("/memory-export history", "owner-a").split()[-1]
@@ -77,7 +79,9 @@ def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch
             created.append((transfer_dir, os.environ["EMBEDDING_PROVIDER"]))
 
     monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
-    monkeypatch.setattr(handler, "MemoryTransfer", FakeTransfer)
+    mp_mod = types.ModuleType("memory_portability")
+    mp_mod.MemoryTransfer = FakeTransfer
+    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
     monkeypatch.setattr(
         handler,
         "config_get_by_key",
