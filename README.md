@@ -97,6 +97,19 @@ To reset OmegaClaw's memory:
 docker volume rm omegaclaw-memory
 ```
 
+### Memory portability
+
+Memory export is disabled by default. See the [memory portability reference](./docs/reference-memory-portability.md)
+for setup, export controls, archive contents, and import modes. To restore an
+archive while upgrading to a tagged image, use the same transfer directory:
+
+```sh
+scripts/omegaclaw start -d singularitynet/omegaclaw:<tag> -p OpenAI -t telegram \
+  --memory-transfer-dir "$HOME/omegaclaw-transfers" \
+  --memory-import omegaclaw-memory-<timestamp>.tar.gz \
+  --memory-mode overwrite
+```
+
 ---
 
 ## Usage

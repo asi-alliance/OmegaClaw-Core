@@ -361,7 +361,10 @@ def _poll_channel(channel_id):
         state = _is_allowed_message(channel_id, user_id, text)
         display_name = _get_display_name(user_id)
         if state == "allow":
-            _set_last(f"<@{user_id}> ({display_name}): {text}")
+            owner_key = f"slack:{channel_id}:{user_id}"
+            deliver_reply = lambda message, target=user_id: _send_export_reply(target, message)
+            if not channels.handle_control_message(text, owner_key, deliver_reply):
+                _set_last(f"{display_name}: {text}")
         elif state == "auth_bound":
             send_message(f"Authentication successful for {display_name}.")
 
@@ -385,6 +388,15 @@ def _deliver_outbound(chunk):
         {"channel": target_channel, "text": chunk},
         timeout=15,
     )
+
+
+def _send_export_reply(user_id, text):
+    """Deliver export-control output through the requester's Slack DM."""
+    payload = _api_call("conversations.open", {"users": user_id}, timeout=15)
+    channel_id = str((payload.get("channel") or {}).get("id", "")).strip()
+    if not channel_id:
+        raise RuntimeError("Slack did not return a direct-message channel")
+    _api_call("chat.postMessage", {"channel": channel_id, "text": str(text)}, timeout=15)
 
 
 def _flush_outbox():

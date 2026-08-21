@@ -163,6 +163,16 @@ def _deliver_outbound(chunk):
     )
 
 
+def _send_export_reply(user_id, text):
+    """Send private export-control output to the authenticated requester."""
+    _api_call(
+        "sendMessage",
+        {"chat_id": user_id, "text": str(text)},
+        timeout=15,
+        use_post=True,
+    )
+
+
 def _flush_outbox():
     global _connected
     try:
@@ -211,7 +221,10 @@ def _poll_loop():
                 state = _is_allowed_message(chat_id, user_id, text)
                 display_name = _display_name(user, chat)
                 if state == "allow":
-                    _set_last(f"{display_name}: {text}")
+                    owner_key = f"telegram:{chat_id}:{user_id}"
+                    deliver_reply = lambda message, target=user_id: _send_export_reply(target, message)
+                    if not channels.handle_control_message(text, owner_key, deliver_reply):
+                        _set_last(f"{display_name}: {text}")
                 elif state == "auth_bound":
                     send_message(f"Authentication successful for {display_name}.")
             _flush_outbox()

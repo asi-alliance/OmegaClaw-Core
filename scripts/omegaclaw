@@ -14,6 +14,7 @@ chmod 0600 "$tmp_py_file"
 cat >"$tmp_py_file" <<'PY'
 import getpass
 import json
+import os
 import secrets
 import string
 import shlex
@@ -282,6 +283,42 @@ def _choose_import_kb():
         print("Please enter y or n.")
 
 
+def _choose_memory_transfer():
+    while True:
+        answer = input("Set up a directory for memory transfer archives? [y/N]: ").strip().lower()
+        if answer in ("", "n", "no"):
+            return "", "0"
+        if answer == "q":
+            sys.exit(1)
+        if answer not in ("y", "yes"):
+            print("Please enter y or n.")
+            continue
+
+        value = input("Host directory for memory archives: ").strip()
+        if not value:
+            print("A directory is required.", file=sys.stderr)
+            continue
+        path = os.path.abspath(os.path.expanduser(value))
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as exc:
+            print(f"Could not create {path}: {exc}", file=sys.stderr)
+            continue
+        if not os.access(path, os.W_OK):
+            print(f"Directory is not writable: {path}", file=sys.stderr)
+            continue
+
+        while True:
+            enable = input("Enable memory export for this instance? [y/N]: ").strip().lower()
+            if enable in ("", "n", "no"):
+                return path, "0"
+            if enable in ("y", "yes"):
+                return path, "1"
+            if enable == "q":
+                sys.exit(1)
+            print("Please enter y or n.")
+
+
 def _prompt_llm_token():
     while True:
         token = getpass.getpass("Please paste your LLM token and press ENTER or 'q' to exit: ").strip()
@@ -309,6 +346,7 @@ def config_run_omegaclaw(config_output_path):
     channel_config = _choose_channel()
     provider, embeddingprovider, api_token_var, model, openaiapi_url, token = _choose_provider()
     import_kb_on_start = _choose_import_kb()
+    memory_transfer_dir, memory_export_enabled = _choose_memory_transfer()
 
     with open(config_output_path, "w", encoding="utf-8") as f:
         _write_kv(f, "api_token_var", api_token_var)
@@ -319,6 +357,8 @@ def config_run_omegaclaw(config_output_path):
         _write_kv(f, "model", model)
         _write_kv(f, "openaiapi_url", openaiapi_url)
         _write_kv(f, "IMPORT_KB_ON_START", import_kb_on_start)
+        _write_kv(f, "memory_transfer_dir", memory_transfer_dir)
+        _write_kv(f, "memory_export_enabled", memory_export_enabled)
         for key, value in channel_config.items():
             _write_kv(f, key, value)
 
@@ -497,6 +537,22 @@ help() {
     echo -e "\t-l <logging config> set Python logging config file"
     echo -e "\t--version, -v show the OmegaClaw version"
     echo -e "\t--help, -h show this help"
+    echo
+    echo -e "Memory portability options:"
+    echo -e "\t--memory-transfer-dir <absolute-path> mount host directory for memory export/import archives"
+    echo -e "\t--enable-memory-export enable memory export"
+    echo -e "\t--memory-import <filename> restore archive from transfer directory before startup"
+    echo -e "\t--memory-mode overwrite|append import mode (default: overwrite)"
+    echo -e "\t--only-history restore history only"
+    echo -e "\t--no-history skip history during import"
+    echo -e "\t--no-vector skip long-term memory during import"
+}
+
+require_option_value() {
+    if [[ "$#" -lt 2 || -z "${2}" ]]; then
+        echo "${1} requires a value" >&2
+        return 1
+    fi
 }
 
 options() {
@@ -515,6 +571,12 @@ options() {
     OMEGACLAW_OPENCLAW_TOKEN="${OMEGACLAW_OPENCLAW_TOKEN:-}"
     commchannel=irc
     log_config_path=""
+    memory_transfer_dir=""
+    memory_import_file=""
+    memory_import_mode="overwrite"
+    memory_import_no_history=0
+    memory_import_no_vector=0
+    memory_export_enabled=0
 
     if [[ "$#" -eq 0 ]]; then
         help
@@ -524,18 +586,61 @@ options() {
     command=${1}
     shift 1
 
-    while getopts s:t:p:u:g:c:d:l:m: flag
-    do
-        case "${flag}" in
-            s) OMEGACLAW_AUTH_SECRET=${OPTARG};;
-            t) commchannel=${OPTARG};;
-            p) provider=${OPTARG};;
-            u) openaiapi_url=${OPTARG};;
-            g) openclaw_url=${OPTARG};;
-            c) IRC_channel=${OPTARG};;
-            d) image=${OPTARG};;
-            l) log_config_path=${OPTARG};;
-            m) model=${OPTARG};;
+    while [[ "$#" -gt 0 ]]; do
+        case "${1}" in
+            -s?*) OMEGACLAW_AUTH_SECRET=${1:2}; shift; continue;;
+            -t?*) commchannel=${1:2}; shift; continue;;
+            -p?*) provider=${1:2}; shift; continue;;
+            -u?*) openaiapi_url=${1:2}; shift; continue;;
+            -g?*) openclaw_url=${1:2}; shift; continue;;
+            -c?*) IRC_channel=${1:2}; shift; continue;;
+            -d?*) image=${1:2}; shift; continue;;
+            -l?*) log_config_path=${1:2}; shift; continue;;
+            -m?*) model=${1:2}; shift; continue;;
+            -s|-t|-p|-u|-g|-c|-d|-l|-m|--memory-transfer-dir|--memory-import|--memory-mode)
+                require_option_value "${1}" "${2:-}" || return 1
+                ;;
+        esac
+        case "${1}" in
+            -s) OMEGACLAW_AUTH_SECRET=${2}; shift 2;;
+            -t) commchannel=${2}; shift 2;;
+            -p) provider=${2}; shift 2;;
+            -u) openaiapi_url=${2}; shift 2;;
+            -g) openclaw_url=${2}; shift 2;;
+            -c) IRC_channel=${2}; shift 2;;
+            -d) image=${2}; shift 2;;
+            -l) log_config_path=${2}; shift 2;;
+            -m) model=${2}; shift 2;;
+            --memory-transfer-dir)
+                memory_transfer_dir="${2}"
+                shift 2
+                ;;
+            --enable-memory-export)
+                memory_export_enabled=1
+                shift
+                ;;
+            --memory-import)
+                memory_import_file="${2}"
+                shift 2
+                ;;
+            --memory-mode)
+                memory_import_mode="${2}"
+                shift 2
+                ;;
+            --no-history)
+                memory_import_no_history=1
+                shift
+                ;;
+            --no-vector)
+                memory_import_no_vector=1
+                shift
+                ;;
+            --only-history)
+                memory_import_no_vector=1
+                shift
+                ;;
+            --version|-v) version; return 0;;
+            --help|-h) help; return 0;;
             *) help
                return 1
                ;;
@@ -583,14 +688,67 @@ options() {
             return 1
         fi
     fi
+
+    if [[ -n "${memory_transfer_dir}" ]]; then
+        if [[ "${memory_transfer_dir}" != /* ]]; then
+            echo "--memory-transfer-dir must be an absolute path: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+        if ! mkdir -p "${memory_transfer_dir}"; then
+            echo "Could not create --memory-transfer-dir: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+        if [[ ! -w "${memory_transfer_dir}" ]]; then
+            echo "--memory-transfer-dir is not writable: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ -n "${memory_import_file}" ]]; then
+        if [[ ! "${memory_import_file}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.gz$ ]]; then
+            echo "--memory-import must be a plain filename, not a path: ${memory_import_file}" >&2
+            return 1
+        fi
+        if [[ -z "${memory_transfer_dir}" ]]; then
+            echo "--memory-import requires --memory-transfer-dir to be set" >&2
+            return 1
+        fi
+        if [[ ! -f "${memory_transfer_dir}/${memory_import_file}" ]]; then
+            echo "--memory-import archive not found: ${memory_transfer_dir}/${memory_import_file}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${memory_export_enabled}" == "1" && -z "${memory_transfer_dir}" ]]; then
+        echo "--enable-memory-export requires --memory-transfer-dir" >&2
+        return 1
+    fi
+
+    if [[ "${memory_import_no_history}" == "1" && "${memory_import_no_vector}" == "1" ]]; then
+        echo "--no-history cannot be combined with --no-vector or --only-history" >&2
+        return 1
+    fi
+    if [[ -z "${memory_import_file}" &&
+          ( "${memory_import_no_history}" == "1" ||
+            "${memory_import_no_vector}" == "1" ) ]]; then
+        echo "Import component flags require --memory-import" >&2
+        return 1
+    fi
+
+    if [[ "${memory_import_mode}" != "overwrite" && "${memory_import_mode}" != "append" ]]; then
+        echo "--memory-mode must be overwrite or append" >&2
+        return 1
+    fi
 }
 
 start() {
-    docker rm -f omegaclaw 2>/dev/null || true
     docker pull "${image}" 2>/dev/null || true
 
     container_log_config_path=""
     log_config_volume=()
+    memory_transfer_volume=()
+    memory_import_env=()
+    memory_export_option=()
 
     if [ -n "${log_config_path}" ]; then
         if [ ! -f "${log_config_path}" ]; then
@@ -603,6 +761,35 @@ start() {
         log_config_volume=(--volume "${log_config_abs}:${container_log_config_path}:ro")
     fi
 
+    if [ -n "${memory_transfer_dir}" ]; then
+        memory_transfer_volume=(--volume "${memory_transfer_dir}:/memory-transfer")
+        if ! docker run --rm --user 65534:65534 --entrypoint /bin/sh \
+            --volume "${memory_transfer_dir}:/memory-transfer" "${image}" \
+            -c 'test -d /memory-transfer && test -w /memory-transfer'; then
+            echo "--memory-transfer-dir must be writable by container user 65534:65534" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${memory_export_enabled}" == "1" ]]; then
+        memory_export_option=("memoryExportEnabled=true")
+    fi
+
+    if [ -n "${memory_import_file}" ]; then
+        memory_import_env=(
+            -e "MEMORY_IMPORT_FILE=${memory_import_file}"
+            -e "MEMORY_IMPORT_MODE=${memory_import_mode}"
+        )
+        if [[ "${memory_import_no_history}" == "1" ]]; then
+            memory_import_env+=(-e MEMORY_IMPORT_NO_HISTORY=1)
+        fi
+        if [[ "${memory_import_no_vector}" == "1" ]]; then
+            memory_import_env+=(-e MEMORY_IMPORT_NO_VECTOR=1)
+        fi
+    fi
+
+    docker rm -f omegaclaw 2>/dev/null || true
+
     docker_cmd=(
         docker run -d -it
             --name omegaclaw
@@ -614,18 +801,21 @@ start() {
             --tmpfs /run:size=16m,mode=755
             --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory
             ${log_config_volume[@]+"${log_config_volume[@]}"}
+            ${memory_transfer_volume[@]+"${memory_transfer_volume[@]}"}
             -e "${api_token_var}"="${api_token}"
             -e "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}"
             -e "SL_BOT_TOKEN=${SL_BOT_TOKEN:-}"
             -e "OMEGACLAW_OPENCLAW_TOKEN=${OMEGACLAW_OPENCLAW_TOKEN:-}"
             -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET"
             -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-0}"
+            ${memory_import_env[@]+"${memory_import_env[@]}"}
             "$image"
             "commchannel=${commchannel}"
             "provider=${provider}"
             "embeddingprovider=${embeddingprovider}"
             "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
             "memoryDirectory=\$MEMORY_DIR"
+            ${memory_export_option[@]+"${memory_export_option[@]}"}
     )
 
     if [ -n "${container_log_config_path}" ]; then

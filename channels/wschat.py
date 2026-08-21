@@ -70,6 +70,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.logger import get_logger
+from memory_export import is_export_command
 try:
     import channels
 except ModuleNotFoundError:
@@ -193,6 +194,9 @@ def _handle_frame(raw_message):
         text = frame.get("text")
         if not isinstance(seq, int) or not isinstance(text, str):
             logger.warning(f"Ignoring malformed user_message frame: {frame!r}")
+            return
+        if is_export_command(text):
+            send_message("Memory export is not supported on the WebSocket channel.")
             return
         _enqueue_user_message(seq, text)
         return

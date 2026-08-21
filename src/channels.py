@@ -4,6 +4,16 @@ logger = logging.getLogger(__name__)
 
 _commChannelRegistry = {}
 
+def handle_control_message(text: str, owner_key: str, deliver_reply) -> bool:
+    from memory_export import handle_export_command, is_export_command
+
+    if not is_export_command(text):
+        return False
+    reply = handle_export_command(text, owner_key)
+    if reply is not None:
+        deliver_reply(reply)
+    return True
+
 class CommChannel:
     """Communication channel implementation"""
 
