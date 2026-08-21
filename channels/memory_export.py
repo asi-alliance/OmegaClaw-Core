@@ -1,5 +1,6 @@
 """Shared /memory-export command handling."""
 
+import os
 import secrets
 import threading
 import time
@@ -18,6 +19,11 @@ _transfer = None
 def _get_transfer() -> MemoryTransfer:
     global _transfer
     if _transfer is None:
+        embedding_provider = str(config_get_by_key("embeddingprovider", "Local")).strip()
+        if embedding_provider.casefold() not in {"local", "openai"}:
+            raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
+        
+        os.environ["EMBEDDING_PROVIDER"] = embedding_provider
         _transfer = MemoryTransfer(_TRANSFER_DIR)
     return _transfer
 

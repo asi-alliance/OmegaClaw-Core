@@ -1,6 +1,7 @@
 import importlib
 import importlib.util
 import json
+import os
 import sys
 import time
 import types
@@ -67,6 +68,27 @@ def test_confirmation_exports_immediately(handler):
     assert exported == ["both"]
     assert "memory.tar.gz" in reply
     assert "SHA-256:  abc" in reply
+
+def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch):
+    created = []
+
+    class FakeTransfer:
+        def __init__(self, transfer_dir):
+            created.append((transfer_dir, os.environ["EMBEDDING_PROVIDER"]))
+
+    monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.setattr(handler, "MemoryTransfer", FakeTransfer)
+    monkeypatch.setattr(
+        handler,
+        "config_get_by_key",
+        lambda key, default=None: "OpenAI" if key == "embeddingprovider" else default,
+    )
+    handler._transfer = None
+
+    transfer = handler._get_transfer()
+
+    assert isinstance(transfer, FakeTransfer)
+    assert created == [(handler._TRANSFER_DIR, "OpenAI")]
 
 def test_websocket_ignores_memory_export(monkeypatch):
     config = types.ModuleType("config")
