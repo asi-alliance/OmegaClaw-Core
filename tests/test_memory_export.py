@@ -89,12 +89,15 @@ def test_websocket_ignores_memory_export(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     received = []
+    replies = []
     module._enqueue_user_message = lambda *args: received.append(args)
+    module.send_message = replies.append
 
     module._handle_frame(json.dumps({
         "type": "user_message", "seq": 1, "text": "/memory-export both"
     }))
     assert received == []
+    assert replies == ["Memory export is not supported on the WebSocket channel."]
 
 def test_shared_dispatcher_consumes_control_commands(monkeypatch):
     control = types.ModuleType("memory_export")

@@ -196,7 +196,7 @@ def _handle_frame(raw_message):
             logger.warning(f"Ignoring malformed user_message frame: {frame!r}")
             return
         if is_export_command(text):
-            logger.info("Ignoring unavailable memory-export command on WebSocket channel")
+            send_message("Memory export is not supported on the WebSocket channel.")
             return
         _enqueue_user_message(seq, text)
         return
