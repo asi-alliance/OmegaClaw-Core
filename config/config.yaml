@@ -73,6 +73,8 @@ MM_CHANNEL_ID: "8fjrmabjx7gupy7e5kjznpt5qh"
 SL_CHANNEL_ID: ""
 # Slack polling interval in seconds (minimum effective value is 60).
 SL_POLL_INTERVAL: 60
+# Slack maximum attachment size to download, in MB.
+SL_MAX_FILE_SIZE_MB: 5
 
 # Telegram
 # Telegram chat ID. If empty, OmegaClaw auto-binds after first valid inbound auth/message.

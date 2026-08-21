@@ -12,7 +12,7 @@ from helpers import (
     try_with_clarification, wait_for_skill_match,
 )
 
-SEARCH_SKILLS = ("search",)
+SEARCH_SKILLS = ("websearch",)
 
 VALENCIA_LAT = 39.47
 VALENCIA_LON = -0.38
