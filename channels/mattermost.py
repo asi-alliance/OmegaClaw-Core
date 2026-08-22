@@ -28,7 +28,6 @@ _outbox = PendingMessages()
 MM_URL = "https://chat.singularitynet.io"
 CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "omegaclaw"x
 BOT_TOKEN = ""
-BOT_USER_ID = ""
 
 def _get_bot_user_id():
     global headers
@@ -109,29 +108,6 @@ def _deliver_outbound(text):
     response.raise_for_status()
 
 
-def _send_export_reply(user_id, text):
-    """Deliver export-control output through the requester's Mattermost DM."""
-    if not BOT_USER_ID:
-        raise RuntimeError("Mattermost bot identity is not initialized")
-    direct = requests.post(
-        f"{MM_URL}/api/v4/channels/direct",
-        headers=_headers,
-        json=[BOT_USER_ID, user_id],
-        timeout=15,
-    )
-    direct.raise_for_status()
-    direct_channel_id = str(direct.json().get("id", "")).strip()
-    if not direct_channel_id:
-        raise RuntimeError("Mattermost did not return a direct-message channel")
-    response = requests.post(
-        f"{MM_URL}/api/v4/posts",
-        headers=_headers,
-        json={"channel_id": direct_channel_id, "message": str(text)},
-        timeout=15,
-    )
-    response.raise_for_status()
-
-
 def _flush_outbox():
     try:
         _outbox.flush(_deliver_outbound, _ready_to_send)
@@ -181,10 +157,7 @@ def _ws_session():
                     state = _is_allowed_message(user_id, message)
                     if state == "allow":
                         name = _get_display_name(user_id)
-                        owner_key = f"mattermost:{CHANNEL_ID}:{user_id}"
-                        deliver_reply = lambda text, target=user_id: _send_export_reply(target, text)
-                        if not channels.handle_control_message(message, owner_key, deliver_reply):
-                            _set_last(f"{name}: {message}")
+                        _set_last(f"{name}: {message}")
                     elif state == "auth_bound":
                         name = _get_display_name(user_id)
                         send_message(f"Authentication successful for {name}.")

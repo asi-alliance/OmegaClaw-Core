@@ -18,9 +18,6 @@ _transfer = None
 def _get_transfer():
     global _transfer
     if _transfer is None:
-        # Keep the runtime package optional while channel modules are imported.
-        # The Docker image installs it, but lightweight CI/unit environments do
-        # not need it unless an export is actually executed.
         from memory_portability import MemoryTransfer
 
         embedding_provider = str(config_get_by_key("embeddingprovider", "Local")).strip()

@@ -97,7 +97,7 @@ def _download_file(url, timeout=30):
             logger.exception(f"Slack file download failed: {url}")
             attach = None
         return attach
-
+        
 def _set_last(msg):
     global _last_message
     with _msg_lock:
@@ -408,44 +408,41 @@ def _poll_channel(channel_id):
         state = _is_allowed_message(channel_id, user_id, text)
         display_name = _get_display_name(user_id)
         if state == "allow":
-            owner_key = f"slack:{channel_id}:{user_id}"
-            deliver_reply = lambda message, target=user_id: _send_export_reply(target, message)
-            if not channels.handle_control_message(text, owner_key, deliver_reply):
-                # After the user is validated, expose attachments to the agent.
-                if files:
-                    file_info = []
-                    for f in files:
-                        name = f.get("name", "unknown")
-                        url = f.get("url_private_download") or f.get("url_private", "")
-                        mime = f.get("mimetype", "")
-                        size = f.get("size", 0)
-                        file_info.append(f"[ATTACHMENT: {name} | {mime} | {size} bytes | {url}]")
-                        # Download content to /tmp for agent access, check file size first -- must be below maximum.
-                        if url:
-                            if size <= SL_MAX_FILE_SIZE_BYTES:
-                                file_data = _download_file(url, timeout=30)
-                                if file_data:
-                                    safe_name = name.replace("/", "_")
-                                    tmp_path = f"/tmp/slack_attachment_{safe_name}"
-                                    try:
-                                        with open(tmp_path, "wb") as fh:
-                                            fh.write(file_data)
-                                        file_info.append(f"[SAVED: {tmp_path}]")
-                                    except Exception as exc:
-                                        logger.exception(f"Failed to save Slack attachment: {exc}")
-                                        file_info.append(f"[ATTACHMENT DOWNLOAD FAILED: {name} {exc}]")
-                                else:
-                                    file_info.append(f"[ATTACHMENT DOWNLOAD FAILED, NO DATA: {name}]")
+            # after user validated, read attachments
+            if files:
+                file_info = []
+                for f in files:
+                    name = f.get("name", "unknown")
+                    url = f.get("url_private_download") or f.get("url_private", "")
+                    mime = f.get("mimetype", "")
+                    size = f.get("size", 0)
+                    file_info.append(f"[ATTACHMENT: {name} | {mime} | {size} bytes | {url}]")
+                    # Download content to /tmp for agent access, check file size first -- must be below maximum.
+                    if url:
+                        if size <= SL_MAX_FILE_SIZE_BYTES:
+                            file_data = _download_file(url, timeout=30)
+                            if file_data:
+                                safe_name = name.replace("/", "_")
+                                tmp_path = f"/tmp/slack_attachment_{safe_name}"
+                                try:
+                                    with open(tmp_path, "wb") as fh:
+                                        fh.write(file_data)
+                                    file_info.append(f"[SAVED: {tmp_path}]")
+                                except Exception as exc:
+                                    logger.exception(f"Failed to save Slack attachment: {exc}")
+                                    file_info.append(f"[ATTACHMENT DOWNLOAD FAILED: {name} {exc}]")
                             else:
-                                file_info.append(f"[ATTACHMENT DOWNLOAD SIZE TOO LARGE, FAILED: {name} Size: {size}]")
+                                file_info.append(f"[ATTACHMENT DOWNLOAD FAILED, NO DATA: {name}]")
                         else:
-                            file_info.append(f"[ATTACHMENT DOWNLOAD BAD URL, FAILED: {name} url: {url}]")
-                    if text:
-                        text = text + "\n" + "\n".join(file_info)
+                            file_info.append(f"[ATTACHMENT DOWNLOAD SIZE TOO LARGE, FAILED: {name} Size: {size}]")
                     else:
-                        text = "\n".join(file_info)
+                        file_info.append(f"[ATTACHMENT DOWNLOAD BAD URL, FAILED: {name} url: {url}]")
+                if text:
+                    text = text + "\n" + "\n".join(file_info)
+                else:
+                    text = "\n".join(file_info)
 
-                _set_last(f"<@{user_id}> ({display_name}): {text}")
+            _set_last(f"<@{user_id}> ({display_name}): {text}")
         elif state == "auth_bound":
             send_message(f"Authentication successful for {display_name}.")
 
@@ -469,15 +466,6 @@ def _deliver_outbound(chunk):
         {"channel": target_channel, "text": chunk},
         timeout=15,
     )
-
-
-def _send_export_reply(user_id, text):
-    """Deliver export-control output through the requester's Slack DM."""
-    payload = _api_call("conversations.open", {"users": user_id}, timeout=15)
-    channel_id = str((payload.get("channel") or {}).get("id", "")).strip()
-    if not channel_id:
-        raise RuntimeError("Slack did not return a direct-message channel")
-    _api_call("chat.postMessage", {"channel": channel_id, "text": str(text)}, timeout=15)
 
 
 def _flush_outbox():
