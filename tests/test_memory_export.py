@@ -25,7 +25,7 @@ def handler(monkeypatch):
 
     spec = importlib.util.spec_from_file_location(
         "memory_export_under_test",
-        REPO_ROOT / "channels" / "memory_export.py",
+        REPO_ROOT / "src" / "memory_export.py",
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -133,12 +133,12 @@ def test_commchannel_receive_dispatches_control_commands(monkeypatch):
     monkeypatch.setitem(sys.modules, "auth", auth)
 
     owners: list[str] = []
-    control = types.ModuleType("memory_export")
+    control = types.ModuleType("src.memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
     control.handle_export_command = lambda text, owner: (
         owners.append(owner) or "Export requested"
     )
-    monkeypatch.setitem(sys.modules, "memory_export", control)
+    monkeypatch.setitem(sys.modules, "src.memory_export", control)
 
     monkeypatch.delitem(sys.modules, "channels", raising=False)
     channels = importlib.import_module("channels")
@@ -161,12 +161,12 @@ def test_commchannel_receive_rejects_unsupported_control_channel(monkeypatch):
     auth.get_channel_authenticated_user_id = lambda *_: "websocket-user"
     monkeypatch.setitem(sys.modules, "auth", auth)
 
-    control = types.ModuleType("memory_export")
+    control = types.ModuleType("src.memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
     control.handle_export_command = lambda *_: pytest.fail(
         "unsupported channels must not execute exports"
     )
-    monkeypatch.setitem(sys.modules, "memory_export", control)
+    monkeypatch.setitem(sys.modules, "src.memory_export", control)
 
     monkeypatch.delitem(sys.modules, "channels", raising=False)
     channels = importlib.import_module("channels")
@@ -190,12 +190,12 @@ def test_commchannel_receive_does_not_consume_command_mentions(monkeypatch):
     )
     monkeypatch.setitem(sys.modules, "auth", auth)
 
-    control = types.ModuleType("memory_export")
+    control = types.ModuleType("src.memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
     control.handle_export_command = lambda *_: pytest.fail(
         "a command mentioned in normal text must not execute"
     )
-    monkeypatch.setitem(sys.modules, "memory_export", control)
+    monkeypatch.setitem(sys.modules, "src.memory_export", control)
 
     monkeypatch.delitem(sys.modules, "channels", raising=False)
     channels = importlib.import_module("channels")
@@ -219,12 +219,12 @@ def test_commchannel_receive_falls_back_to_sender_without_auth(monkeypatch):
     monkeypatch.setitem(sys.modules, "auth", auth)
 
     owners: list[str] = []
-    control = types.ModuleType("memory_export")
+    control = types.ModuleType("src.memory_export")
     control.is_export_command = lambda text: text == "/memory-export both"
     control.handle_export_command = lambda text, owner: (
         owners.append(owner) or "Export requested"
     )
-    monkeypatch.setitem(sys.modules, "memory_export", control)
+    monkeypatch.setitem(sys.modules, "src.memory_export", control)
 
     monkeypatch.delitem(sys.modules, "channels", raising=False)
     channels = importlib.import_module("channels")

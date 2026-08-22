@@ -7,7 +7,7 @@ _commChannelRegistry = {}
 
 def handle_control_message(message: str) -> bool:
     from auth import get_channel_authenticated_user_id, is_auth_enabled
-    from memory_export import handle_export_command, is_export_command
+    from src.memory_export import handle_export_command, is_export_command
 
     sender, separator, command = message.rpartition(": ")
     if not separator:

@@ -15,6 +15,7 @@ _TRANSFER_DIR = Path("/memory-transfer")
 
 _transfer = None
 
+
 def _get_transfer():
     global _transfer
     if _transfer is None:
@@ -28,6 +29,7 @@ def _get_transfer():
         _transfer = MemoryTransfer(_TRANSFER_DIR)
     return _transfer
 
+
 _TOKEN_TTL_SECONDS = 60
 
 _request_lock = threading.Lock()
@@ -35,11 +37,13 @@ _pending_requests: dict[str, tuple[str, str, float]] = {}
 
 _VALID_COMPONENTS = ("history", "ltm", "both")
 
+
 def is_export_enabled() -> bool:
     value = config_get_by_key("memoryExportEnabled", False)
     return value is True or (
         isinstance(value, str) and value.strip().lower() == "true"
     )
+
 
 def is_export_command(text: str) -> bool:
     command = text.strip().split(None, 1)
@@ -48,9 +52,11 @@ def is_export_command(text: str) -> bool:
     name = command[0].lower()
     return name == "/memory-export" or name.startswith("/memory-export@")
 
+
 def _command_arguments(text: str) -> str:
     parts = text.strip().split(None, 1)
     return parts[1].strip() if len(parts) == 2 else ""
+
 
 def _issue_token(owner_key: str, component: str) -> str:
     token = secrets.token_hex(8)
@@ -60,6 +66,7 @@ def _issue_token(owner_key: str, component: str) -> str:
         time.monotonic() + _TOKEN_TTL_SECONDS,
     )
     return token
+
 
 def handle_export_command(
     text: str,
@@ -90,6 +97,7 @@ def handle_export_command(
         "/memory-export confirm <token>"
     )
 
+
 def _handle_request(owner_key: str, component: str) -> str:
     with _request_lock:
         token = _issue_token(owner_key, component)
@@ -99,6 +107,7 @@ def _handle_request(owner_key: str, component: str) -> str:
         f"Confirm within {_TOKEN_TTL_SECONDS}s:\n"
         f"/memory-export confirm {token}"
     )
+
 
 def _handle_confirm(owner_key: str, token: str) -> str:
     if not token:
@@ -121,6 +130,7 @@ def _handle_confirm(owner_key: str, token: str) -> str:
     except Exception as exc:
         logger.exception(f"memory_export: export failed: {exc}")
         return f"Memory export failed: {exc}"
+
 
 def _format_export(result: dict) -> str:
     return (
