@@ -824,7 +824,6 @@ start() {
             "provider=${provider}"
             "embeddingprovider=${embeddingprovider}"
             "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
-            "memoryDirectory=\$MEMORY_DIR"
             ${memory_export_option[@]+"${memory_export_option[@]}"}
     )
 
