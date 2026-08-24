@@ -9,7 +9,7 @@ from helpers import (
     wait_for_skill_call, wait_for_history_keyword, find_skill_calls,
 )
 
-SEARCH_SKILLS = ("search",)
+SEARCH_SKILLS = ("websearch",)
 
 
 def test_search_basic():

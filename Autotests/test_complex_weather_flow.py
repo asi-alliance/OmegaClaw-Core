@@ -11,7 +11,7 @@ from helpers import (
     send_prompt, try_with_clarification, wait_for_file,
 )
 
-SEARCH_SKILLS = ("search",)
+SEARCH_SKILLS = ("websearch",)
 
 TARGET_DIR = "/tmp/wflow"
 WEATHER_TXT = f"{TARGET_DIR}/w.txt"

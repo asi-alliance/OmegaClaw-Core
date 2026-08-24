@@ -10,7 +10,7 @@ from helpers import (
 )
 
 GIBBERISH = "dfghjkgkfjghj"
-SEARCH_SKILLS = ("search",)
+SEARCH_SKILLS = ("websearch",)
 
 
 def test_search_invalid():

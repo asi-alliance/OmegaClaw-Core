@@ -17,7 +17,8 @@
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
-          (configure memoryDirectory ./)
+          (configure memoryDirectory
+               (joinPath ((py-call (helper.projectRootDirectory)) memory)))
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))
