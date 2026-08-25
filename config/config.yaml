@@ -10,7 +10,7 @@ spamShield: False
 sleepInterval: 1
 # LLM model to load overrides *_model parameters see below
 #model: 
-# LLM provider, see the list below in the Providers section
+# LLM provider id, see the list below in the Providers section
 provider: Anthropic
 # Output cap passed to the provider
 maxOutputToken: 6000
@@ -46,11 +46,12 @@ securityPolicyPath: "./repos/OmegaClaw-Core/profile/policy.yaml"
 
 # Channels
 
-# Type of the communication channel for agent to use
+# Identifier of the communication channel for agent to use
 # see the list below
 commchannel: irc
 
 # IRC
+# Enabled with commchannel: irc
 # IRC channel to join 
 IRC_channel: "##omegaclaw"
 # IRC server hostname
@@ -61,12 +62,14 @@ IRC_port: 6667
 IRC_user: "omegaclaw"
 
 # Mattermost
+# Enabled with commchannel: mattermost
 # Mattermost base URL.
 MM_URL: "https://chat.singularitynet.io"
 # Mattermost channel ID.
 MM_CHANNEL_ID: "8fjrmabjx7gupy7e5kjznpt5qh"
 
 # Slack
+# Enabled with commchannel: slack
 # Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message.
 SL_CHANNEL_ID: ""
 # Slack polling interval in seconds (minimum effective value is 60).
@@ -75,6 +78,7 @@ SL_POLL_INTERVAL: 60
 SL_MAX_FILE_SIZE_MB: 5
 
 # Telegram
+# Enabled with commchannel: telegram
 # Legacy single-chat allowlist. When set, only this chat is accepted.
 TG_CHAT_ID: ""
 # Optional additional comma-separated chat IDs. These are a hard
@@ -84,15 +88,20 @@ TG_ALLOWED_CHAT_IDS: ""
 # Telegram polling timeout in seconds.
 TG_POLL_TIMEOUT: 20
 
-# WSchat
+# Websocket
+# Enabled with commchannel: websocket
 # WebSocket endpoint URL (`ws://` or `wss://`). Required when `commchannel=websocket`.
 WS_URL: ""
 # Optional bearer token sent as `Authorization: Bearer <token>`.
 WS_TOKEN: ""
 
+# Mock channel
+# Enabled with commchannel: test
+
 # Providers
 
 # OpenAIAPI
+# Enabled with provider: OpenAIAPI
 # Name of the API key variable to read
 api_token_var: "OPENAIAPI_API_KEY"
 # LLM endpoint URL.
@@ -101,14 +110,17 @@ openaiapi_url: "http://localhost:11434/v1/"
 openaiapi_model: "qwen3.5:9b"
 
 # ASICloud
+# Enabled with provider: ASICloud
 # Default model
 asicloud_model: "minimax/minimax-m3"
 
 # Anthropic
+# Enabled with provider: Anthropic
 # Default model
 anthropic_model: "claude-opus-4-8"
 
 # OpenRouter
+# Enabled with provider: OpenRouter
 # Default model
 openrouter_model: "z-ai/glm-5.2"
 # Overrides session id
@@ -117,14 +129,19 @@ openrouter_model: "z-ai/glm-5.2"
 OPENROUTER_CACHE_TTL: 5m
 
 # OpenAI
+# Enabled with provider: OpenAI
 # Default model
 openai_model: "gpt-5.5"
 # Overrides prompt cache key
 #OPENAI_PROMPT_CACHE_KEY:
 
 # ASIOne
+# Enabled with provider: ASIOne
 # Default model
 asione_model: "asi1-ultra"
+
+# Mock provider
+# Enabled with provider: Test
 
 # Skills
 
