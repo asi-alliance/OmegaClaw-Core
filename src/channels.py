@@ -52,11 +52,11 @@ class CommChannel:
 
     def start(self) -> None:
         """Configure and start communication channel"""
-        raise NotImplementedError()
+        pass
 
     def stop(self) -> None:
         """Stop communication channel and free resources"""
-        raise NotImplementedError()
+        pass
 
     def receive(self) -> str:
         """Receive message from the communication channel"""
@@ -67,7 +67,13 @@ class CommChannel:
         raise NotImplementedError()
 
 def registerCommChannel(id: str, channel: CommChannel) -> None:
-    """Register communication channel in the registry"""
+    """
+    Register communication channel in the registry.
+
+    Arguments:
+    id: the identifier of the plugin which is used to load it
+    channel: the implementation of the channel
+    """
     global _commChannelRegistry
     logger.info(f"registerCommChannel: registering communication channel {id}")
     _commChannelRegistry[id] = channel
@@ -81,7 +87,9 @@ def commChannelStart(commchannel):
     global _commchannel, _commchannel_id
     _commchannel = _commChannelRegistry.get(commchannel, None)
     if _commchannel is None:
-        _error("commChannelStart", f"Communication channel plugin {commchannel} is not registered")
+        error = f"commChannelStart: Communication channel plugin {commchannel} is not registered"
+        logger.error(error)
+        raise RuntimeError(error)
     _commchannel_id = str(commchannel).lower()
     _commchannel.start()
 

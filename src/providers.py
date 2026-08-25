@@ -9,18 +9,24 @@ class LLMProvider:
 
     def start(self) -> None:
         """Configure and start LLM provider"""
-        raise NotImplementedError()
+        pass
 
     def stop(self) -> None:
         """Stop and LLM provider and free resources"""
-        raise NotImplementedError()
+        pass
 
     def chat(self, prompt: str, max_tokens: int = 6000, reasoning_mode: str = "medium") -> str:
         """Chat with LLM provider"""
         raise NotImplementedError()
 
 def registerLLMProvider(id: str, provider: LLMProvider) -> None:
-    """Register LLM provider in the registry"""
+    """
+    Register LLM provider in the registry.
+
+    Arguments:
+    id: the identifier of the plugin which is used to load it
+    provider: the implementation of the provider
+    """
     global _llmProviderRegistry
     logger.info(f"registerLLMProvider: registering LLM provider {id}")
     _llmProviderRegistry[id] = provider
@@ -32,7 +38,9 @@ def llmProviderStart(provider):
     global _llmprovider
     _llmprovider = _llmProviderRegistry.get(provider, None)
     if _llmprovider is None:
-        _error("llmProviderStart", f"LLM provider plugin {provider} is not registered")
+        error = f"llmProviderStart: LLM provider plugin {provider} is not registered"
+        logger.error(error)
+        raise RuntimeError(error)
     _llmprovider.start()
 
 def llmProviderChat(prompt, max_tokens, reasoning_mode):
