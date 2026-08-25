@@ -102,11 +102,10 @@ docker volume rm omegaclaw-memory
 Memory export is disabled by default. See the [memory portability reference](./docs/reference-memory-portability.md)
 for setup, export controls, archive contents, and import modes.
 
-> **Current limitation:** Memory import and interrupted-import recovery are
-> supported only when OmegaClaw is run through Docker using
-> `scripts/omegaclaw`. Standalone execution does not invoke the container
-> entrypoint and therefore does not support memory import or recovery in this
-> release.
+> **Current limitation:** Memory import does not work in a standalone OmegaClaw
+> run. Import and interrupted-import recovery are supported only through Docker
+> using `scripts/omegaclaw`, because both operations run from the container
+> entrypoint before the agent loop starts.
 
 To restore an archive while upgrading to a tagged image, use the same transfer directory:
 
