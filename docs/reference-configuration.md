@@ -42,7 +42,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname. |
 | `IRC_port` | 6667 | IRC port. |
 | `IRC_user` | `omegaclaw` | IRC nickname. |
-| `TG_CHAT_ID` | *(empty — auto-bind supported)* | Optional fixed Telegram chat ID. Leave empty to auto-bind on first valid inbound auth/message. |
+| `TG_CHAT_ID` | *(empty — auto-bind supported)* | Optional Telegram chat ID used as the default destination for startup, heartbeat, and other proactive messages. Leave empty to auto-bind inbound traffic without a proactive destination. |
+| `TG_ALLOWED_CHAT_IDS` | *(empty)* | Optional comma-separated boundary for Telegram chats. Owner authentication in private DM remains available when authentication is enabled. |
 | `TG_POLL_TIMEOUT` | 20 | Telegram long-poll timeout in seconds. |
 | `SL_CHANNEL_ID` | *(empty — auto-bind supported)* | Optional Slack channel ID where OmegaClaw reads/writes messages. Leave empty to auto-bind on first valid inbound auth/message. |
 | `SL_POLL_INTERVAL` | 60 | Slack poll interval in seconds (minimum effective value is 60). |

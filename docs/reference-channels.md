@@ -50,10 +50,12 @@ Mattermost adapter using a bot token.
 
 Telegram adapter using Bot API long polling.
 
-- `start_telegram(chat_id, poll_timeout)` — starts a poll loop.
-- `TG_CHAT_ID` is optional; if empty, the adapter can auto-bind to the first valid inbound chat.
-- Outbound messages are chunked to Telegram-safe lengths.
-- Uses the same one-time `auth <secret>` ownership gate as the other adapters.
+- `start_telegram(chat_id, allowed_chat_ids, poll_timeout)` — validates saved authorization state and starts the poll loop.
+- `TG_CHAT_ID` is the default destination for startup, heartbeat, and other proactive messages. If it is empty, proactive messages are not sent until a chat is active.
+- With authentication enabled, the owner authenticates with `auth <secret>` in a private DM, then uses `/bind` in a group to authorize all members of that group.
+- The owner can revoke the current group with `/unbind`, or revoke a group from DM with `/unbind <group_id>`. `/bind@BotName` and `/unbind@BotName` are also supported.
+- Authorized chats are processed serially: a later chat remains queued until the active chat receives its response.
+- Outbound messages are split into Telegram-safe chunks and retained with their destination for retry after transient delivery failures.
 
 ## `channels/slack.py`
 

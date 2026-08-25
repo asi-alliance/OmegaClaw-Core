@@ -3,6 +3,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHANNELS_DIRECTORY = REPO_ROOT / "channels"
@@ -13,6 +15,10 @@ def load_telegram(monkeypatch, auth_enabled=True):
     auth = types.ModuleType("auth")
     auth.is_auth_enabled = lambda: auth_enabled
     auth.get_proxy_url = lambda: ""
+    auth.load_channel_auth_state = lambda _channel: (
+        state["owner"],
+        {group for channel, group in state["groups"] if channel == "TELEGRAM"},
+    )
     auth.get_channel_authenticated_user_id = lambda channel: state["owner"]
     auth.get_channel_saved_group_id = lambda channel, group: (
         channel, str(group)
@@ -126,6 +132,91 @@ def test_proactive_message_uses_only_the_configured_default_chat(monkeypatch):
     telegram.send_message("startup message")
 
     assert sent[0][1]["chat_id"] == "configured-default"
+
+
+def test_cached_authorization_avoids_disk_reads_per_message(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._owner_id = "owner"
+    telegram._authorized_groups = {"group"}
+    telegram.auth.get_channel_authenticated_user_id = lambda *_args: (_ for _ in ()).throw(
+        AssertionError("unexpected owner file read")
+    )
+    telegram.auth.get_channel_saved_group_id = lambda *_args: (_ for _ in ()).throw(
+        AssertionError("unexpected group file read")
+    )
+
+    assert telegram._is_allowed_message("owner-dm", "owner", "private", "hello") == "allow"
+    assert telegram._is_allowed_message("group", "member", "group", "hello") == "allow"
+
+
+def test_get_me_failure_does_not_abort_initialization(monkeypatch):
+    telegram = load_telegram(monkeypatch, auth_enabled=False)
+    telegram._bot_username = "stale-name"
+    telegram._api_call = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        RuntimeError("temporary Telegram failure")
+    )
+
+    assert telegram._initialize_bot_identity() is False
+    assert telegram._bot_username == ""
+
+
+def test_invalid_auth_state_stops_startup_before_telegram_is_polled(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    monkeypatch.setenv("TG_BOT_TOKEN", "token")
+    telegram.auth.load_channel_auth_state = lambda _channel: (_ for _ in ()).throw(
+        RuntimeError("malformed authorization state")
+    )
+    telegram._api_call = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        AssertionError("Telegram API called before authorization validation")
+    )
+
+    with pytest.raises(RuntimeError, match="malformed authorization state"):
+        telegram.start_telegram()
+
+
+def test_offset_advances_only_after_update_processing(monkeypatch):
+    telegram = load_telegram(monkeypatch, auth_enabled=False)
+    update = {
+        "update_id": 7,
+        "message": {
+            "text": "hello",
+            "chat": {"id": "dm", "type": "private"},
+            "from": {"id": "user", "username": "alice"},
+        },
+    }
+    telegram._running = True
+    telegram._offset = None
+    telegram._flush_outbox = lambda: None
+
+    def get_updates(*_args, **_kwargs):
+        telegram._running = False
+        return [update]
+
+    telegram._api_call = get_updates
+    telegram._poll_loop()
+
+    assert telegram._offset == 8
+    assert telegram.getLastMessage() == "@alice: hello"
+
+
+def test_failed_update_processing_retains_offset(monkeypatch):
+    telegram = load_telegram(monkeypatch, auth_enabled=False)
+    telegram._running = True
+    telegram._offset = None
+    telegram._flush_outbox = lambda: None
+    telegram.time.sleep = lambda _seconds: None
+
+    def get_updates(*_args, **_kwargs):
+        telegram._running = False
+        return [{"update_id": 7, "message": {"text": "hello"}}]
+
+    telegram._api_call = get_updates
+    telegram._process_update = lambda _update: (_ for _ in ()).throw(
+        RuntimeError("authorization state failure")
+    )
+    telegram._poll_loop()
+
+    assert telegram._offset is None
 
 
 def test_owner_binds_group_without_exposing_secret(monkeypatch):

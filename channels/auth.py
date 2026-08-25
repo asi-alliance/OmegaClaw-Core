@@ -179,6 +179,56 @@ def _channel_auth_group_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
 
 
+def load_channel_auth_state(channel_identifier):
+    """Validate and load one channel's persisted owner and active groups."""
+    channel_identifier = str(channel_identifier or "").strip()
+    if not channel_identifier:
+        raise ValueError("channel_identifier is required")
+
+    def read_records(path, label):
+        try:
+            with open(path, "r", encoding="utf-8") as source:
+                records = []
+                for line_number, line in enumerate(source, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise RuntimeError(
+                            f"Malformed {label} record at line {line_number}"
+                        ) from exc
+                    if not isinstance(record, dict):
+                        raise RuntimeError(
+                            f"Malformed {label} record at line {line_number}"
+                        )
+                    records.append(record)
+                return records
+        except FileNotFoundError:
+            return []
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError(f"Failed to read {label} records") from exc
+
+    owner_id = None
+    for record in read_records(_channel_auth_user_path(), "channel authenticated user"):
+        saved_channel = str(record.get("channel_identifier", "")).strip()
+        saved_user = str(record.get("user_id", "")).strip()
+        if saved_channel == channel_identifier and saved_user and owner_id is None:
+            owner_id = saved_user
+
+    group_states = {}
+    for record in read_records(_channel_auth_group_path(), "channel authenticated group"):
+        saved_channel = str(record.get("channel_identifier", "")).strip()
+        saved_group = str(record.get("group_id", "")).strip()
+        if saved_channel == channel_identifier and saved_group:
+            group_states[saved_group] = not bool(record.get("revoked", False))
+
+    authorized_groups = {
+        group_id for group_id, authorized in group_states.items() if authorized
+    }
+    return owner_id, authorized_groups
+
+
 def store_channel_authenticated_group_id(channel_identifier, group_id, authorized_by_user_id):
     """Persist a trusted group. Never touches the single-user auth file."""
     channel_identifier = str(channel_identifier or "").strip()

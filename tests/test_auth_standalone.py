@@ -130,3 +130,29 @@ def test_owner_can_revoke_an_authorized_group(monkeypatch, tmp_path):
 
     assert auth.store_channel_authenticated_group_id("TELEGRAM", "group", "owner") is True
     assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+
+def test_load_channel_auth_state_validates_and_loads_records(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "active", "owner") is True
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "revoked", "owner") is True
+    assert auth.revoke_channel_group("TELEGRAM", "revoked", "owner") == "group_unbound"
+
+    owner, groups = auth.load_channel_auth_state("TELEGRAM")
+
+    assert owner == "owner"
+    assert groups == {"active"}
+
+
+def test_load_channel_auth_state_rejects_malformed_records(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    path.parent.mkdir()
+    path.write_text("not-json\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="Malformed channel authenticated group record"):
+        auth.load_channel_auth_state("TELEGRAM")
