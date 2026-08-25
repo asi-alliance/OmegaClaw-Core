@@ -212,6 +212,7 @@ def get_channel_saved_group_id(channel_identifier, group_id):
     group_id = str(group_id or "").strip()
     if not channel_identifier or not group_id:
         return False
+    authorized = False
     try:
         with open(_channel_auth_group_path(), "r", encoding="utf-8") as f:
             for line in f:
@@ -223,12 +224,12 @@ def get_channel_saved_group_id(channel_identifier, group_id):
                     logger.warning(f"Skipping malformed channel authenticated group record: {e}")
                     continue
                 if saved_channel == channel_identifier and saved_group == group_id:
-                    return True
+                    authorized = not bool(record.get("revoked", False))
     except FileNotFoundError:
         return False
     except Exception as e:
         raise RuntimeError("Failed to read channel authenticated group records") from e
-    return False
+    return authorized
 
 
 def authorize_channel_group(channel_identifier, group_id, requester_user_id):
@@ -253,3 +254,38 @@ def authorize_channel_group(channel_identifier, group_id, requester_user_id):
 
     logger.error(f"[{str(channel_identifier).upper()}] ERROR -- Unable to save group ID")
     return "ignore"
+
+
+def revoke_channel_group(channel_identifier, group_id, requester_user_id):
+    """Remove a trusted group when requested by the persisted channel owner."""
+    channel_identifier = str(channel_identifier or "").strip()
+    group_id = str(group_id or "").strip()
+    requester_user_id = str(requester_user_id or "").strip()
+    if not channel_identifier or not group_id:
+        return "ignore"
+
+    owner_id = get_channel_authenticated_user_id(channel_identifier)
+    if owner_id is None or requester_user_id != owner_id:
+        return "ignore"
+
+    if not get_channel_saved_group_id(channel_identifier, group_id):
+        return "ignore"
+
+    payload = {
+        "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "channel_identifier": channel_identifier,
+        "group_id": group_id,
+        "authorized_by": owner_id,
+        "revoked": True,
+    }
+    path = _channel_auth_group_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            json.dump(payload, f, separators=(",", ":"))
+            f.write("\n")
+    except OSError as e:
+        raise RuntimeError("Failed to write channel group revocation record") from e
+
+    logger.info(f"[{channel_identifier.upper()}] Removed authorized group ID {group_id}")
+    return "group_unbound"

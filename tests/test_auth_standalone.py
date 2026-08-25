@@ -112,3 +112,21 @@ def test_plain_message_does_not_verify_a_token(monkeypatch):
     monkeypatch.setattr(auth, "get_channel_authenticated_user_id", lambda *args: None)
 
     assert auth.authenticate_channel_user("IRC", "alice") == "ignore"
+
+
+def test_owner_can_revoke_an_authorized_group(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    monkeypatch.setattr(auth, "get_channel_authenticated_user_id", lambda _channel: "owner")
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "group", "owner") is True
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+    assert auth.revoke_channel_group("TELEGRAM", "group", "attacker") == "ignore"
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+    assert auth.revoke_channel_group("TELEGRAM", "group", "owner") == "group_unbound"
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is False
+
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "group", "owner") is True
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True

@@ -7,6 +7,7 @@ import urllib.request
 from collections import deque
 import auth
 from src.logger import get_logger
+from delivery_queue import PendingMessages
 import channels
 from config import config_get_by_key
 
@@ -17,6 +18,11 @@ _msg_lock = threading.Lock()
 _state_lock = threading.Lock()
 _inbox = deque()
 _active_chat_id = ""
+_active_message_token = None
+_active_replied = False
+_next_message_token = 0
+_default_chat_id = ""
+_outbox = PendingMessages()
 
 _bot_token = ""
 _api_base = ""
@@ -29,50 +35,88 @@ _admin_allowed_chats = set()
 _auto_bound_chat = ""
 
 _BIND_COMMANDS = ("/bind", "/authorize_group")
+_UNBIND_COMMANDS = ("/unbind", "/unauthorize_group")
 
 
 def _enqueue_message(msg, chat_id):
+    global _next_message_token
     with _msg_lock:
-        _inbox.append((str(chat_id), str(msg)))
+        _next_message_token += 1
+        _inbox.append((_next_message_token, str(chat_id), str(msg)))
 
 
 def getLastMessage():
-    global _active_chat_id
+    global _active_chat_id, _active_message_token, _active_replied
     with _msg_lock:
+        if _active_chat_id and not _active_replied:
+            return ""
+        if _active_replied:
+            _active_chat_id = ""
+            _active_message_token = None
+            _active_replied = False
         if not _inbox:
             return ""
-        chat_id, message = _inbox.popleft()
-    with _state_lock:
+        message_token, chat_id, message = _inbox.popleft()
         _active_chat_id = chat_id
+        _active_message_token = message_token
     return message
+
+
+def _ready_to_send():
+    return _connected
+
+
+def _deliver_outbound(item):
+    global _active_replied
+    target_chat, chunk, completed_message_token = item
+    _api_call(
+        "sendMessage",
+        {"chat_id": target_chat, "text": chunk},
+        timeout=15,
+        use_post=True,
+    )
+    if completed_message_token is not None:
+        with _msg_lock:
+            if completed_message_token == _active_message_token:
+                _active_replied = True
+
+
+def _flush_outbox():
+    try:
+        _outbox.flush(_deliver_outbound, _ready_to_send)
+    except Exception as exc:
+        logger.warning(f"Telegram send failed; retaining queued message: {exc}")
 
 
 def send_message(text, target_chat=None):
     text = str(text).replace("\\n", "\n").replace("\r", "")
     if not text:
-        return
+        return False
 
-    with _state_lock:
-        target_chat = str(target_chat or _active_chat_id).strip()
+    explicit_target = str(target_chat or "").strip()
+    with _msg_lock:
+        active_chat = _active_chat_id
+        active_message_token = _active_message_token
+        target_chat = explicit_target or active_chat or _default_chat_id
+        completed_message_token = (
+            active_message_token
+            if not explicit_target and active_chat and target_chat == active_chat
+            else None
+        )
 
-    if not _connected or not target_chat:
-        return
+    if not target_chat:
+        logger.warning("Telegram send skipped: no active or default chat is available")
+        return False
 
     max_len = 3900
-    for i in range(0, len(text), max_len):
-        chunk = text[i:i + max_len]
-        if not chunk:
-            continue
-        try:
-            _api_call(
-                "sendMessage",
-                {"chat_id": target_chat, "text": chunk},
-                timeout=15,
-                use_post=True,
-            )
-        except Exception as exc:
-            logger.exception(f"Send failed: {exc}")
-            return
+    chunks = [text[i:i + max_len] for i in range(0, len(text), max_len)]
+    outbound = []
+    for index, chunk in enumerate(chunks):
+        completes_message = completed_message_token if index == len(chunks) - 1 else None
+        outbound.append((target_chat, chunk, completes_message))
+    _outbox.extend(outbound)
+    _flush_outbox()
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -100,18 +144,30 @@ def _first_token(msg):
     return stripped.split(None, 1)[0].lower()
 
 
-def _is_bind_command(msg):
-    # Handle Telegram's "/bind@YourBotName" form
+def _is_targeted_command(msg, commands):
     token = _first_token(msg)
     command, separator, target_username = token.partition("@")
 
-    if command not in _BIND_COMMANDS:
+    if command not in commands:
         return False
 
     if not separator:
         return True
 
     return bool(_bot_username) and target_username == _bot_username
+
+
+def _is_bind_command(msg):
+    return _is_targeted_command(msg, _BIND_COMMANDS)
+
+
+def _is_unbind_command(msg):
+    return _is_targeted_command(msg, _UNBIND_COMMANDS)
+
+
+def _command_argument(msg):
+    parts = str(msg or "").strip().split(None, 1)
+    return parts[1].strip() if len(parts) == 2 else ""
 
 
 def _is_allowed_message(chat_id, user_id, chat_type, msg):
@@ -158,9 +214,19 @@ def _is_allowed_message(chat_id, user_id, chat_type, msg):
         return "ignore"
 
     if chat_type == "private":
+        if user_id == owner_id and _is_unbind_command(msg):
+            group_id = _command_argument(msg)
+            if group_id:
+                return auth.revoke_channel_group("TELEGRAM", group_id, user_id)
+            return "ignore"
         return "allow" if user_id == owner_id else "ignore"
 
     # Anything that isn't "private" is a group/supergroup chat.
+    if _is_unbind_command(msg):
+        if user_id == owner_id:
+            return auth.revoke_channel_group("TELEGRAM", chat_id, user_id)
+        return "ignore"
+
     if auth.get_channel_saved_group_id("TELEGRAM", chat_id):
         return "allow"
 
@@ -256,6 +322,7 @@ def _poll_loop():
 
             updates = _api_call("getUpdates", params=params, timeout=int(_poll_timeout) + 10) or []
             _connected = True
+            _flush_outbox()
 
             for update in updates:
                 update_id = update.get("update_id")
@@ -296,6 +363,11 @@ def _poll_loop():
                         "This group is now authorized. All members can talk to the bot here.",
                         chat_id,
                     )
+                elif state == "group_unbound":
+                    send_message(
+                        "This group is no longer authorized.",
+                        chat_id,
+                    )
         except Exception as exc:
             _connected = False
             logger.warning(f"Poll error: {exc}")
@@ -319,7 +391,9 @@ def _parse_admin_allowed_chats(chat_id_config, allowed_config):
 
 def start_telegram(chat_id="", allowed_chat_ids="", poll_timeout=20):
     global _running, _bot_token, _api_base, _poll_timeout, _offset, _connected
-    global _active_chat_id, _admin_allowed_chats, _auto_bound_chat
+    global _active_chat_id, _active_message_token, _active_replied
+    global _next_message_token, _default_chat_id
+    global _admin_allowed_chats, _auto_bound_chat
 
     proxy = auth.get_proxy_url()
     if proxy:
@@ -332,12 +406,16 @@ def start_telegram(chat_id="", allowed_chat_ids="", poll_timeout=20):
         _api_base = f"https://api.telegram.org/bot{_bot_token}"
 
     _admin_allowed_chats = _parse_admin_allowed_chats(chat_id, allowed_chat_ids)
+    _default_chat_id = str(chat_id or "").strip()
     _auto_bound_chat = ""
 
     with _msg_lock:
         _inbox.clear()
-    with _state_lock:
         _active_chat_id = ""
+        _active_message_token = None
+        _active_replied = False
+        _next_message_token = 0
+    _outbox.clear()
 
     try:
         _poll_timeout = max(1, int(poll_timeout))
