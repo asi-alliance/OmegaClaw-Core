@@ -21,20 +21,20 @@ The transfer directory must be writable by the container's agent user.
 
 ## Export
 
-In a supported chat, request one component and confirm the returned short-lived
-token. When channel authentication is active, only the authenticated owner can
-use these commands. When it is disabled, normal channel access rules apply:
+In the active chat, request one component. The export runs immediately. For IRC,
+Telegram, Slack, and Mattermost, the export handler requires the authenticated
+user ID persisted by the channel authorization layer. WebSocket export requires
+a configured `WS_TOKEN`; the handler derives a non-reversible principal from the
+token so the credential itself is never used as an identifier:
 
 ```text
 /memory-export history
 /memory-export ltm
 /memory-export both
-/memory-export confirm <token>
 ```
 
-The confirmed export runs immediately in the channel harness. Completion is
-delivered to the requester and includes the filename, record count, size, and
-SHA-256.
+Completion is delivered through the active channel and includes the filename,
+record count, size, and SHA-256.
 
 Archives contain selected persistent user memory only:
 
@@ -71,7 +71,8 @@ counts, and embedding compatibility before changing live memory. It runs before
 the agent loop starts. A receipt prevents a completed archive import from
 running again on container restart.
 
-## Limits
+## Security
 
-Memory export commands are not supported on the WebSocket chat channel.
 Archives are private operator data; keep the host transfer directory protected.
+Memory export is denied when channel authentication is disabled, no authenticated
+channel user has been persisted, or WebSocket has no `WS_TOKEN`.

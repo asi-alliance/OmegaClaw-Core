@@ -36,7 +36,7 @@ maxEpisodeRecallLines: 20
 maxHistory: 30000
 # `Local` (Python-side model) or `OpenAI` (requires `OPENAI_API_KEY`)
 embeddingprovider: Local
-# Enable authenticated /memory-export commands (disabled by default).
+# Enable authenticated operator-triggered /memory-export commands (disabled by default).
 memoryExportEnabled: false
 
 # Policy

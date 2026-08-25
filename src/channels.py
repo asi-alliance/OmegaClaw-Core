@@ -1,3 +1,4 @@
+import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
@@ -5,27 +6,39 @@ logger = logging.getLogger(__name__)
 _commChannelRegistry = {}
 
 
-def handle_control_message(message: str) -> bool:
+def _authenticated_export_principal() -> str | None:
+    if _commchannel_id == "websocket":
+        from config import config_get_by_key
+
+        token = str(config_get_by_key("WS_TOKEN", "")).strip()
+        if not token:
+            return None
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        return f"websocket:{digest}"
+
     from auth import get_channel_authenticated_user_id, is_auth_enabled
+
+    if not is_auth_enabled():
+        return None
+    return get_channel_authenticated_user_id(_commchannel_id.upper())
+
+
+def handle_control_message(message: str) -> bool:
     from src.memory_export import handle_export_command, is_export_command
 
-    sender, separator, command = message.rpartition(": ")
+    _, separator, command = message.rpartition(": ")
     if not separator:
         command = message
     if not is_export_command(command):
         return False
 
-    authenticated_user_id = None
-    if is_auth_enabled():
-        authenticated_user_id = get_channel_authenticated_user_id(
-            _commchannel_id.upper()
-        )
-    owner = authenticated_user_id or sender.strip() or "owner"
-    owner_key = f"{_commchannel_id}:{owner}"
-    if _commchannel_id == "websocket":
-        reply = "Memory export is not supported on the WebSocket channel."
-    else:
-        reply = handle_export_command(command, owner_key)
+    try:
+        authenticated_principal = _authenticated_export_principal()
+    except Exception as exc:
+        logger.exception("Failed to resolve memory-export principal: %s", exc)
+        authenticated_principal = None
+
+    reply = handle_export_command(command, authenticated_principal)
     if reply is not None:
         try:
             _commchannel.send(reply)
