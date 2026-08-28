@@ -6,12 +6,12 @@
 (= (reasoningMode) (empty))
 (= (wakeupInterval) (empty))
 (= (memoryDirectory) (empty))
-; (= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
+(= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
 
 (= (initLoop)
    (progn (configure maxNewInputLoops 50) ;20
           (configure maxWakeLoops 1)
-         ;  (configure spamShield False)
+          (configure spamShield False)
           (configure sleepInterval 1) ;10
           (configure provider Anthropic)
           (configure maxOutputToken 6000)
@@ -70,9 +70,9 @@
    (progn (if (== $k 1) (progn (initConfig)
                                (initLoop)
                                (initLogger)
-                              ;  (applySecurityPolicy)
+                               (applySecurityPolicy)
                                (initMemory)
-                              ;  (initKnowledge)
+                               (initKnowledge)
                                (initPlugins)
                                (initChannels)
                                (addTelegramPromptExtension)
