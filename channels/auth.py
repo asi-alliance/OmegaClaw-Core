@@ -128,7 +128,7 @@ def authenticate_channel_user(channel_identifier, user_id, auth_candidate=None):
     channel_identifier = str(channel_identifier or "").strip()
     user_id = str(user_id or "").strip()
 
-    # A persisted owner always wins over a reusable secret. 
+    # A persisted owner always wins over a reusable secret.
     saved_user_id = get_channel_authenticated_user_id(channel_identifier)
     if saved_user_id is not None:
         return "allow" if saved_user_id == user_id else "ignore"
@@ -173,7 +173,7 @@ def get_channel_authenticated_user_id(channel_identifier):
 
 
 # ---------------------------------------------------------------------------
-# Telegram-only group authorization.
+# Owner-managed group authorization.
 
 def _channel_auth_group_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
@@ -220,8 +220,19 @@ def load_channel_auth_state(channel_identifier):
     for record in read_records(_channel_auth_group_path(), "channel authenticated group"):
         saved_channel = str(record.get("channel_identifier", "")).strip()
         saved_group = str(record.get("group_id", "")).strip()
-        if saved_channel == channel_identifier and saved_group:
+        authorized_by = str(record.get("authorized_by", "")).strip()
+        if (
+            saved_channel == channel_identifier
+            and saved_group
+            and owner_id is not None
+            and authorized_by == owner_id
+        ):
             group_states[saved_group] = not bool(record.get("revoked", False))
+        elif saved_channel == channel_identifier and saved_group:
+            logger.warning(
+                f"[{channel_identifier.upper()}] Skipping group authorization "
+                f"for {saved_group}: record is not owned by the authenticated user"
+            )
 
     authorized_groups = {
         group_id for group_id, authorized in group_states.items() if authorized
@@ -238,6 +249,8 @@ def store_channel_authenticated_group_id(channel_identifier, group_id, authorize
         raise ValueError("channel_identifier is required")
     if not group_id:
         raise ValueError("group_id is required")
+    if not authorized_by_user_id:
+        raise ValueError("authorized_by_user_id is required")
 
     payload = {
         "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -262,6 +275,10 @@ def get_channel_saved_group_id(channel_identifier, group_id):
     group_id = str(group_id or "").strip()
     if not channel_identifier or not group_id:
         return False
+    owner_id = get_channel_authenticated_user_id(channel_identifier)
+    if owner_id is None:
+        return False
+
     authorized = False
     try:
         with open(_channel_auth_group_path(), "r", encoding="utf-8") as f:
@@ -270,10 +287,15 @@ def get_channel_saved_group_id(channel_identifier, group_id):
                     record = json.loads(line)
                     saved_channel = str(record.get("channel_identifier", "")).strip()
                     saved_group = str(record.get("group_id", "")).strip()
+                    authorized_by = str(record.get("authorized_by", "")).strip()
                 except (AttributeError, json.JSONDecodeError) as e:
                     logger.warning(f"Skipping malformed channel authenticated group record: {e}")
                     continue
-                if saved_channel == channel_identifier and saved_group == group_id:
+                if (
+                    saved_channel == channel_identifier
+                    and saved_group == group_id
+                    and authorized_by == owner_id
+                ):
                     authorized = not bool(record.get("revoked", False))
     except FileNotFoundError:
         return False

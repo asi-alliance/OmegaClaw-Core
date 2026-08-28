@@ -6,12 +6,12 @@
 (= (reasoningMode) (empty))
 (= (wakeupInterval) (empty))
 (= (memoryDirectory) (empty))
-(= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
+; (= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
 
 (= (initLoop)
    (progn (configure maxNewInputLoops 50) ;20
           (configure maxWakeLoops 1)
-          (configure spamShield False)
+         ;  (configure spamShield False)
           (configure sleepInterval 1) ;10
           (configure provider Anthropic)
           (configure maxOutputToken 6000)
@@ -44,6 +44,15 @@
                          " HISTORY: " (getHistory) 
                          " TIME: " (get_time_as_string)))))
 
+(= (addTelegramPromptExtension)
+   (if (== (commchannel) telegram)
+       (let $path (joinPath ((memoryDirectory) "tg_prompt.txt"))
+            (if (exists-file $path)
+                (add-prompt-extension tg-prompt (read-file $path))
+                (progn (log WARN "loop" (TELEGRAM_PROMPT_NOT_FOUND: $path))
+                       ())))
+       ()))
+
 (= (getPromptExtensions)
    (join (newline) (collapse (prompt-extension $_))))
 
@@ -61,11 +70,12 @@
    (progn (if (== $k 1) (progn (initConfig)
                                (initLoop)
                                (initLogger)
-                               (applySecurityPolicy)
+                              ;  (applySecurityPolicy)
                                (initMemory)
-                               (initKnowledge)
+                              ;  (initKnowledge)
                                (initPlugins)
                                (initChannels)
+                               (addTelegramPromptExtension)
                                (commChannelSend (version))
                                (llmProviderStart (provider)))
                         (change-state! &loops (- (get-state &loops) 1)))

@@ -2,6 +2,12 @@
 !(import! &self ../src/helper.py)
 !(import! &self ./src/utils)
 !(import! &self ./src/skills)
+
+; Define the selected channel and memory path used by the Telegram prompt
+; registration test.
+(= (commchannel) telegram)
+(= (memoryDirectory) (joinPath ((projectRootDirectory) "memory")))
+
 !(import! &self ./src/loop)
 
 !(test (progn
@@ -22,6 +28,16 @@
 !(test (progn
          (remove-prompt-extension test-prompt)
          (contains-text (getPromptExtensions) "TEST PROMPT EXTENSION"))
+       False)
+
+!(test (progn
+         (addTelegramPromptExtension)
+         (contains-text (getPromptExtensions) "TELEGRAM ROUTING:"))
+       True)
+
+!(test (progn
+         (remove-prompt-extension tg-prompt)
+         (contains-text (getPromptExtensions) "TELEGRAM ROUTING:"))
        False)
 
 (= (on-heartbeat $iter)

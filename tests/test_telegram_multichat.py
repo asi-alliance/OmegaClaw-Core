@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -68,40 +69,39 @@ def load_telegram(monkeypatch, auth_enabled=True):
 def test_reply_uses_the_chat_that_supplied_the_message(monkeypatch):
     telegram = load_telegram(monkeypatch, auth_enabled=False)
     telegram._connected = True
+    telegram._admin_allowed_chats = {"101", "-202"}
     sent = []
     telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
 
-    telegram._enqueue_message("dm message", "dm")
-    telegram._enqueue_message("group message", "group")
-    assert telegram.getLastMessage() == "dm message"
-    assert telegram.getLastMessage() == ""
-    telegram.send_message("dm reply")
-    assert telegram.getLastMessage() == "group message"
-    telegram.send_message("group reply")
+    telegram._enqueue_message("dm message", "101", 11)
+    telegram._enqueue_message("group message", "-202", 12)
+    assert telegram.getLastMessage() == "[101] [11] dm message"
+    telegram.send_message("[101] [11] dm reply")
+    assert telegram.getLastMessage() == "[-202] [12] group message"
+    telegram.send_message("[-202] [12] group reply")
 
-    assert [params["chat_id"] for _, params in sent] == ["dm", "group"]
+    assert [params["chat_id"] for _, params in sent] == ["101", "-202"]
+    assert [
+        json.loads(params["reply_parameters"])["message_id"]
+        for _, params in sent
+    ] == [11, 12]
 
 
 def test_identical_messages_from_different_chats_are_processed(monkeypatch):
     telegram = load_telegram(monkeypatch, auth_enabled=False)
     telegram._connected = True
-    sent = []
-    telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
+    telegram._enqueue_message("same message", "101", 21)
+    telegram._enqueue_message("same message", "-202", 22)
 
-    telegram._enqueue_message("same message", "dm")
-    telegram._enqueue_message("same message", "group")
-
-    assert telegram.getLastMessage() == "same message"
-    telegram.send_message("dm reply")
-    assert telegram.getLastMessage() == "same message"
-    telegram.send_message("group reply")
-
-    assert [params["chat_id"] for _, params in sent] == ["dm", "group"]
+    assert telegram.getLastMessage() == "[101] [21] same message"
+    assert telegram.getLastMessage() == "[-202] [22] same message"
+    assert telegram.getLastMessage() == ""
 
 
 def test_failed_delivery_retains_the_original_chat(monkeypatch):
     telegram = load_telegram(monkeypatch, auth_enabled=False)
     telegram._connected = True
+    telegram._admin_allowed_chats = {"101", "-202"}
     attempts = []
 
     def flaky_api(method, params, **_kwargs):
@@ -110,28 +110,90 @@ def test_failed_delivery_retains_the_original_chat(monkeypatch):
             raise RuntimeError("temporary failure")
 
     telegram._api_call = flaky_api
-    telegram._enqueue_message("dm message", "dm")
-    assert telegram.getLastMessage() == "dm message"
+    telegram._enqueue_message("dm message", "101", 31)
+    assert telegram.getLastMessage() == "[101] [31] dm message"
 
-    telegram.send_message("dm reply")
-    telegram._enqueue_message("group message", "group")
-    assert telegram.getLastMessage() == ""
+    telegram.send_message("[101] [31] dm reply")
+    telegram._enqueue_message("group message", "-202", 32)
+    # A failed outbound delivery does not block the inbound queue.
+    assert telegram.getLastMessage() == "[-202] [32] group message"
 
     telegram._flush_outbox()
-    assert telegram.getLastMessage() == "group message"
-    assert [params["chat_id"] for _, params in attempts] == ["dm", "dm"]
+    assert [params["chat_id"] for _, params in attempts] == ["101", "101"]
 
 
-def test_proactive_message_uses_only_the_configured_default_chat(monkeypatch):
-    telegram = load_telegram(monkeypatch, auth_enabled=False)
+def test_proactive_message_uses_authenticated_owner_dm(monkeypatch):
+    telegram = load_telegram(monkeypatch)
     telegram._connected = True
-    telegram._default_chat_id = "configured-default"
+    telegram._owner_id = "101"
+    telegram._default_chat_id = "101"
     sent = []
     telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
 
     telegram.send_message("startup message")
 
-    assert sent[0][1]["chat_id"] == "configured-default"
+    assert sent[0][1]["chat_id"] == "101"
+    assert "reply_parameters" not in sent[0][1]
+
+
+def test_proactive_message_before_auth_is_sent_after_owner_binding(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._connected = True
+    sent = []
+    telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
+
+    assert telegram.send_message("OmegaClaw version=test") is True
+    assert sent == []
+
+    telegram._process_update(
+        {
+            "message": {
+                "message_id": 42,
+                "text": "auth secret",
+                "chat": {"id": 101, "type": "private"},
+                "from": {"id": 101, "username": "owner"},
+            }
+        }
+    )
+
+    assert [params["text"] for _, params in sent] == [
+        "Authentication successful. @owner is now the bot owner. "
+        "Send /bind in a group to open it to everyone there.",
+        "OmegaClaw version=test",
+    ]
+    assert all(params["chat_id"] == "101" for _, params in sent)
+    assert json.loads(sent[0][1]["reply_parameters"]) == {
+        "message_id": 42,
+        "allow_sending_without_reply": True,
+    }
+    assert "reply_parameters" not in sent[1][1]
+
+def test_missing_route_fields_fall_back_to_owner_without_reply(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._connected = True
+    telegram._owner_id = "101"
+    telegram._default_chat_id = "101"
+    sent = []
+    telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
+
+    assert telegram.send_message("[] [] proactive message") is True
+
+    assert sent[0][1] == {"chat_id": "101", "text": "proactive message"}
+
+
+def test_generated_target_must_be_owner_or_authorized_group(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._connected = True
+    telegram._owner_id = "101"
+    telegram._default_chat_id = "101"
+    telegram._authorized_groups = {"-202"}
+    sent = []
+    telegram._api_call = lambda method, params, **_kwargs: sent.append((method, params))
+
+    assert telegram.send_message("[-202] [] allowed") is True
+    assert telegram.send_message("[-999] [] rejected") is False
+
+    assert [params["chat_id"] for _, params in sent] == ["-202"]
 
 
 def test_cached_authorization_avoids_disk_reads_per_message(monkeypatch):
@@ -174,13 +236,33 @@ def test_invalid_auth_state_stops_startup_before_telegram_is_polled(monkeypatch)
         telegram.start_telegram()
 
 
+def test_startup_restores_owner_default_and_bound_groups(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    monkeypatch.setenv("TG_BOT_TOKEN", "token")
+    telegram.auth.load_channel_auth_state = lambda _channel: ("101", {"-202"})
+    telegram._initialize_bot_identity = lambda: True
+
+    class FakeThread:
+        def start(self):
+            return None
+
+    telegram.threading.Thread = lambda **_kwargs: FakeThread()
+
+    telegram.start_telegram(allowed_chat_ids="-303")
+
+    assert telegram._default_chat_id == "101"
+    assert telegram._authorized_groups == {"-202"}
+    assert telegram._admin_allowed_chats == {"-202", "-303"}
+
+
 def test_offset_advances_only_after_update_processing(monkeypatch):
     telegram = load_telegram(monkeypatch, auth_enabled=False)
     update = {
         "update_id": 7,
         "message": {
+            "message_id": 41,
             "text": "hello",
-            "chat": {"id": "dm", "type": "private"},
+            "chat": {"id": 101, "type": "private"},
             "from": {"id": "user", "username": "alice"},
         },
     }
@@ -196,7 +278,7 @@ def test_offset_advances_only_after_update_processing(monkeypatch):
     telegram._poll_loop()
 
     assert telegram._offset == 8
-    assert telegram.getLastMessage() == "@alice: hello"
+    assert telegram.getLastMessage() == "[101] [41] @alice: hello"
 
 
 def test_failed_update_processing_retains_offset(monkeypatch):
@@ -227,10 +309,13 @@ def test_owner_binds_group_without_exposing_secret(monkeypatch):
     assert telegram._is_allowed_message("group", "1", "group", "auth secret") == "ignore"
     # The owner authenticates once in a private DM.
     assert telegram._is_allowed_message("dm", "1", "private", "auth secret") == "auth_bound"
+    assert telegram._default_chat_id == "dm"
     assert telegram._is_allowed_message("dm", "2", "private", "hello") == "ignore"
     # Only that owner can open the group; then every group member is allowed.
     assert telegram._is_allowed_message("group", "2", "group", "/bind") == "ignore"
     assert telegram._is_allowed_message("group", "1", "group", "/bind@ExampleBot") == "group_bound"
+    assert "group" in telegram._authorized_groups
+    assert "group" in telegram._admin_allowed_chats
     assert telegram._is_allowed_message("group", "2", "group", "hello") == "allow"
     assert telegram._is_allowed_message("other-group", "2", "group", "hello") == "ignore"
 
@@ -264,6 +349,8 @@ def test_only_owner_can_unbind_group(monkeypatch):
     assert telegram._is_allowed_message("group", "2", "group", "/unbind") == "ignore"
     assert telegram._is_allowed_message("group", "2", "group", "hello") == "allow"
     assert telegram._is_allowed_message("group", "1", "group", "/unbind@ExampleBot") == "group_unbound"
+    assert "group" not in telegram._authorized_groups
+    assert "group" not in telegram._admin_allowed_chats
     assert telegram._is_allowed_message("group", "2", "group", "hello") == "ignore"
 
 
@@ -273,6 +360,8 @@ def test_owner_can_unbind_group_from_dm(monkeypatch):
     assert telegram._is_allowed_message("dm", "1", "private", "auth secret") == "auth_bound"
     assert telegram._is_allowed_message("group", "1", "group", "/bind") == "group_bound"
     assert telegram._is_allowed_message("dm", "1", "private", "/unbind group") == "group_unbound"
+    assert "group" not in telegram._authorized_groups
+    assert "group" not in telegram._admin_allowed_chats
     assert telegram._is_allowed_message("group", "2", "group", "hello") == "ignore"
 
 
@@ -294,3 +383,13 @@ def test_allowlist_still_permits_owner_dm_bootstrap(monkeypatch):
     assert telegram._is_allowed_message("owner-dm", "1", "private", "auth secret") == "auth_bound"
     assert telegram._is_allowed_message("owner-dm", "1", "private", "hello") == "allow"
     assert telegram._is_allowed_message("unlisted-group", "2", "group", "hello") == "ignore"
+
+
+def test_owner_bind_can_expand_configured_runtime_allowlist(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+    telegram._admin_allowed_chats = {"configured-group"}
+
+    assert telegram._is_allowed_message("owner-dm", "1", "private", "auth secret") == "auth_bound"
+    assert telegram._is_allowed_message("new-group", "1", "group", "/bind") == "group_bound"
+    assert "new-group" in telegram._admin_allowed_chats
+    assert "new-group" in telegram._authorized_groups

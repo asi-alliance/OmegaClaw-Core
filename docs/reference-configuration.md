@@ -42,8 +42,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `IRC_server` | `irc.quakenet.org` | IRC server hostname. |
 | `IRC_port` | 6667 | IRC port. |
 | `IRC_user` | `omegaclaw` | IRC nickname. |
-| `TG_CHAT_ID` | *(empty — auto-bind supported)* | Optional Telegram chat ID used as the default destination for startup, heartbeat, and other proactive messages. Leave empty to auto-bind inbound traffic without a proactive destination. |
-| `TG_ALLOWED_CHAT_IDS` | *(empty)* | Optional comma-separated boundary for Telegram chats. Owner authentication in private DM remains available when authentication is enabled. |
+| `TG_CHAT_ID` | *(empty)* | Legacy single-chat bootstrap/fallback, primarily for authentication-disabled deployments. With authentication enabled, the authenticated owner's DM becomes the proactive-message default. |
+| `TG_ALLOWED_CHAT_IDS` | *(empty)* | Optional comma-separated initial allowed-chat set. The authenticated owner can add groups with `/bind` and remove them with `/unbind`; those changes are persisted in `memory/.channel/authenticated-group.json`, not written back to YAML. |
 | `TG_POLL_TIMEOUT` | 20 | Telegram long-poll timeout in seconds. |
 | `SL_CHANNEL_ID` | *(empty — auto-bind supported)* | Optional Slack channel ID where OmegaClaw reads/writes messages. Leave empty to auto-bind on first valid inbound auth/message. |
 | `SL_POLL_INTERVAL` | 60 | Slack poll interval in seconds (minimum effective value is 60). |
@@ -55,6 +55,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | Environment variable | Meaning |
 |---|---|
 | `TG_BOT_TOKEN` | Telegram bot token (from BotFather). |
+| `OMEGACLAW_AUTH_SECRET` | Enables the one-time owner-authentication handshake when non-empty. The owner sends `auth <secret>` in a private Telegram DM. |
 | `MM_BOT_TOKEN` | Bot auth token. |
 | `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
 
@@ -64,6 +65,18 @@ Any `configure`d parameter can be overridden at startup:
 
 ```bash
 metta run.metta provider=Anthropic LLM=claude-opus-4-6 commchannel=mattermost
+```
+
+Configuration values are resolved in this order: command-line `key=value`,
+`OMEGACLAW_<KEY>` environment variable, `config/config.yaml`, then the caller's
+default. `TG_BOT_TOKEN` and `OMEGACLAW_AUTH_SECRET` are read directly from the
+environment and must be placed before the `metta`/`petta` command.
+
+Telegram example:
+
+```bash
+TG_BOT_TOKEN=... OMEGACLAW_AUTH_SECRET=... \
+  metta run.metta commchannel=telegram
 ```
 
 Slack example:
