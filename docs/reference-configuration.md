@@ -31,7 +31,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `maxRecallItems` | 20 | Items returned by `query`. |
 | `maxEpisodeRecallLines` | 20 | Lines returned by `episodes`. |
 | `maxHistory` | 30000 (chars) | Tail of `memory/history.metta` included in the prompt. |
-| `embeddingprovider` | `Local` | `Local` (Python-side model) or `OpenAI`. |
+| `embeddingprovider` | `Local` | `Local` (Python-side model), or the id of a provider that serves an OpenAI-compatible `/embeddings` endpoint — `OpenAI` and `ASICloud` are known to. The gateway supplies that provider's key. |
+| `embedding_model` | `text-embedding-3-large` | Model asked of a non-`Local` `embeddingprovider`. |
 
 ## Channels (`src/channels.metta`, `initChannels`)
 

@@ -497,6 +497,10 @@ help() {
     echo -e "\t-l <logging config> set Python logging config file"
     echo -e "\t--version, -v show the OmegaClaw version"
     echo -e "\t--help, -h show this help"
+    echo
+    echo -e "Environment:"
+    echo -e "\tEMBEDDING_PROVIDER override the embedding backend (default depends on provider)"
+    echo -e "\tEMBEDDING_MODEL set the model asked of a non-Local EMBEDDING_PROVIDER"
 }
 
 options() {
@@ -586,6 +590,10 @@ options() {
 }
 
 start() {
+    # Each provider above picks a default embedding backend. EMBEDDING_PROVIDER
+    # overrides it, so a remote provider can serve embeddings too.
+    embeddingprovider="${EMBEDDING_PROVIDER:-${embeddingprovider}}"
+
     docker rm -f omegaclaw 2>/dev/null || true
     docker pull "${image}" 2>/dev/null || true
 
@@ -654,6 +662,10 @@ start() {
 
     if [ -n "${openaiapi_url:-}" ]; then
       docker_cmd+=("openaiapi_url=${openaiapi_url}")
+    fi
+
+    if [ -n "${EMBEDDING_MODEL:-}" ]; then
+      docker_cmd+=("embedding_model=${EMBEDDING_MODEL}")
     fi
 
     if [ -n "${openclaw_url:-}" ]; then
