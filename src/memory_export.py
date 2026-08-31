@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from config import config_get_by_key
+from helper import projectRootDirectory
 from src.logger import get_logger
 
 logger = get_logger(__name__)
@@ -11,6 +12,36 @@ logger = get_logger(__name__)
 _TRANSFER_DIR = Path("/memory-transfer")
 
 _transfer = None
+
+
+def _resolve_memory_dir() -> Path:
+    default = os.environ.get(
+        "MEMORY_DIR",
+        str(Path(projectRootDirectory()) / "memory"),
+    )
+    configured = config_get_by_key("memoryDirectory", default)
+    return Path(str(configured)).expanduser().resolve()
+
+
+def _resolve_chroma_path() -> Path:
+    environment_path = os.environ.get("CHROMA_DB_PATH")
+    if environment_path:
+        return Path(environment_path).expanduser().resolve()
+
+    default = str(Path(projectRootDirectory()).parents[1] / "chroma_db")
+    configured = config_get_by_key("chromaDbPath", default)
+    return Path(str(configured)).expanduser().resolve()
+
+
+def create_memory_store():
+    """Build an import-kb store from OmegaClaw's effective configuration."""
+    from memory_portability.storage import MemoryStore
+
+    return MemoryStore(
+        memory_dir=_resolve_memory_dir(),
+        chroma_path=_resolve_chroma_path(),
+        collection_name="memories",
+    )
 
 
 def _get_transfer():
@@ -23,7 +54,10 @@ def _get_transfer():
             raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
 
         os.environ["EMBEDDING_PROVIDER"] = embedding_provider
-        _transfer = MemoryTransfer(_TRANSFER_DIR)
+        _transfer = MemoryTransfer(
+            transfer_dir=_TRANSFER_DIR,
+            store=create_memory_store(),
+        )
     return _transfer
 
 

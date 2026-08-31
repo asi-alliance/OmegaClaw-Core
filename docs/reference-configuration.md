@@ -31,6 +31,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `maxRecallItems` | 20 | Items returned by `query`. |
 | `maxEpisodeRecallLines` | 20 | Lines returned by `episodes`. |
 | `maxHistory` | 30000 (chars) | Tail of `memory/history.metta` included in the prompt. |
+| `memoryDirectory` | `./repos/OmegaClaw-Core/memory` | Directory containing persistent memory files such as `history.metta`. |
+| `chromaDbPath` | `./chroma_db` | ChromaDB persistence directory used for memory backup and restore. |
 | `embeddingprovider` | `Local` | `Local` (Python-side model) or `OpenAI`. |
 
 ## Channels (`src/channels.metta`, `initChannels`)

@@ -101,13 +101,17 @@ def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch
     created = []
 
     class FakeTransfer:
-        def __init__(self, transfer_dir):
-            created.append((transfer_dir, os.environ["EMBEDDING_PROVIDER"]))
+        def __init__(self, **kwargs):
+            created.append({
+                **kwargs,
+                "embedding_provider": os.environ["EMBEDDING_PROVIDER"],
+            })
 
     monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
-    mp_mod = types.ModuleType("memory_portability")
-    mp_mod.MemoryTransfer = FakeTransfer
-    monkeypatch.setitem(sys.modules, "memory_portability", mp_mod)
+    package = types.ModuleType("memory_portability")
+    package.MemoryTransfer = FakeTransfer
+    monkeypatch.setitem(sys.modules, "memory_portability", package)
+    monkeypatch.setattr(handler, "create_memory_store", lambda: "configured-store")
     monkeypatch.setattr(
         handler,
         "config_get_by_key",
@@ -117,8 +121,68 @@ def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch
 
     transfer = handler._get_transfer()
 
-    assert isinstance(transfer, FakeTransfer)
-    assert created == [(handler._TRANSFER_DIR, "OpenAI")]
+    assert transfer is handler._transfer
+    assert created == [{
+        "transfer_dir": handler._TRANSFER_DIR,
+        "store": "configured-store",
+        "embedding_provider": "OpenAI",
+    }]
+
+
+def test_memory_store_receives_explicit_omegaclaw_storage_configuration(
+    handler,
+    monkeypatch,
+    tmp_path,
+):
+    created_stores = []
+
+    class FakeStore:
+        def __init__(self, **kwargs):
+            created_stores.append(kwargs)
+
+    package = types.ModuleType("memory_portability")
+    package.__path__ = []
+    storage = types.ModuleType("memory_portability.storage")
+    storage.MemoryStore = FakeStore
+    monkeypatch.setitem(sys.modules, "memory_portability", package)
+    monkeypatch.setitem(sys.modules, "memory_portability.storage", storage)
+
+    memory_dir = tmp_path / "custom-memory"
+    chroma_path = tmp_path / "custom-chroma"
+    monkeypatch.setattr(handler, "_resolve_memory_dir", lambda: memory_dir)
+    monkeypatch.setattr(handler, "_resolve_chroma_path", lambda: chroma_path)
+
+    store = handler.create_memory_store()
+
+    assert isinstance(store, FakeStore)
+    assert created_stores == [
+        {
+            "memory_dir": memory_dir,
+            "chroma_path": chroma_path,
+            "collection_name": "memories",
+        }
+    ]
+
+
+def test_storage_paths_are_resolved_from_omegaclaw_config(
+    handler,
+    monkeypatch,
+    tmp_path,
+):
+    configured = {
+        "memoryDirectory": str(tmp_path / "configured-memory"),
+        "chromaDbPath": str(tmp_path / "configured-chroma"),
+    }
+    monkeypatch.delenv("CHROMA_DB_PATH", raising=False)
+    monkeypatch.setattr(
+        handler,
+        "config_get_by_key",
+        lambda key, default=None: configured.get(key, default),
+    )
+
+    assert handler._resolve_memory_dir() == tmp_path / "configured-memory"
+    assert handler._resolve_chroma_path() == tmp_path / "configured-chroma"
+
 
 def test_websocket_defers_memory_export_to_core_dispatch(monkeypatch):
     config = types.ModuleType("config")
