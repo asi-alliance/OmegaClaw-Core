@@ -34,8 +34,10 @@ maxRecallItems: 20
 maxEpisodeRecallLines: 20
 # Tail of `memory/history.metta` included in the prompt (chars)
 maxHistory: 30000
-# `Local` (Python-side model) or `OpenAI` (requires `OPENAI_API_KEY`)
+# `Local` (Python-side model) or the id of a provider serving OpenAI-compatible embeddings: `OpenAI`, `ASICloud`
 embeddingprovider: Local
+# Model asked of a non-`Local` embeddingprovider
+embedding_model: "text-embedding-3-large"
 
 # Policy
 
