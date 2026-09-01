@@ -168,12 +168,25 @@ def test_load_channel_auth_state_validates_and_loads_records(monkeypatch, tmp_pa
     assert groups == {"active"}
 
 
-def test_load_channel_auth_state_rejects_malformed_records(monkeypatch, tmp_path):
+@pytest.mark.parametrize("damaged_record", ["not-json\n", '{"time":'])
+def test_load_channel_auth_state_skips_malformed_records(
+    monkeypatch, tmp_path, damaged_record
+):
     auth = load_auth_module(monkeypatch)
     monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
-    path = tmp_path / ".channel" / "authenticated-group.json"
-    path.parent.mkdir()
-    path.write_text("not-json\n", encoding="utf-8")
+    warnings = []
+    monkeypatch.setattr(auth.logger, "warning", warnings.append)
 
-    with pytest.raises(RuntimeError, match="Malformed channel authenticated group record"):
-        auth.load_channel_auth_state("TELEGRAM")
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("a", encoding="utf-8") as target:
+        target.write(damaged_record)
+
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", {"active"})
+    assert any(
+        "Skipping malformed channel authenticated group record at line 2" in warning
+        for warning in warnings
+    )

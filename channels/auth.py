@@ -195,13 +195,17 @@ def load_channel_auth_state(channel_identifier):
                     try:
                         record = json.loads(line)
                     except json.JSONDecodeError as exc:
-                        raise RuntimeError(
-                            f"Malformed {label} record at line {line_number}"
-                        ) from exc
-                    if not isinstance(record, dict):
-                        raise RuntimeError(
-                            f"Malformed {label} record at line {line_number}"
+                        logger.warning(
+                            f"Skipping malformed {label} record at line "
+                            f"{line_number}: {exc}"
                         )
+                        continue
+                    if not isinstance(record, dict):
+                        logger.warning(
+                            f"Skipping malformed {label} record at line "
+                            f"{line_number}: expected a JSON object"
+                        )
+                        continue
                     records.append(record)
                 return records
         except FileNotFoundError:
@@ -262,8 +266,7 @@ def store_channel_authenticated_group_id(channel_identifier, group_id, authorize
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
         with open(path, "a", encoding="utf-8") as f:
-            json.dump(payload, f, separators=(",", ":"))
-            f.write("\n")
+            f.write(json.dumps(payload, separators=(",", ":")) + "\n")
     except OSError as e:
         raise RuntimeError("Failed to write channel authenticated group record") from e
     return True
@@ -354,8 +357,7 @@ def revoke_channel_group(channel_identifier, group_id, requester_user_id):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
         with open(path, "a", encoding="utf-8") as f:
-            json.dump(payload, f, separators=(",", ":"))
-            f.write("\n")
+            f.write(json.dumps(payload, separators=(",", ":")) + "\n")
     except OSError as e:
         raise RuntimeError("Failed to write channel group revocation record") from e
 
