@@ -56,7 +56,7 @@ except sqlite3.OperationalError:
 
 def test_memory_no_autoremember():
     with Checker("HUMAN_MESSAGE does NOT autopromote to ChromaDB (live)") as c:
-        print(f"\n=== OmegaClaw: no-autoremember live (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: no-autoremember live (run-id {c.run_id}) ===",
               flush=True)
 
         fact_marker = f"azure-{c.run_id}"

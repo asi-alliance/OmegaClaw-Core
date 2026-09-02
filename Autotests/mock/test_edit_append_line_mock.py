@@ -25,7 +25,7 @@ LINE4_EXPECTED = "Delta"
 
 def test_edit_append_line_mock(llm, comm):
     with Checker("edit append line (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: append line mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: append line mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

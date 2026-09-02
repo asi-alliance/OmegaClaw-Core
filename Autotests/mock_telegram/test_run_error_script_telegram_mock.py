@@ -29,7 +29,7 @@ echo "unreachable"
 
 def test_run_error_script_telegram_mock(llm, tg):
     with Checker("run error script (telegram mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: error script telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: error script telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

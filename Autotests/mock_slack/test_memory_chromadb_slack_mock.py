@@ -41,7 +41,7 @@ def chromadb_vector_count():
 
 def test_memory_chromadb_slack_mock(llm, sl):
     with Checker("chromadb vector write (slack mock)") as c:
-        print(f"\n=== OmegaClaw: chromadb slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: chromadb slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("count chromadb vectors before")

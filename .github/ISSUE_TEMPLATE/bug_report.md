@@ -34,6 +34,6 @@ A clear and concise description of what happens.
  - Version [e.g. 22]
 
 **Additional context**
-- OmegaClaw version: [e.g. v0.1.10]
+- Omega version: [e.g. v0.1.10]
 - Communication channel: [e.g. IRC]
 - Model provider: [e.g. Anthropic]

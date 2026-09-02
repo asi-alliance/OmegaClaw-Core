@@ -188,7 +188,7 @@ def _irc_loop(channel, server, port, nick):
         time.sleep(backoff_seconds)
         backoff_seconds = min(backoff_seconds * 2, 30)
 
-def start_irc(channel, server="irc.libera.chat", port=6667, nick="omegaclaw"):
+def start_irc(channel, server="irc.libera.chat", port=6667, nick="omega"):
     global _running, _channel, _connected
     nick = f"{nick}{random.randint(1000, 9999)}"
     if not channel.startswith("#"):
@@ -226,10 +226,10 @@ class IRCChannel(channels.CommChannel):
         super().__init__()
 
     def start(self) -> None:
-        channel = config_get_by_key("IRC_channel", "##omegaclaw")
+        channel = config_get_by_key("IRC_channel", "##omega")
         server = config_get_by_key("IRC_server", "irc.quakenet.org")
         port = int(config_get_by_key("IRC_port", 6667))
-        user = config_get_by_key("IRC_user", "omegaclaw")
+        user = config_get_by_key("IRC_user", "omega")
         start_irc(channel, server, port, user)
 
     def stop(self) -> None:
@@ -241,5 +241,5 @@ class IRCChannel(channels.CommChannel):
     def send(self, message: str) -> None:
         send_message(message)
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("irc", IRCChannel())

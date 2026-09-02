@@ -32,7 +32,7 @@ NEGATION_PHRASES = [
 
 def test_search_invalid_mock(llm, comm):
     with Checker("search invalid (mock)") as c:
-        print(f"\n=== OmegaClaw: invalid search mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: invalid search mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via comm channel with mocked negation response")

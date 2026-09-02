@@ -21,7 +21,7 @@ from helpers import (
 
 def test_memory_history():
     with Checker("history append") as c:
-        print(f"\n=== OmegaClaw: history append (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: history append (run-id {c.run_id}) ===", flush=True)
 
         c.step("capture initial history state")
         mtime_before = get_mtime(HISTORY_FILE)

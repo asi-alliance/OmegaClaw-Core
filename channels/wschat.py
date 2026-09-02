@@ -369,5 +369,5 @@ class WSChannel(channels.CommChannel):
         send_message(message)
 
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("websocket", WSChannel())

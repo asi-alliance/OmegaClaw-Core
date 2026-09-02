@@ -60,7 +60,7 @@ To add a new backend, add a branch and implement the Python function.
 
 ## Change the reasoning library
 
-`lib_nal.metta` and `lib_pln.metta` are plain MeTTa files loaded by `lib_omegaclaw.metta`. Add new rule definitions directly, or swap in a different logic library entirely — the only required surface is whatever operator the LLM invokes through `(metta ...)`.
+`lib_nal.metta` and `lib_pln.metta` are plain MeTTa files loaded by `lib_omega.metta`. Add new rule definitions directly, or swap in a different logic library entirely — the only required surface is whatever operator the LLM invokes through `(metta ...)`.
 
 ## See also
 

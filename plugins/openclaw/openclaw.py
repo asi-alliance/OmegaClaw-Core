@@ -1,4 +1,4 @@
-"""Bridge between an OmegaClaw dynamic skill and an external OpenClaw Gateway.
+"""Bridge between an Omega dynamic skill and an external OpenClaw Gateway.
 
 Protocol reference: https://docs.openclaw.ai/gateway/openresponses-http-api
 (Gateway OpenResponses HTTP API).
@@ -79,7 +79,7 @@ def _get_token() -> str:
     Returns:
         str: The auth token.
     """
-    return os.getenv("OMEGACLAW_OPENCLAW_TOKEN", "").strip()
+    return os.getenv("OMEGA_OPENCLAW_TOKEN", "").strip()
 
 
 def send(
@@ -363,7 +363,7 @@ def _request_target(openclaw_url: str):
     Nginx injects the Bearer token from its own environment, so this process
     never holds the Gateway token. Without `GATEWAY_URL` (e.g. running outside
     Docker), fall back to talking to `openclaw_url` directly with a token read
-    from `OMEGACLAW_OPENCLAW_TOKEN`.
+    from `OMEGA_OPENCLAW_TOKEN`.
 
     Args:
         openclaw_url (str): The configured Gateway base URL, used only by the
@@ -386,7 +386,7 @@ def _request_target(openclaw_url: str):
         # Sending an empty Bearer would come back as a plain 401, which is
         # indistinguishable from a wrong token. Say what is actually missing.
         raise OpenClawError(
-            "No GATEWAY_URL to proxy through and OMEGACLAW_OPENCLAW_TOKEN is "
+            "No GATEWAY_URL to proxy through and OMEGA_OPENCLAW_TOKEN is "
             "empty, so the request cannot be authenticated"
         )
     logger.debug("No GATEWAY_URL, calling the OpenClaw Gateway directly")

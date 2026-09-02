@@ -1,9 +1,9 @@
 ---
 name: research-workflow
-description: End-to-end research workflow for OmegaClaw. Iterative planning,
+description: End-to-end research workflow for Omega. Iterative planning,
   data acquisition, experiments, and write-up.
 ---
-# Research Workflow (OmegaClaw)
+# Research Workflow (Omega)
 This workflow guides you through problem definition, online research,
 and creating a detailed execution plan. Once the user approves the plan,
 it replaces these instructions and you follow it step by step.

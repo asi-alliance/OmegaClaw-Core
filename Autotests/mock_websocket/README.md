@@ -18,7 +18,7 @@ For the LLM-mock harness shared with this suite see `Autotests/mock/README.md`.
 ## 2. Build the local image
 
 ```
-docker build -t omegaclaw:mock .
+docker build -t omega:mock .
 ```
 
 ## 3. Start the container on the websocket channel with the Test provider
@@ -31,7 +31,7 @@ match the bearer token the mock server checks (`test-token`).
 
 ```
 env WS_URL=ws://172.17.0.1:8770 WS_TOKEN=test-token TEST_SERVER_IP=172.17.0.1 \
-  ./scripts/omegaclaw start -s 0000 -p Test -t websocket -d omegaclaw:mock
+  ./scripts/omega start -s 0000 -p Test -t websocket -d omega:mock
 ```
 
 Notes:
@@ -40,27 +40,27 @@ Notes:
   the container.
 - `-p Test` selects the mock LLM dispatcher; `TEST_SERVER_IP` is the host's
   docker-bridge address used to reach the mock LLM controller.
-- The container is created with the name `omegaclaw` (the script default).
+- The container is created with the name `omega` (the script default).
 
 The agent reconnects with backoff until the mock server is up, so the container
 can be started before or after the pytest session. Wait until the agent loop is
 running:
 
 ```
-until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
+until docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
 ```
 
 ## 4. Configure the test environment
 
 ```
-export OMEGACLAW_CONTAINER=omegaclaw
+export OMEGA_CONTAINER=omega
 export WS_MOCK_PORT=8770        # must match the WS_URL port used in step 3
 export WS_TOKEN=test-token      # must match step 3
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `OMEGACLAW_CONTAINER` | Yes | Container name passed to `docker exec`. |
+| `OMEGA_CONTAINER` | Yes | Container name passed to `docker exec`. |
 | `WS_MOCK_PORT` | No | Port the mock WS server binds (default `8770`). Must match the `WS_URL` port. |
 | `WS_TOKEN` | No | Bearer token the mock server requires (default `test-token`). Must match the container's `WS_TOKEN`. |
 
@@ -100,7 +100,7 @@ per session.
 ## 6. Tear down
 
 ```
-./scripts/omegaclaw clean
+./scripts/omega clean
 ```
 
 # Tests description

@@ -3,11 +3,11 @@
 (= (pluginWorkflowInstructionsDir) (empty))
 (= (pluginWorkflowMemoryDir) (empty))
 
-(= (loadOmegaClawPlugin)
+(= (loadOmegaPlugin)
    (progn
      (configure pluginWorkflowInstructionsDir (joinPath ((projectRootDirectory) "plugins" "workflow" "instructions")))
      (if (not (exists-directory (pluginWorkflowInstructionsDir)))
-       (Error (_loadOmegaClawPlugin) (strings-concat ("Instructions directory: " (pluginWorkflowInstructionsDir) " doesn't exist")))
+       (Error (_loadOmegaPlugin) (strings-concat ("Instructions directory: " (pluginWorkflowInstructionsDir) " doesn't exist")))
        (progn 
          (configure pluginWorkflowMemoryDir (joinPath ((memoryDirectory) workflow_space)))
          (log INFO "workflow-plugin" (strings-concat ("Creating working directory: " (pluginWorkflowMemoryDir))))

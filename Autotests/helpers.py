@@ -1,4 +1,4 @@
-"""Shared test infrastructure for OmegaClaw smoke tests."""
+"""Shared test infrastructure for Omega smoke tests."""
 import atexit
 import inspect
 import os
@@ -10,21 +10,21 @@ import time
 
 import pytest
 
-CHANNEL = os.environ.get("OMEGACLAW_IRC_CHANNEL") or "#metaclaw777"
-CONTAINER = os.environ.get("OMEGACLAW_CONTAINER") or "omegaclaw"
+CHANNEL = os.environ.get("OMEGA_IRC_CHANNEL") or "#metaclaw777"
+CONTAINER = os.environ.get("OMEGA_CONTAINER") or "omega"
 IRC_SERVER = "irc.quakenet.org"
 IRC_PORT = 6667
 WAIT = 30
 POLL = 3
 
-HISTORY_FILE = "/PeTTa/repos/OmegaClaw-Core/memory/history.metta"
+HISTORY_FILE = "/PeTTa/repos/Omega/memory/history.metta"
 CHROMA_SQLITE = "/PeTTa/chroma_db/chroma.sqlite3"
 
-GIT_TOKEN_ENV = "OMEGACLAW_GIT_TOKEN"
-GIT_REMOTE_ENV = "OMEGACLAW_GIT_REMOTE"
+GIT_TOKEN_ENV = "OMEGA_GIT_TOKEN"
+GIT_REMOTE_ENV = "OMEGA_GIT_REMOTE"
 GIT_DEFAULT_REMOTE = "https://github.com/OmegaSing/Test-Repopo"
-GIT_AUTHOR_NAME = "OmegaClaw Test"
-GIT_AUTHOR_EMAIL = "test@omegaclaw.local"
+GIT_AUTHOR_NAME = "Omega Test"
+GIT_AUTHOR_EMAIL = "test@omega.local"
 GIT_CREDENTIALS_PATH = "/etc/git-credentials"
 
 

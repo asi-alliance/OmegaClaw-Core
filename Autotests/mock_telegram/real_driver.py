@@ -12,7 +12,7 @@ bot-to-bot communication mode (Bot API 10.0, May 2026). Test-side surface:
 
 Requires `channels/telegram.py` to run against the real api.telegram.org
 and both bots opted into bot-to-bot mode via BotFather. See
-`Autotests/mock_telegram/README.pdf` for setup.
+`Autotests/mock_telegram/README.md` for setup.
 """
 import json
 import queue

@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw invokes (search ...) for "SingularityNet" and gets relevant info.
+Test: Omega invokes (search ...) for "SingularityNet" and gets relevant info.
 
 Run:
     pytest test_search_basic.py -s
@@ -14,7 +14,7 @@ SEARCH_SKILLS = ("websearch",)
 
 def test_search_basic():
     with Checker("search singularitynet") as c:
-        print(f"\n=== OmegaClaw: basic search (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: basic search (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt via IRC")
         prompt = make_prompt(

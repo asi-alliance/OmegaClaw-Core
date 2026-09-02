@@ -38,7 +38,7 @@ def chars_sent_lines():
 
 def test_pin_invisible_within_iteration_mock(llm, comm):
     with Checker("pin not visible inside its own iteration (mock)") as c:
-        print(f"\n=== OmegaClaw: pin within-iteration (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: pin within-iteration (run-id {c.run_id}) ===",
               flush=True)
 
         marker = f"XENO-{c.run_id}"

@@ -40,7 +40,7 @@ embeddingprovider: Local
 # Policy
 
 # Path to the security profile written using [OpenShell YAML](https://docs.nvidia.com/openshell/reference/policy-schema#filesystem-policy). See [./profile/policy.yaml](./profile/policy.yaml) as an example. Empty value disables restrictions.
-securityPolicyPath: "./repos/OmegaClaw-Core/profile/policy.yaml"
+securityPolicyPath: "./repos/Omega/profile/policy.yaml"
 # (internal) URL to the Nginx proxy isolating API keys from agent
 #GATEWAY_URL:
 
@@ -53,13 +53,13 @@ commchannel: irc
 # IRC
 # Enabled with commchannel: irc
 # IRC channel to join 
-IRC_channel: "##omegaclaw"
+IRC_channel: "##omega"
 # IRC server hostname
 IRC_server: "irc.quakenet.org"
 # IRC port
 IRC_port: 6667
 # IRC nickname
-IRC_user: "omegaclaw"
+IRC_user: "omega"
 
 # Mattermost
 # Enabled with commchannel: mattermost
@@ -70,7 +70,7 @@ MM_CHANNEL_ID: "8fjrmabjx7gupy7e5kjznpt5qh"
 
 # Slack
 # Enabled with commchannel: slack
-# Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message.
+# Slack channel ID (for example `C0123456789`). If empty, Omega auto-binds on first successful auth message.
 SL_CHANNEL_ID: ""
 # Slack polling interval in seconds (minimum effective value is 60).
 SL_POLL_INTERVAL: 60
@@ -159,7 +159,7 @@ asione_model: "asi1-ultra"
 # OpenClaw
 openClawEnabled: disabled
 # In Docker, openClawURL is only a fallback: the real Gateway target and its
-# token are set at container start (openclaw_url=, OMEGACLAW_OPENCLAW_TOKEN)
+# token are set at container start (openclaw_url=, OMEGA_OPENCLAW_TOKEN)
 # and injected by the local Nginx proxy, so the agent never sees the token.
 # See plugins/openclaw/README.md.
 openClawURL: "http://172.17.0.1:18789"

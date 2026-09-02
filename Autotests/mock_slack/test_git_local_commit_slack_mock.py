@@ -36,7 +36,7 @@ def test_git_local_commit_slack_mock(llm, sl):
         c.ok("git setup")
 
         start_ts = int(time.time()) - 1
-        marker = f"omegaclaw run {c.run_id}"
+        marker = f"omega run {c.run_id}"
         c.add_cleanup_marker(marker)
 
         c.step("send prompt via Slack with mocked response")

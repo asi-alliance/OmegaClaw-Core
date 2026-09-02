@@ -7,8 +7,8 @@ with `env -i` + a SAFE_VARS allowlist, so no provider key, channel token,
 or auth secret survives into the agent process.
 
 Red/green: before the fix the agent was the container's main process and
-inherited every `-e` var. OMEGACLAW_AUTH_SECRET is always injected by
-scripts/omegaclaw (default 0000), so it is the reliable marker: this test
+inherited every `-e` var. OMEGA_AUTH_SECRET is always injected by
+scripts/omega (default 0000), so it is the reliable marker: this test
 is RED before the fix and GREEN after.
 
 The agent reads its OWN environment via the shell skill, because only the
@@ -23,11 +23,11 @@ WAIT = 30
 DUMP = "/tmp/omega38_agentenv.txt"
 
 FORBIDDEN = [
-    "OMEGACLAW_AUTH_SECRET",
+    "OMEGA_AUTH_SECRET",
     "ANTHROPIC_API_KEY", "ASI_API_KEY", "ASIONE_API_KEY",
     "OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENAIAPI_API_KEY",
     "TG_BOT_TOKEN", "SL_BOT_TOKEN", "MM_BOT_TOKEN",
-    "OMEGACLAW_OPENCLAW_TOKEN",
+    "OMEGA_OPENCLAW_TOKEN",
 ]
 
 

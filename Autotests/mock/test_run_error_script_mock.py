@@ -28,7 +28,7 @@ echo "unreachable"
 
 def test_run_error_script_mock(llm, comm):
     with Checker("run error script (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: error script mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: error script mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

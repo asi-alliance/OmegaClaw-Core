@@ -64,9 +64,9 @@
                                           (progn (change-state! &error $new) (ALERT_FAILED $a $b))))
                  ($else $sexpr))))
 
-(= (omegaclaw)
-   (omegaclaw 1))
-(= (omegaclaw $k)
+(= (omega)
+   (omega 1))
+(= (omega $k)
    (progn (if (== $k 1) (progn (initConfig)
                                (initLoop)
                                (initLogger)
@@ -116,4 +116,4 @@
                       (sleep (sleepInterval))
                       (cut)
                       (gc)
-                      (omegaclaw (+ 1 $k))))))
+                      (omega (+ 1 $k))))))

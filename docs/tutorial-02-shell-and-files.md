@@ -1,11 +1,11 @@
 # Tutorial 02 — Shell and Files
 
-**Goal:** let OmegaClaw inspect and modify its environment using `shell`, `read-file`, `write-file`, and `append-file`.
+**Goal:** let Omega inspect and modify its environment using `shell`, `read-file`, `write-file`, and `append-file`.
 
 ## Prerequisites
 
-- A running OmegaClaw (see [Usage](/README.md#usage)).
-- Awareness that these skills run with the permissions of the OmegaClaw process.
+- A running Omega (see [Usage](/README.md#usage)).
+- Awareness that these skills run with the permissions of the Omega process.
 
 ## The four I/O skills
 
@@ -46,7 +46,7 @@ The agent should `(append-file "/tmp/session.log" "...")` on each subsequent tur
 
 - **Apostrophes in `shell` arguments are rejected** by the Prolog-side `shell` helper. Quote text with double quotes instead, or write it to a file first and operate on the file.
 - **There is no sandbox.** If you expose destructive commands (`rm -rf`, etc.) through the shell you will get what you ask for. Run in Docker and treat the container as ephemeral.
-- File paths are resolved relative to the OmegaClaw working directory unless absolute.
+- File paths are resolved relative to the Omega working directory unless absolute.
 
 ## Verification
 

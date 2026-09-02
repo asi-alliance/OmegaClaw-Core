@@ -29,7 +29,7 @@ echo "unreachable"
 
 def test_run_error_script_slack_mock(llm, sl):
     with Checker("run error script (slack mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: error script slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: error script slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

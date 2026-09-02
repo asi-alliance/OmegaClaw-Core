@@ -21,7 +21,7 @@ from tg_helpers import tg_send_prompt
 
 def test_memory_history_telegram_mock(llm, tg):
     with Checker("history append (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: history append telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: history append telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("capture initial history state")

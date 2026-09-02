@@ -18,7 +18,7 @@ Truth values share NAL's `(stv frequency confidence)` format, interpreted probab
 
 ## The `|~` operator
 
-`|~` applies PLN rules. OmegaClaw's current deployment supports a useful subset; the rest are left to NAL or future work.
+`|~` applies PLN rules. Omega's current deployment supports a useful subset; the rest are left to NAL or future work.
 
 ---
 

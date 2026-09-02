@@ -20,7 +20,7 @@ WAIT = 40
 
 def test_ws_outbox_flush_ws_mock(llm, ws):
     with Checker("ws outbox flush after reconnect") as c:
-        print(f"\n=== OmegaClaw: ws outbox flush (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: ws outbox flush (run-id {c.run_id}) ===", flush=True)
 
         c.step("wait for agent WebSocket connection")
         if not ws.wait_for_connection(timeout=60):

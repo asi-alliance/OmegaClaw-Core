@@ -53,7 +53,7 @@ configured with - the plugin never overrides it.
 Token auth is the default (`gateway.auth.mode: "token"`). The value lives in
 the Gateway's `.env` as `OPENCLAW_GATEWAY_TOKEN`.
 
-## Configure the OmegaClaw side
+## Configure the Omega side
 
 `config/config.yaml`:
 
@@ -74,14 +74,14 @@ openClawAgent: "main"
 ### The token never reaches the agent process
 
 Unlike a bare Python deployment, the Docker image never lets the agent
-process hold the Gateway token. `OMEGACLAW_OPENCLAW_TOKEN` must still be
+process hold the Gateway token. `OMEGA_OPENCLAW_TOKEN` must still be
 passed through the environment, never through config files:
 
 ```bash
-docker run ... -e OMEGACLAW_OPENCLAW_TOKEN="<token>" openclaw_url="<gateway URL>" ...
+docker run ... -e OMEGA_OPENCLAW_TOKEN="<token>" openclaw_url="<gateway URL>" ...
 ```
 
-(with `scripts/omegaclaw`: `OMEGACLAW_OPENCLAW_TOKEN=<token> ./scripts/omegaclaw start -g "<gateway URL>" ...`)
+(with `scripts/omega`: `OMEGA_OPENCLAW_TOKEN=<token> ./scripts/omega start -g "<gateway URL>" ...`)
 
 but the local Nginx proxy (`proxy/nginx.conf.template`, `location /openclaw/`)
 reads it *before* the agent's environment is scrubbed (see `entrypoint.sh`)
@@ -96,7 +96,7 @@ same Gateway for that case to keep working.
 
 ### Choosing the Gateway URL
 
-| OmegaClaw runs | Gateway runs | Use |
+| Omega runs | Gateway runs | Use |
 | --- | --- | --- |
 | in Docker | on the host | `http://172.17.0.1:18789` (the `docker0` bridge address) |
 | in Docker | in Docker, same user-defined network | `http://<gateway-container>:18789` |
@@ -126,7 +126,7 @@ curl -sS http://127.0.0.1:18789/v1/responses \
   -d '{"model":"openclaw","input":"Reply with exactly: PONG"}'
 ```
 
-On OmegaClaw startup the log should show
+On Omega startup the log should show
 `openclaw-plugin: OpenClaw integration is enabled`, and the agent should offer
 the `delegate-task-to-openclaw-agent` skill.
 
@@ -183,7 +183,7 @@ the rest of the history window (`maxHistory`).
 | Error | Cause |
 | --- | --- |
 | `HTTP 404` | `gateway.http.endpoints.responses.enabled` is not set, or the Gateway was not restarted after setting it |
-| `HTTP 401: Unauthorized` | `OMEGACLAW_OPENCLAW_TOKEN` is empty or does not match `OPENCLAW_GATEWAY_TOKEN` |
+| `HTTP 401: Unauthorized` | `OMEGA_OPENCLAW_TOKEN` is empty or does not match `OPENCLAW_GATEWAY_TOKEN` |
 | `HTTP 400: Unknown agent '<id>'` | `openClawAgent` does not exist in `agents.entries` |
 | `Cannot reach OpenClaw Gateway` | Wrong `openClawURL`, or the Gateway is bound to loopback only |
 | `missing scope ... (MISSING_SCOPE)` | The request went to the WebSocket surface instead of `/v1/responses` |
