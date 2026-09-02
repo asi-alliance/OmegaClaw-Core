@@ -84,7 +84,7 @@ A canonical decomposition for a non-trivial question:
 
 | Cycle | Commands |
 |---|---|
-| 1 | `query` memory, `search` / `tavily-search` for missing facts, `pin` the plan. |
+| 1 | `query` memory, `websearch` for missing facts, `pin` the plan. |
 | 2 | Atomize verified facts, run first `(metta (\|- ...))` step. |
 | 3 | Revision with independent evidence; follow-up inference. |
 | 4 | Threshold check; `send` the answer with provenance. |

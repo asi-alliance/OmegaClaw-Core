@@ -28,7 +28,7 @@ from slack_helpers import sl_send_prompt
 
 def test_memory_episode_slack_mock(llm, sl):
     with Checker("memory episode recall (slack mock)") as c:
-        print(f"\n=== OmegaClaw: memory episode slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: memory episode slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.add_cleanup_marker("Barney")

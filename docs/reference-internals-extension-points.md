@@ -11,17 +11,6 @@ Most common extension. Two edits:
 
 Full walkthrough: [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md).
 
-## Add a remote skill
-
-Same as above, but the body delegates to `src/agentverse.py`:
-
-```metta
-(= (my-remote-skill $arg)
-   (py-call (agentverse.my_remote_skill $arg)))
-```
-
-Full walkthrough: [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
-
 ## Add a channel
 
 Three touch points:
@@ -71,7 +60,7 @@ To add a new backend, add a branch and implement the Python function.
 
 ## Change the reasoning library
 
-`lib_nal.metta` and `lib_pln.metta` are plain MeTTa files loaded by `lib_omegaclaw.metta`. Add new rule definitions directly, or swap in a different logic library entirely — the only required surface is whatever operator the LLM invokes through `(metta ...)`.
+`lib_nal.metta` and `lib_pln.metta` are plain MeTTa files loaded by `lib_omega.metta`. Add new rule definitions directly, or swap in a different logic library entirely — the only required surface is whatever operator the LLM invokes through `(metta ...)`.
 
 ## See also
 

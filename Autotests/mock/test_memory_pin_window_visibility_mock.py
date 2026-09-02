@@ -28,7 +28,7 @@ def history_tail_bytes(n):
 
 def test_memory_pin_window_visibility_mock(llm, comm):
     with Checker("pin visibility in HISTORY window (mock)") as c:
-        print(f"\n=== OmegaClaw: pin window visibility (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: pin window visibility (run-id {c.run_id}) ===",
               flush=True)
 
         pin_marker = f"alpha-{c.run_id}"

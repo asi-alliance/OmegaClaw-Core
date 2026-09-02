@@ -1,0 +1,54 @@
+# plugins.yaml lists all plugins to be loaded by the agent
+# see /docs/reference-plugin-api.md for details
+
+- name: irc
+  loader: python
+  location: "{REPO}/channels"
+
+- name: telegram
+  loader: python
+  location: "{REPO}/channels"
+
+- name: slack
+  loader: python
+  location: "{REPO}/channels"
+
+- name: mattermost
+  loader: python
+  location: "{REPO}/channels"
+
+- name: mockchannel
+  loader: python
+  location: "{REPO}/channels"
+
+- name: wschat
+  loader: python
+  location: "{REPO}/channels"
+
+- name: openaiapi
+  loader: python
+  location: "{REPO}/providers"
+
+- name: asione
+  loader: python
+  location: "{REPO}/providers"
+
+- name: openrouter
+  loader: python
+  location: "{REPO}/providers"
+
+- name: openai
+  loader: python
+  location: "{REPO}/providers"
+
+- name: mockprovider
+  loader: python
+  location: "{REPO}/providers"
+
+- name: workflow
+  loader: metta
+  location: "{REPO}/plugins/workflow"
+
+- name: openclaw
+  loader: metta
+  location: "{REPO}/plugins/openclaw"

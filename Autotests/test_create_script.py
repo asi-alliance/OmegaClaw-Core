@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw creates date.sh that prints the current date.
+Test: Omega creates date.sh that prints the current date.
 
 Run:
     pytest test_create_script.py -s
@@ -25,7 +25,7 @@ def _current_year_strs():
 
 def test_create_date_script():
     with Checker("create date.sh", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create date.sh (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: create date.sh (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

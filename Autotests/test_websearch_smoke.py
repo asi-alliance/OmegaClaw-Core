@@ -12,7 +12,7 @@ from helpers import dexec
 def test_websearch_returns_results():
     code = (
         "import os, sys;"
-        "sys.path.insert(0, os.path.join(os.environ['OMEGACLAW_DIR'], 'channels'));"
+        "sys.path.insert(0, os.path.join(os.environ['OMEGA_DIR'], 'src'));"
         "import websearch;"
         "print('COUNT', len(websearch.search_('test')))"
     )

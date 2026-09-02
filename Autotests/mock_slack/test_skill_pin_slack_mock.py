@@ -18,7 +18,7 @@ STEP_KEYWORDS = ("step", "alpha", "beta", "gamma", "restart", "server", "done")
 
 def test_skill_pin_slack_mock(llm, sl):
     with Checker("pin skill invocation (slack mock)") as c:
-        print(f"\n=== OmegaClaw: pin slack mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: pin slack mock (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt with mocked pin + send response")
         prompt = make_prompt(

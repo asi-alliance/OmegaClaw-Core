@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw appends a 4th line to a 3-line file.
+Test: Omega appends a 4th line to a 3-line file.
 
 Run:
     pytest test_edit_append_line.py -s
@@ -20,7 +20,7 @@ LINE4_EXPECTED = "Delta"
 
 def test_edit_append_line():
     with Checker("edit append line", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: append line (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: append line (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

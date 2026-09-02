@@ -12,7 +12,7 @@ Defined in `src/channels.metta`. Dispatch depends on the `commchannel` configura
 ```
 
 ### Purpose
-Send a message to the currently active communication channel (IRC, Telegram, Slack, or Mattermost).
+Send a message to the currently active communication channel (IRC, Telegram, Slack, Mattermost, or WebSocket).
 
 ### Parameters
 - `message` — the text to send. Newlines are replaced with `\n` before transmission.
@@ -55,20 +55,20 @@ The agent does not normally call `receive` itself; the loop wraps it:
 ```
 
 ### Notes / Limits
-- Delegates to `irc.getLastMessage`, `telegram.getLastMessage`, `slack.getLastMessage`, or `mattermost.getLastMessage`.
+- Delegates to `wschat.getLastMessage`, `irc.getLastMessage`, `telegram.getLastMessage`, `slack.getLastMessage`, or `mattermost.getLastMessage`.
 - The loop treats an unchanged message as "no new input" via the `&prevmsg` state.
 
 ---
 
-## `search`
+## `websearch`
 
 ### Signature
 ```metta
-(search "query")
+(websearch "query")
 ```
 
 ### Purpose
-Perform a web search through the `channels/websearch.py` adapter.
+Perform a web search through the `src/websearch.py` adapter.
 
 ### Parameters
 - `query` — the search string.
@@ -78,9 +78,8 @@ A string of search results suitable for feeding back into the prompt.
 
 ### Examples
 ```metta
-(search "MeTTa AtomSpace tutorial")
+(websearch "MeTTa AtomSpace tutorial")
 ```
 
 ### Notes / Limits
-- For research-oriented search through an Agentverse agent, see `tavily-search` in [reference-skills-remote-agents.md](./reference-skills-remote-agents.md).
 - Result format depends on the backend used by `websearch.search`.

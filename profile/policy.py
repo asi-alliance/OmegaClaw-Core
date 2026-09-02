@@ -1,8 +1,12 @@
+import os
+import enum
 import yaml
+import json
 from py_landlock import Landlock, AccessFs
 from pathlib import Path
-import enum
-import os
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 def apply_security_policy(path):
     try:
@@ -11,10 +15,46 @@ def apply_security_policy(path):
             policy.load_file(path)
             policy.apply()
         else:
-            print("[policy.apply_security_policy]: securityPolicyPath is not set")
+            logger.warning("SecurityPolicyPath is not set")
     except Exception as e:
-        print(f"[policy.apply_security_policy]: Unexpected exception: {e}")
+        logger.exception(f"Unexpected exception: {e}")
         raise
+
+def get_allowed_policy_paths(path) -> str:
+    """
+    Retrieves and serializes the allowed filesystem paths from the security policy.
+
+    This function is exposed to the agent as a skill (`get-io-policy`). It reads the 
+    Landlock security policy configuration and returns the permitted base paths 
+    for read-only and read-write operations in JSON format. This allows the LLM 
+    to proactively check path permissions before attempting File I/O operations.
+
+    Args:
+        path (str | Any): The file path to the security policy YAML file. 
+                          Can be a raw string or a MeTTa symbol (which will be parsed to a string).
+
+    Returns:
+        str: A JSON-formatted string containing two keys: 'read_only' and 'read_write', 
+             with lists of allowed directory paths.
+             If the path is missing or an error occurs, returns a descriptive error string.
+    """
+    try:
+        path = str(path or "").strip().strip('"')
+        if path:
+            policy = FileSystemPolicy()
+            policy.load_file(path)
+            return json.dumps({
+                'read_only': [str(p) for p in policy._read_only],
+                'read_write': [str(p) for p in policy._read_write]
+            })
+        else:
+            logger.warning("SecurityPolicyPath is not set")
+            return "Could not retrieve policy: policy is not set"
+    except Exception as e:
+        logger.exception(
+            f"Could not retrieve a policy due to unexpected exception: {e}"
+        )
+        return "Could not retrieve a policy: unexpected exception"
 
 class LandLockCompatibility(enum.Enum):
     BEST_EFFORT = 0
@@ -39,7 +79,7 @@ class FileSystemPolicy:
         self._read_write = []
 
     def load_file(self, path: str|Path):
-        print(f"[FileSystemPolicy.load_file] loading policy from file {path}")
+        logger.info(f"Loading policy from file {path}")
         policy = None
         with open(path, "r") as f:
             policy = yaml.safe_load(f)
@@ -93,4 +133,4 @@ class FileSystemPolicy:
             .add_path_rule(*rof, access=FileSystemPolicy.READ_ONLY_FILE_ACCESS) \
             .apply()
 
-        print("[FileSystemPolicy.load_file] policy applied")
+        logger.info("Policy applied")

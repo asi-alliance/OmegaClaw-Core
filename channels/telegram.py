@@ -5,6 +5,12 @@ import time
 import urllib.parse
 import urllib.request
 import auth
+from src.logger import get_logger
+from delivery_queue import PendingMessages
+import channels
+from config import config_get_by_key
+
+logger = get_logger(__name__)
 
 _running = False
 _last_message = ""
@@ -19,6 +25,7 @@ _offset = None
 _connected = False
 
 _authenticated_user_id = None
+_outbox = PendingMessages()
 
 
 def _set_last(msg):
@@ -95,7 +102,7 @@ def _initialize_offset():
     try:
         updates = _api_call("getUpdates", {"timeout": 0}, timeout=10) or []
     except Exception as exc:
-        print(f"[TELEGRAM] Could not read initial offset: {exc}")
+        logger.warning(f"Could not read initial offset: {exc}")
         return
 
     max_update = -1
@@ -128,19 +135,46 @@ def _is_allowed_message(chat_id, user_id, msg):
             if chat_id != _chat_id:
                 return "ignore"
             return "allow" if user_id == _authenticated_user_id else "ignore"
-        if not _is_auth_command(msg):
-            return "ignore"
-        candidate = _parse_auth_candidate(msg)
-        if auth.verify_token(candidate):
+        auth_candidate = _parse_auth_candidate(msg) if _is_auth_command(msg) else None
+        user_id_check = auth.authenticate_channel_user('TELEGRAM', user_id, auth_candidate)
+        if user_id_check in ["auth_bound", "allow"]:
             _authenticated_user_id = user_id
             _chat_id = chat_id
-            return "auth_bound"
-        return "ignore"
+            return user_id_check
+        else:
+            return "ignore"
+
+
+def _ready_to_send():
+    with _state_lock:
+        return _connected and bool(_chat_id)
+
+
+def _deliver_outbound(chunk):
+    with _state_lock:
+        target_chat = _chat_id
+    if not target_chat:
+        raise RuntimeError("Telegram chat is not bound")
+    _api_call(
+        "sendMessage",
+        {"chat_id": target_chat, "text": chunk},
+        timeout=15,
+        use_post=True,
+    )
+
+
+def _flush_outbox():
+    global _connected
+    try:
+        _outbox.flush(_deliver_outbound, _ready_to_send)
+    except Exception as exc:
+        _connected = False
+        logger.warning(f"Telegram send failed; retaining queued message: {exc}")
 
 
 def _poll_loop():
     global _connected, _offset
-    print("[TELEGRAM] Polling started")
+    logger.info("Polling started")
 
     while _running:
         try:
@@ -180,13 +214,14 @@ def _poll_loop():
                     _set_last(f"{display_name}: {text}")
                 elif state == "auth_bound":
                     send_message(f"Authentication successful for {display_name}.")
+            _flush_outbox()
         except Exception as exc:
             _connected = False
-            print(f"[TELEGRAM] Poll error: {exc}")
+            logger.warning(f"Poll error: {exc}")
             time.sleep(2)
 
     _connected = False
-    print("[TELEGRAM] Polling stopped")
+    logger.info("Polling stopped")
 
 
 def start_telegram(chat_id="", poll_timeout=20):
@@ -206,13 +241,14 @@ def start_telegram(chat_id="", poll_timeout=20):
 
     try:
         _poll_timeout = max(1, int(poll_timeout))
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Invalid poll_timeout {poll_timeout!r}, falling back to 20: {e}")
         _poll_timeout = 20
 
     _offset = None
     _running = True
     _connected = False
-    print(f"[TELEGRAM] Starting adapter with chat target: {_chat_id or 'auto-bind'}")
+    logger.info(f"Starting adapter with chat target: {_chat_id or 'auto-bind'}")
     _initialize_offset()
 
     t = threading.Thread(target=_poll_loop, daemon=True)
@@ -230,24 +266,33 @@ def send_message(text):
     if not text:
         return
 
-    with _state_lock:
-        target_chat = _chat_id
-
-    if not _connected or not target_chat:
-        return
-
     max_len = 3900
+    chunks = []
     for i in range(0, len(text), max_len):
         chunk = text[i:i + max_len]
-        if not chunk:
-            continue
-        try:
-            _api_call(
-                "sendMessage",
-                {"chat_id": target_chat, "text": chunk},
-                timeout=15,
-                use_post=True,
-            )
-        except Exception as exc:
-            print(f"[TELEGRAM] Send failed: {exc}")
-            return
+        if chunk:
+            chunks.append(chunk)
+    _outbox.extend(chunks)
+    _flush_outbox()
+
+class TelegramChannel(channels.CommChannel):
+
+    def __init__(self):
+        super().__init__()
+
+    def start(self) -> None:
+        chat_id = config_get_by_key("TG_CHAT_ID", "")
+        poll_timeout = int(config_get_by_key("TG_POLL_TIMEOUT", 20))
+        start_telegram(chat_id, poll_timeout)
+
+    def stop(self) -> None:
+        stop_telegram()
+
+    def receive(self) -> str:
+        return getLastMessage()
+
+    def send(self, message: str) -> None:
+        send_message(message)
+
+def loadOmegaPlugin():
+    channels.registerCommChannel("telegram", TelegramChannel())

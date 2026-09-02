@@ -1,0 +1,149 @@
+name: autotests
+
+on:
+  workflow_call:
+    inputs:
+      platforms:
+        description: 'Comma separated list of platforms to test'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+        type: string
+      no_build_cache:
+        description: 'Do not use cached docker layers on image build'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      CICD_GITHUB_PAT:
+        required: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - name: Select supported platforms
+        id: platforms
+        env:
+          REQUESTED_PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          # Add new autotest platforms here, including their dedicated runner.
+          supported_platforms='[
+            {"platform":"linux/amd64","runner":"ubuntu-latest"},
+            {"platform":"linux/arm64","runner":"ubuntu-24.04-arm"}
+          ]'
+
+          matrix=$(jq -c --arg requested "$REQUESTED_PLATFORMS" '
+            ($requested | split(",") | map(gsub("^\\s+|\\s+$"; "")) | unique) as $requested_platforms
+            | {include: [
+                .[]
+                | select(.platform as $platform | $requested_platforms | index($platform))
+              ]}
+          ' <<< "$supported_platforms")
+
+          echo "Selected autotest matrix: $matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  autotests:
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      AUTOTESTS_OMEGA_CONTAINER: omega
+      AUTOTESTS_OMEGA_TAG: 'cicd-${{ github.run_id }}'
+      # Not a real credential: it authenticates against the stub Gateway that
+      # the openclaw fixture starts. It also gives test_credentials_scrubbed_mock
+      # a token that is really present, so that check can fail if one leaks.
+      OMEGA_OPENCLAW_TOKEN: 'ci-openclaw-stub-token'
+    steps:
+      - name: Complete tag name
+        run: |
+          NEW_TAG="$AUTOTESTS_OMEGA_TAG-${PLATFORM////-}"
+          echo "AUTOTESTS_OMEGA_TAG=$NEW_TAG" >> "$GITHUB_ENV"
+          echo "Completed image tag $NEW_TAG"
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          tags: singularitynet/omega:${{ env.AUTOTESTS_OMEGA_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          no-cache: ${{ inputs.no_build_cache }}
+
+      - name: Verify version in release image
+        run: |
+          expected="Omega version=$(git describe --tags --dirty --always)"
+          test "$(./scripts/omega --version)" = "$expected"
+          actual="$(docker run --rm \
+            --entrypoint /PeTTa/repos/Omega/scripts/omega \
+            singularitynet/omega:${AUTOTESTS_OMEGA_TAG} --version)"
+          test "$actual" = "$expected"
+
+      - name: Autotests - Set up
+        run: |
+          chmod +x ./scripts/omega
+          ./scripts/omega start -p Test -t test -d singularitynet/omega:${{ env.AUTOTESTS_OMEGA_TAG }} -g "http://host.docker.internal:18789"
+          pip install pytest
+          echo "Waiting for agent to become ready..."
+          ready=
+          for i in $(seq 1 90); do
+            if docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; then
+              echo "Agent ready after ${i}s"
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::Agent did not become ready in 90s"
+            docker logs omega 2>&1 | tail -100
+            exit 1
+          fi
+        env:
+          TEST_SERVER_IP: 'host.docker.internal'
+          IMPORT_KB_ON_START: '0' # TODO: this is turned off because Python dependencies are not installed to the workflow environment
+
+      - name: MeTTa and Python unit tests
+        env:
+          PETTA_PATH: '/PeTTa'
+          PROJECT_ROOT: '/PeTTa/repos/Omega'
+        run: |
+          docker exec -e PETTA_PATH=${PETTA_PATH} omega ${PROJECT_ROOT}/tests/mettatest.sh
+          ./tests/pytest.sh
+
+      - name: Autotests - Phase 1 (Blocking Checks)
+        working-directory: Autotests
+        run: |
+          python ../src/helper.py
+          pytest -s -v @run_mandatory
+        env:
+          OMEGA_CONTAINER: ${{ env.AUTOTESTS_OMEGA_CONTAINER }}
+
+      - name: Autotests - Phase 2 (Non-Blocking Checks)
+        continue-on-error: true
+        working-directory: Autotests
+        run: pytest -s -v @run_optional
+        env:
+          OMEGA_CONTAINER: ${{ env.AUTOTESTS_OMEGA_CONTAINER }}
+          OMEGA_GIT_TOKEN: ${{ secrets.CICD_GITHUB_PAT }}

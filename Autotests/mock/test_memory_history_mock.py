@@ -21,7 +21,7 @@ from helpers import (
 
 def test_memory_history_mock(llm, comm):
     with Checker("history append (mock)") as c:
-        print(f"\n=== OmegaClaw: history append mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: history append mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("capture initial history state")

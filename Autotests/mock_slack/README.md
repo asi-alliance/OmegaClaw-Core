@@ -1,6 +1,6 @@
 # Slack autotests — setup and run
 
-This section describes how to run the `test_*_slack_mock.py` suite against a local OmegaClaw container that talks to the real Slack Web API. Two Slack bots are used: an "agent" bot, which OmegaClaw runs as inside the container, and a "driver" bot, which the pytest harness uses to post prompts into a shared channel and to read the agent's replies. The LLM is still mocked (`provider="Test"`, deterministic answers from `Autotests/mock/llm.py`); only the message-delivery transport differs from `Autotests/mock/`.
+This section describes how to run the `test_*_slack_mock.py` suite against a local Omega container that talks to the real Slack Web API. Two Slack bots are used: an "agent" bot, which Omega runs as inside the container, and a "driver" bot, which the pytest harness uses to post prompts into a shared channel and to read the agent's replies. The LLM is still mocked (`provider="Test"`, deterministic answers from `Autotests/mock/llm.py`); only the message-delivery transport differs from `Autotests/mock/`.
 
 The 26 tests in this directory mirror `Autotests/mock/test_*_mock.py` 1:1: same mock-LLM answers, same prompts, same assertions. They are listed at the end of this document.
 
@@ -22,14 +22,14 @@ A free Slack workspace is enough. Create one at [slack.com/get-started](https://
 
 ### 2.2. Shared channel
 
-In the Slack client, click `+` next to **Channels** in the sidebar, choose **Create channel**, give it a name (for example `omegaclaw-qa`), keep it public, create. A private channel works too, but requires extra scopes on both apps (see 2.4).
+In the Slack client, click `+` next to **Channels** in the sidebar, choose **Create channel**, give it a name (for example `omega-qa`), keep it public, create. A private channel works too, but requires extra scopes on both apps (see 2.4).
 
 ### 2.3. Create the two apps
 
 For each role (agent and driver) repeat the same flow at [api.slack.com/apps](https://api.slack.com/apps), signed in with the same account that owns the workspace:
 
 1. Click **Create New App**, choose **From scratch**.
-2. Set **App Name** (for example `OmegaClaw Agent` for the first app and `OmegaClaw Driver` for the second; the names are arbitrary, only the resulting tokens matter).
+2. Set **App Name** (for example `Omega Agent` for the first app and `Omega Driver` for the second; the names are arbitrary, only the resulting tokens matter).
 3. Pick the workspace from 2.1.
 4. Click **Create App**. You land on the **Basic Information** page of the new app.
 
@@ -104,12 +104,12 @@ This value is `SL_AGENT_USER_ID`, used by pytest only (step 5).
 The mock infrastructure is part of the source tree, so the image must be built locally rather than pulled from the registry.
 
 ```
-docker build -t omegaclaw:mock .
+docker build -t omega:mock .
 ```
 
 ## 4. Start the container with the Test provider and the Slack channel
 
-Use the `scripts/omegaclaw` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
+Use the `scripts/omega` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
 
 The container connects back to the host on TCP port 9765 to reach the mock LLM controller. `TEST_SERVER_IP` must hold the host IP that is reachable from inside the container; under the default Docker bridge this is `172.17.0.1`. The Slack adapter inside the container talks directly to `slack.com/api`.
 
@@ -117,22 +117,22 @@ The container connects back to the host on TCP port 9765 to reach the mock LLM c
 env TEST_SERVER_IP=172.17.0.1 \
     SL_BOT_TOKEN="<agent_bot_token>" \
     SL_CHANNEL_ID="<channel_id>" \
-    ./scripts/omegaclaw start -s 0000 -p Test -t slack -d omegaclaw:mock
+    ./scripts/omega start -s 0000 -p Test -t slack -d omega:mock
 ```
 
 Notes:
 
 - `-t slack` selects the Slack adapter inside `src/channels.metta`.
 - `-p Test` selects the mock LLM dispatcher.
-- `-s 0000` sets `OMEGACLAW_AUTH_SECRET` inside the container; the test harness sends this same secret via the driver bot during `_sl_authenticate` once per session, binding the driver as the agent's owner.
-- `SL_BOT_TOKEN` is the agent bot token (the bot OmegaClaw runs as).
+- `-s 0000` sets `OMEGA_AUTH_SECRET` inside the container; the test harness sends this same secret via the driver bot during `_sl_authenticate` once per session, binding the driver as the agent's owner.
+- `SL_BOT_TOKEN` is the agent bot token (the bot Omega runs as).
 - `SL_CHANNEL_ID` is the shared channel both bots live in.
 - `TEST_SERVER_IP=172.17.0.1` is the host's docker-bridge address used by the mock LLM provider. It must be set even for the Slack channel, because `provider=Test` reads it.
 
 Wait until the agent loop is up. The first runtime `CHARS_SENT:` line (with a byte count after the colon) marks the end of `initChannels` / `initMemory`:
 
 ```
-until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
+until docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
 ```
 
 ## 5. Configure the test environment
@@ -140,22 +140,22 @@ until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; do
 Export the variables the test harness reads.
 
 ```
-export OMEGACLAW_CONTAINER=omegaclaw
-export OMEGACLAW_AUTH_SECRET=0000
+export OMEGA_CONTAINER=omega
+export OMEGA_AUTH_SECRET=0000
 export SL_DRIVER_TOKEN="<driver_bot_token>"
 export SL_CHANNEL_ID="<channel_id>"
 export SL_AGENT_USER_ID="<agent_bot_user_id>"
-export OMEGACLAW_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_slack_mock
+export OMEGA_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_slack_mock
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `OMEGACLAW_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name from step 4 (`omegaclaw` when using the script). |
-| `OMEGACLAW_AUTH_SECRET` | Yes | Auth secret used by the driver bot once per session. Must equal the `-s` value from step 4. |
+| `OMEGA_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name from step 4 (`omega` when using the script). |
+| `OMEGA_AUTH_SECRET` | Yes | Auth secret used by the driver bot once per session. Must equal the `-s` value from step 4. |
 | `SL_DRIVER_TOKEN` | Yes | Driver bot token. Tests are skipped if unset. |
 | `SL_CHANNEL_ID` | Yes | Shared channel id. Same value the container was started with. |
 | `SL_AGENT_USER_ID` | Yes | Bot user id of the agent app. The driver bot filters incoming messages by author and ignores everything except messages from this user id. |
-| `OMEGACLAW_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_slack_mock`. The test is skipped if this variable is unset. |
+| `OMEGA_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_slack_mock`. The test is skipped if this variable is unset. |
 
 ## 6. Run the suite
 
@@ -165,15 +165,15 @@ source venv/bin/activate
 pytest -s -v mock_slack/test_*_slack_mock.py
 ```
 
-The `LlmMockController` and the `SlackRealDriver` are provided by session-scoped fixtures in `mock_slack/conftest.py`, so both are started once per pytest session. Expected output: `26 passed` (or `25 passed, 1 skipped` if `OMEGACLAW_GIT_TOKEN` is not set).
+The `LlmMockController` and the `SlackRealDriver` are provided by session-scoped fixtures in `mock_slack/conftest.py`, so both are started once per pytest session. Expected output: `26 passed` (or `25 passed, 1 skipped` if `OMEGA_GIT_TOKEN` is not set).
 
 ## 7. Tear down
 
 ```
-./scripts/omegaclaw clean
+./scripts/omega clean
 ```
 
-This removes the `omegaclaw` container and the `omegaclaw-memory` volume created by the script in step 4.
+This removes the `omega` container and the `omega-memory` volume created by the script in step 4.
 
 # Tests description
 
@@ -271,30 +271,16 @@ Asks about a gibberish string.
 - Mock answer: `(send "No results found for <gibberish>. The string appears to be gibberish, no meaningful matches.")`.
 - Checks: the reply contains a negation phrase (`no results`, `not found`, `gibberish`, `nonsense`, `no meaning`, `unknown`, ...).
 
-### 13. test_tavily_search_slack_mock.py
-
-Live variant exercises the external Tavily uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the answer directly via `(send ...)` and the assertion narrows to "did the agent surface a real Fetch.ai-specific reply".
-
-- Mock answer: `(send "Fetch.ai (FET) is a decentralized AI blockchain platform powering autonomous economic agents (uAgents). Recent news covers the ASI Alliance roadmap, FET token activity, and integration work with SingularityNET and CUDOS.")`. The `tavily-search` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body contains at least one strict Fetch keyword (`fetch.ai`, `fetch ai`, `fet `, `asi alliance`, `humayun`, `uagent`, `decentralized`, `blockchain`, `token`) AND none of the delivery-error markers (`delivery failed`, `tavily-search failed`, `currently unavailable`, ...).
-
-### 14. test_technical_analysis_slack_mock.py
-
-Live variant exercises the external technical-analysis uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the TA summary directly via `(send ...)` and the assertion narrows to "did the agent surface TA-style content for the requested ticker".
-
-- Mock answer: `(send "AAPL (Apple) is showing bullish momentum: RSI is rising, MACD crossed above its signal line, and the 50-day SMA is above the 200-day. Composite indicators point to a buy signal with strong trend strength.")`. The `technical-analysis` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body mentions the ticker (`aapl` or `apple`) AND at least one TA indicator (`rsi`, `macd`, `sma`, `bullish`, `bearish`, `buy signal`, `trend`, `momentum`, ...) AND none of the delivery-error markers.
-
 ## Memory
 
-### 15. test_memory_chromadb_slack_mock.py
+### 13. test_memory_chromadb_slack_mock.py
 
 Requests the agent to remember a fact tagged with marker `CI-SMOKE-<run_id>`.
 
 - Mock answer: `(remember "Unique smoke marker CI-SMOKE-<run_id> was emitted by CI.")`.
 - Checks: `(remember ...)` was invoked with the marker; vector count in the `embeddings` table of `chroma.sqlite3` grew by ≥ 1.
 
-### 16. test_memory_history_slack_mock.py
+### 14. test_memory_history_slack_mock.py
 
 Sends "Acknowledge with one short line that you received marker `<run_id>`." and verifies the entry in `history.metta`.
 
@@ -303,14 +289,14 @@ Sends "Acknowledge with one short line that you received marker `<run_id>`." and
 
 ## Skills
 
-### 17. test_skill_metta_slack_mock.py
+### 15. test_skill_metta_slack_mock.py
 
 Asks the agent to evaluate a short MeTTa expression and report the result.
 
 - Mock answer: `(metta "(+ 2 2)") (send "The metta skill evaluated (+ 2 2) and returned 4.")`.
 - Checks: `(metta ...)` was invoked; the agent then issued a `(send ...)`. Semantic correctness of the MeTTa expression is not checked; the goal is to exercise the skill.
 
-### 18. test_skill_pin_slack_mock.py
+### 16. test_skill_pin_slack_mock.py
 
 Gives a multi-step task ("restarting servers alpha → beta → gamma, just finished alpha") and expects the agent to track progress with `pin`.
 
@@ -319,38 +305,38 @@ Gives a multi-step task ("restarting servers alpha → beta → gamma, just fini
 
 ## Working with git
 
-### 19. test_git_pull_public_slack_mock.py
+### 17. test_git_pull_public_slack_mock.py
 
 Agent clones a public repository over anonymous HTTPS, no token.
 
 - Mock answer: `(shell "rm -rf {TARGET_DIR} && git clone {remote} {TARGET_DIR}")`.
 - Checks: `.git/` appears, HEAD points to a real commit, ≥ 1 tracked file in HEAD, origin matches the expected remote URL (normalized, trailing `/` and `.git` ignored).
 
-### 20. test_git_local_commit_slack_mock.py
+### 18. test_git_local_commit_slack_mock.py
 
 Agent runs `git init`, `git add`, `git commit` locally inside the container.
 
 - Mock answer: chain of `(shell "git -C {TARGET_DIR} init") (shell "...write file...") (shell "git -C {TARGET_DIR} add -A") (shell "git -C {TARGET_DIR} commit -m 'add hello <run_id>'")`.
 - Checks: HEAD has at least one commit, commit subject contains the `run_id` (warning, not failure), the file is present in the tree.
 
-### 21. test_git_push_to_remote_slack_mock.py
+### 19. test_git_push_to_remote_slack_mock.py
 
 Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and pushes.
 
 - Mock answer: single `(shell "rm -rf ... && git clone ... && cd ... && git checkout -b ... && printf ... > <file> && git add -A && git commit -m '...' && git push -u origin ...")`.
-- Parameters via env vars: `OMEGACLAW_GIT_TOKEN` (token; never appears in code) and `OMEGACLAW_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
+- Parameters via env vars: `OMEGA_GIT_TOKEN` (token; never appears in code) and `OMEGA_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
 - Checks: branch present on remote (GitHub API 200), file present on branch, the shell call included `git push`, credentials wiped on teardown.
 
 ## Multi-skill tests
 
-### 22. test_run_create_dirs_slack_mock.py
+### 20. test_run_create_dirs_slack_mock.py
 
 Agent writes `mkdirs.sh` and runs it. The script must create `test1`, `test2`, `test3` inside `/tmp/test_dirs/`.
 
 - Mock answer: `(write-file "{SCRIPT_PATH}" "#!/bin/bash\nmkdir -p .../test1 .../test2 .../test3\n") (shell "chmod +x {SCRIPT_PATH}") (shell "{SCRIPT_PATH}")`.
 - Checks: all three directories exist with fresh mtimes; agent invoked `(write-file ...)` referencing `mkdirs.sh`; agent invoked `(shell ...)` to run the script. Diagnostics print `wf=<count>, sh=<count>, perms=<...>` to make stalls obvious.
 
-### 23. test_memory_episode_slack_mock.py
+### 21. test_memory_episode_slack_mock.py
 
 Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, waits 5 seconds, then asks to recall when this happened.
 
@@ -358,7 +344,7 @@ Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, wai
 - Turn 2 mock answer: `(query "Barney tooth") (send "Barney the dog lost his first baby tooth on <YYYY-MM-DD>. The milestone is recorded in my notes.")`.
 - Checks (turn 1): `(remember ...)` was invoked whose argument contains `tooth` or `Barney`. Checks (turn 2): `(query ...)` or `(episodes ...)` was invoked; the reply contains at least one of `dog` / `tooth` / `lost`; the reply contains the captured seed date in `YYYY-MM-DD` format.
 
-### 24. test_skill_query_slack_mock.py
+### 22. test_skill_query_slack_mock.py
 
 Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for embeddings to settle, then ask the agent to recall it via `query` (embedding lookup, not timestamp lookup).
 
@@ -366,7 +352,7 @@ Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for 
 - Turn 2 mock answer: `(query "favorite color") (send "Your favorite color is azure-<run_id>.")`.
 - Checks (turn 1): `(remember ...)` carried the secret color. Checks (turn 2): `(query ...)` was invoked; the reply mentions the secret color verbatim.
 
-### 25. test_skill_episodes_slack_mock.py
+### 23. test_skill_episodes_slack_mock.py
 
 Two-turn flow: send a message tagged with a unique keyword (no `remember`), capture the timestamp, then ask the agent to use `episodes` (timestamp lookup, not `query`) to recall what was discussed at that earlier time.
 
@@ -374,7 +360,7 @@ Two-turn flow: send a message tagged with a unique keyword (no `remember`), capt
 - Turn 2 mock answer: `(episodes "<seed_ts>") (send "The unique keyword was <marker>.")`.
 - Checks (turn 1): the turn is recorded in `history.metta` with a timestamp. Checks (turn 2): `(episodes ...)` was invoked for the seed timestamp; the reply mentions the original marker.
 
-### 26. test_complex_weather_flow_slack_mock.py
+### 24. test_complex_weather_flow_slack_mock.py
 
 Four-step pipeline: search NY weather → write `w.txt` with the forecast → write `p.sh` extracting the first Celsius number into `t.txt` → run `p.sh`. Because the mock controls only the LLM dispatch (the network-bound `search` skill is not exercised), the mocked response provides the forecast text directly.
 

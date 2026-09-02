@@ -35,7 +35,7 @@ FORECAST_TEXT = "New York tomorrow: clear, high 22 degrees Celsius."
 
 def test_complex_weather_flow_slack_mock(llm, sl):
     with Checker("complex weather flow (slack mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: complex flow slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: complex flow slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

@@ -18,7 +18,7 @@ STEP_KEYWORDS = ("step", "alpha", "beta", "gamma", "restart", "server", "done")
 
 def test_skill_pin_telegram_mock(llm, tg):
     with Checker("pin skill invocation (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: pin telegram mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: pin telegram mock (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt with mocked pin + send response")
         prompt = make_prompt(

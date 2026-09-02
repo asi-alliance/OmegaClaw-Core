@@ -29,7 +29,7 @@ def docker_logs():
 
 def test_last_skill_results_visible_next_turn_mock(llm, comm):
     with Checker("LAST_SKILL_USE_RESULTS carries to next iteration (mock)") as c:
-        print(f"\n=== OmegaClaw: lastresults carry (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: lastresults carry (run-id {c.run_id}) ===",
               flush=True)
 
         sentinel = f"UNIQ{c.run_id}"  # appears in the metta expression
@@ -88,5 +88,12 @@ def test_last_skill_results_visible_next_turn_mock(llm, comm):
                    f"checked: {len(chars_sent_lines)}")
         c.ok("sentinel in lastresults",
              f"found in {len(relevant)} subsequent iteration prompt(s)")
+
+        deprecated_instruction = "you must rectify ALERT_FAILED skill use cases"
+        if any(deprecated_instruction in ln for ln in relevant):
+            c.fail("no unconditional failure instruction",
+                   f"found deprecated prompt text: {deprecated_instruction!r}")
+        c.ok("no unconditional failure instruction",
+             "LAST_SKILL_USE_RESULTS contains feedback without failure guidance")
 
         c.done()

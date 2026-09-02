@@ -1,5 +1,5 @@
 !(import! &self (library lib_import))
-!(git-import! "https://github.com/asi-alliance/OmegaClaw-Core.git")
-!(import! &self (library OmegaClaw-Core lib_omegaclaw))
+!(git-import! "https://github.com/singnet/Omega.git")
+!(import! &self (library Omega lib_omega))
 
-!(omegaclaw)
+!(omega)

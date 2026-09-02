@@ -1,16 +1,16 @@
 # Introduction
 
-OmegaClaw is a **hybrid agentic AI framework** implemented in MeTTa on OpenCog Hyperon. A large language model (LLM) works together with formal logic engines — **NAL** and **PLN** — to reason about the world, track uncertainty, combine evidence, and produce conclusions that are mathematically grounded rather than just plausible-sounding.
+Omega is a **hybrid agentic AI framework** implemented in MeTTa on OpenCog Hyperon. A large language model (LLM) works together with formal logic engines — **NAL** and **PLN** — to reason about the world, track uncertainty, combine evidence, and produce conclusions that are mathematically grounded rather than just plausible-sounding.
 
 The core agent loop is approximately **200 lines of MeTTa**.
 
-> Most AI assistants generate answers that sound right. OmegaClaw-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
+> Most AI assistants generate answers that sound right. Omega-hosted agents generate answers that come with a **mathematical receipt** showing exactly how confident each conclusion is and what evidence supports it. When the agent says it is 72% confident, that number comes from formal inference — not a feeling.
 
-This page is the conceptual introduction: what OmegaClaw is, why the hybrid architecture exists, how the pieces connect at runtime, the vocabulary used throughout the rest of the docs, and the honest limits of the current system. For getting a running instance, see [installation instruction](/README.md#installation). For hands-on walkthroughs, see the tutorials listed at the end.
+This page is the conceptual introduction: what Omega is, why the hybrid architecture exists, how the pieces connect at runtime, the vocabulary used throughout the rest of the docs, and the honest limits of the current system. For getting a running instance, see [installation instruction](/README.md#installation). For hands-on walkthroughs, see the tutorials listed at the end.
 
 ---
 
-## What OmegaClaw does
+## What Omega does
 
 - Runs a token-efficient agentic loop that receives messages, selects skills, and acts.
 - Delegates reasoning to one of two formal engines, orchestrated by the LLM:
@@ -111,16 +111,17 @@ The **LLM layer** is opaque and creative. The **engine layer** is deterministic 
 ### Module map
 
 ```
-run.metta                 entry point: (omegaclaw)
-lib_omegaclaw.metta       loads all submodules
+run.metta                 entry point: (omega)
+lib_omega.metta           loads all submodules
 ├── src/loop.metta        agentic loop, turn structure
 ├── src/memory.metta      long-term memory + history
 ├── src/skills.metta      callable skill surface
-├── src/channels.metta    receive/send/search dispatch
-├── src/utils.metta       configure, string ops, time
+├── src/channels.metta    receive/send dispatch
+├── src/utils.metta       utility, string ops, time
+├── src/config.metta      configure
 ├── src/helper.py         parenthesis balancing, normalization
-├── src/agentverse.py     remote-agent bridge
 ├── src/skills.pl         Prolog helpers (shell, first_char)
+├── src/websearch.py      web search
 ├── lib_nal.metta         NAL truth functions
 ├── lib_pln.metta         PLN rules
 └── lib_llm_ext.py        Claude / GPT / MiniMax / local embeddings
@@ -129,7 +130,6 @@ channels/irc.py           IRC adapter
 channels/telegram.py      Telegram adapter
 channels/slack.py         Slack adapter
 channels/mattermost.py    Mattermost adapter
-channels/websearch.py     web search
 
 memory/prompt.txt         system prompt (agent identity + values)
 memory/history.metta      episodic trace (written at runtime)
@@ -137,7 +137,7 @@ memory/history.metta      episodic trace (written at runtime)
 
 ### The agentic turn
 
-Each iteration of `(omegaclaw $k)` in `src/loop.metta` performs:
+Each iteration of `(omega $k)` in `src/loop.metta` performs:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -151,7 +151,7 @@ Each iteration of `(omegaclaw $k)` in `src/loop.metta` performs:
 │ 6. addToHistory     append human msg + response +           │
 │                     any errors                              │
 │ 7. sleep            sleepInterval seconds                   │
-│ 8. recurse          (omegaclaw (+ 1 $k))                    │
+│ 8. recurse          (omega (+ 1 $k))                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -223,7 +223,7 @@ Vocabulary used throughout the rest of the documentation. Skim once; come back w
 
 ### AtomSpace
 
-The knowledge substrate provided by Hyperon / MeTTa. Every fact, memory item, and program fragment in OmegaClaw lives in the same AtomSpace, so memory is directly interrogable by other Hyperon components.
+The knowledge substrate provided by Hyperon / MeTTa. Every fact, memory item, and program fragment in Omega lives in the same AtomSpace, so memory is directly interrogable by other Hyperon components.
 
 ### Atomization
 
@@ -284,7 +284,7 @@ The set of callable operations available to the agent at each turn — plain MeT
 
 ### Channels
 
-Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC, Telegram, Slack, or Mattermost). See [reference-channels.md](./reference-channels.md).
+Abstract communication endpoints. `(send ...)` and `(receive)` delegate to the active channel adapter (IRC, Telegram, Slack, Mattermost, or WebSocket). See [reference-channels.md](./reference-channels.md).
 
 ### Orchestration
 
@@ -325,12 +325,6 @@ An inference rule that merges independent evidence about the same statement. Inc
 
 The failure mode where a flawed premise is run through the formal engine and emerges with a mathematically-authoritative-looking conclusion. Why the mitigations matter. See [reference-failure-modes.md](./reference-failure-modes.md).
 
-### Agentverse-backed skill
-
-A skill whose implementation is a remote agent reached through the Agentverse bridge rather than a local function. See [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md).
-
----
-
 ## Design goals and honest limits
 
 ### Design goals
@@ -340,7 +334,7 @@ A skill whose implementation is a remote agent reached through the Agentverse br
 - **Extensibility.** New skills, channels, tools, and engines are short additions — see [reference-internals-extension-points.md](./reference-internals-extension-points.md).
 - **Flexibility in memory representation.** Memory items coexist with other Hyperon components in the same AtomSpace; no single representation is hardcoded.
 
-### When to use OmegaClaw
+### When to use Omega
 
 - a small, auditable agent that can explain **why** it reached a conclusion;
 - reasoning with explicit uncertainty (`stv frequency confidence`) rather than opaque probabilities;

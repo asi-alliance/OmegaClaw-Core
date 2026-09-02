@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw runs a script with a syntax error and reports the error.
+Test: Omega runs a script with a syntax error and reports the error.
 
 Run:
     pytest test_run_error_script.py -s
@@ -29,7 +29,7 @@ echo "unreachable"
 
 def test_run_error_script():
     with Checker("run error script", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: error script (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: error script (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

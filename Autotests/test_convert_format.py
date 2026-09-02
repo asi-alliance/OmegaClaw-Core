@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw converts a .md file to .txt preserving content.
+Test: Omega converts a .md file to .txt preserving content.
 
 Run:
     pytest test_convert_format.py -s
@@ -20,7 +20,7 @@ KEY_PHRASES = ["My Title", "Some paragraph text", "item one", "item two"]
 
 def test_convert_md_to_txt():
     with Checker("convert .md to .txt", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: convert format (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: convert format (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

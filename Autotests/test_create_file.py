@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw creates hello.txt with content "Hello" in /tmp/testcat.
+Test: Omega creates hello.txt with content "Hello" in /tmp/testcat.
 
 Run:
     pytest test_create_file.py -s
@@ -17,7 +17,7 @@ WAIT = 180
 
 def test_hello_file():
     with Checker("create hello.txt", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw smoke test (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega smoke test (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

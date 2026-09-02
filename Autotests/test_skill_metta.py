@@ -30,7 +30,7 @@ ERROR_MARKERS = (
 
 def test_skill_metta():
     with Checker("metta skill invocation") as c:
-        print(f"\n=== OmegaClaw: metta skill (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: metta skill (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt asking agent to use metta skill")
         prompt = make_prompt(

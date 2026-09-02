@@ -25,7 +25,7 @@ EXPECTED_RUNS = 10
 
 def test_run_repeated_slack_mock(llm, sl):
     with Checker("run repeated script (slack mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: run 10x slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: run 10x slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

@@ -24,7 +24,7 @@ LINE3 = "Third line"
 
 def test_edit_delete_line_slack_mock(llm, sl):
     with Checker("edit delete line (slack mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: delete second line slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: delete second line slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

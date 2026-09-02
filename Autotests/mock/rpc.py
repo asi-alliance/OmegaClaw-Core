@@ -105,7 +105,7 @@ class Future:
         self._value = None
         self._error = None
         self._lock = threading.Lock()
-        self._recieved = threading.Condition(self._lock)
+        self._received = threading.Condition(self._lock)
 
     def is_error(self):
         with self._lock:
@@ -117,7 +117,7 @@ class Future:
 
     def get(self, timeout=None):
         with self._lock:
-            self._recieved.wait_for(lambda: self._value or self._error, timeout)
+            self._received.wait_for(lambda: self._value or self._error, timeout)
             if self._error:
                 raise self._error
             return self._value
@@ -125,12 +125,12 @@ class Future:
     def _set(self, value):
         with self._lock:
             self._value = value
-            self._recieved.notify_all()
+            self._received.notify_all()
 
     def _set_error(self, error):
         with self._lock:
             self._error = error
-            self._recieved.notify_all()
+            self._received.notify_all()
 
 class Message:
 

@@ -24,7 +24,7 @@ EXPECTED_RUNS = 10
 
 def test_run_repeated_mock(llm, comm):
     with Checker("run repeated script (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: run 10x mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: run 10x mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

@@ -35,7 +35,7 @@ def chromadb_vector_count():
 
 def test_memory_chromadb():
     with Checker("chromadb vector write") as c:
-        print(f"\n=== OmegaClaw: chromadb write (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: chromadb write (run-id {c.run_id}) ===", flush=True)
 
         c.step("count chromadb vectors before")
         count_before = chromadb_vector_count()

@@ -1,6 +1,6 @@
 # Reference — `lib_nal.metta`
 
-Non-Axiomatic Logic (NAL) — a logic of uncertain reasoning with explicit evidence-based truth values. NAL is the primary symbolic engine for OmegaClaw's inheritance and implication reasoning.
+Non-Axiomatic Logic (NAL) — a logic of uncertain reasoning with explicit evidence-based truth values. NAL is the primary symbolic engine for Omega's inheritance and implication reasoning.
 
 ---
 
@@ -32,7 +32,7 @@ Every NAL statement carries `(stv frequency confidence)`:
 
 ## The `|-` operator
 
-`|-` applies NAL inference. OmegaClaw selects the appropriate rule automatically based on premise shape.
+`|-` applies NAL inference. Omega selects the appropriate rule automatically based on premise shape.
 
 ---
 

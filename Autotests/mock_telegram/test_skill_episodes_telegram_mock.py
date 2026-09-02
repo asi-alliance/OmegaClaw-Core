@@ -25,7 +25,7 @@ from tg_helpers import tg_send_prompt
 
 def test_skill_episodes_telegram_mock(llm, tg):
     with Checker("episodes skill recall (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: episodes telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: episodes telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         marker = f"BEACON-{c.run_id}"

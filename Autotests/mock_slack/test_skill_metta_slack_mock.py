@@ -19,7 +19,7 @@ from slack_helpers import sl_send_prompt
 
 def test_skill_metta_slack_mock(llm, sl):
     with Checker("metta skill invocation (slack mock)") as c:
-        print(f"\n=== OmegaClaw: metta slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: metta slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via Slack with mocked metta + send response")

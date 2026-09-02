@@ -23,7 +23,7 @@ from helpers import (
 
 def test_skill_query_mock(llm, comm):
     with Checker("query skill recall (mock)") as c:
-        print(f"\n=== OmegaClaw: query mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: query mock (run-id {c.run_id}) ===",
               flush=True)
 
         secret_color = f"azure-{c.run_id}"
