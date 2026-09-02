@@ -66,6 +66,12 @@ def load_telegram(monkeypatch, auth_enabled=True):
     return module
 
 
+def test_exposes_omega_plugin_entrypoint(monkeypatch):
+    telegram = load_telegram(monkeypatch)
+
+    assert callable(telegram.loadOmegaPlugin)
+
+
 def test_reply_uses_the_chat_that_supplied_the_message(monkeypatch):
     telegram = load_telegram(monkeypatch, auth_enabled=False)
     telegram._connected = True

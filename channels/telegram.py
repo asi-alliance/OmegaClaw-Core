@@ -549,5 +549,5 @@ class TelegramChannel(channels.CommChannel):
         send_message(message)
 
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("telegram", TelegramChannel())

@@ -55,7 +55,7 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | Environment variable | Meaning |
 |---|---|
 | `TG_BOT_TOKEN` | Telegram bot token (from BotFather). |
-| `OMEGACLAW_AUTH_SECRET` | Enables the one-time owner-authentication handshake when non-empty. The owner sends `auth <secret>` in a private Telegram DM. |
+| `OMEGA_AUTH_SECRET` | Enables the one-time owner-authentication handshake when non-empty. The owner sends `auth <secret>` in a private Telegram DM. |
 | `MM_BOT_TOKEN` | Bot auth token. |
 | `SL_BOT_TOKEN` | Slack bot token (`xoxb-...`). |
 
@@ -69,13 +69,13 @@ metta run.metta provider=Anthropic LLM=claude-opus-4-6 commchannel=mattermost
 
 Configuration values are resolved in this order: command-line `key=value`,
 `OMEGACLAW_<KEY>` environment variable, `config/config.yaml`, then the caller's
-default. `TG_BOT_TOKEN` and `OMEGACLAW_AUTH_SECRET` are read directly from the
+default. `TG_BOT_TOKEN` and `OMEGA_AUTH_SECRET` are read directly from the
 environment and must be placed before the `metta`/`petta` command.
 
 Telegram example:
 
 ```bash
-TG_BOT_TOKEN=... OMEGACLAW_AUTH_SECRET=... \
+TG_BOT_TOKEN=... OMEGA_AUTH_SECRET=... \
   metta run.metta commchannel=telegram
 ```
 

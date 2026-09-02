@@ -88,7 +88,7 @@ def test_saved_owner_blocks_auth_secret_reuse_after_restart(monkeypatch, tmp_pat
 
 
 def test_saved_owner_cannot_be_replaced_by_a_reused_secret(monkeypatch, tmp_path):
-    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "one-time-secret")
+    monkeypatch.setenv("OMEGA_AUTH_SECRET", "one-time-secret")
 
     first_process = load_auth_module(monkeypatch)
     monkeypatch.setattr(first_process, "_MEMORY_DIRECTORY", str(tmp_path))
