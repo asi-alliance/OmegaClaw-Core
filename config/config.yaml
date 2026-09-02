@@ -79,8 +79,12 @@ SL_MAX_FILE_SIZE_MB: 5
 
 # Telegram
 # Enabled with commchannel: telegram
-# Telegram chat ID. If empty, Omega auto-binds after first valid inbound auth/message.
+# Legacy single-chat allowlist. When set, only this chat is accepted.
 TG_CHAT_ID: ""
+# Optional additional comma-separated chat IDs. These are a hard
+# administrator boundary. With authentication enabled, the owner can still
+# bootstrap and use their private DM.
+TG_ALLOWED_CHAT_IDS: ""
 # Telegram polling timeout in seconds.
 TG_POLL_TIMEOUT: 20
 

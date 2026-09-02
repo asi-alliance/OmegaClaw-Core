@@ -50,10 +50,15 @@ Mattermost adapter using a bot token.
 
 Telegram adapter using Bot API long polling.
 
-- `start_telegram(chat_id, poll_timeout)` — starts a poll loop.
-- `TG_CHAT_ID` is optional; if empty, the adapter can auto-bind to the first valid inbound chat.
-- Outbound messages are chunked to Telegram-safe lengths.
-- Uses the same one-time `auth <secret>` ownership gate as the other adapters.
+- `start_telegram(chat_id, allowed_chat_ids, poll_timeout)` — validates saved authorization state and starts the poll loop.
+- With authentication enabled, the owner authenticates with `auth <secret>` in a private DM. That DM becomes the default destination for startup, heartbeat, and other proactive messages and is restored from persisted owner state after restart.
+- The owner uses `/bind` in a group to add its chat ID to the runtime and persisted allowed-group sets. `/unbind` removes the current group; `/unbind <group_id>` performs the same operation from the owner's DM. Targeted forms such as `/bind@BotName` and `/unbind@BotName` are supported.
+- `TG_ALLOWED_CHAT_IDS` supplies initial operator-configured chat IDs. Runtime `/bind` additions and `/unbind` removals are persisted in `memory/.channel/authenticated-group.json`; the YAML file itself is never rewritten.
+- Each inbound message is delivered to the agent as `[chat_id] [message_id] message`. Dequeueing does not depend on the model producing or successfully delivering a reply, so a no-response turn cannot freeze later inbound messages.
+- Outbound replies use the same `[chat_id] [message_id] message` envelope. An empty target falls back to the owner DM, and an empty message ID sends without Telegram reply metadata. Legacy plain outbound text also uses the owner-DM fallback.
+- Explicit LLM-generated targets are accepted only for the owner DM or a currently authorized group. Group chat IDs may be negative.
+- Outbound messages are split into Telegram-safe chunks and retained with their destination and reply ID for retry after transient delivery failures.
+- When `commchannel=telegram`, startup registers the routing instructions from `memory/tg_prompt.txt` through `add-prompt-extension`. Other channels do not receive this prompt section.
 
 ## `channels/slack.py`
 

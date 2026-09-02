@@ -44,6 +44,15 @@
                          " HISTORY: " (getHistory) 
                          " TIME: " (get_time_as_string)))))
 
+(= (addTelegramPromptExtension)
+   (if (== (commchannel) telegram)
+       (let $path (joinPath ((memoryDirectory) "tg_prompt.txt"))
+            (if (exists-file $path)
+                (add-prompt-extension tg-prompt (read-file $path))
+                (progn (log WARN "loop" (TELEGRAM_PROMPT_NOT_FOUND: $path))
+                       ())))
+       ()))
+
 (= (getPromptExtensions)
    (join (newline) (collapse (prompt-extension $_))))
 
@@ -66,6 +75,7 @@
                                (initKnowledge)
                                (initPlugins)
                                (initChannels)
+                               (addTelegramPromptExtension)
                                (commChannelSend (version))
                                (llmProviderStart (provider)))
                         (change-state! &loops (- (get-state &loops) 1)))
