@@ -25,7 +25,7 @@ def load_auth_module(monkeypatch, gateway_url=""):
 
 
 def test_standalone_auth_rejects_wrong_secret(monkeypatch):
-    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "1234")
+    monkeypatch.setenv("OMEGA_AUTH_SECRET", "1234")
     auth = load_auth_module(monkeypatch)
 
     assert auth.is_auth_enabled() is True
@@ -34,7 +34,7 @@ def test_standalone_auth_rejects_wrong_secret(monkeypatch):
 
 
 def test_standalone_auth_without_secret_is_disabled_and_denies(monkeypatch):
-    monkeypatch.delenv("OMEGACLAW_AUTH_SECRET", raising=False)
+    monkeypatch.delenv("OMEGA_AUTH_SECRET", raising=False)
     auth = load_auth_module(monkeypatch)
 
     assert auth.is_auth_enabled() is False
@@ -42,7 +42,7 @@ def test_standalone_auth_without_secret_is_disabled_and_denies(monkeypatch):
 
 
 def test_standalone_auth_accepts_unicode_secret(monkeypatch):
-    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "пароль🔒")
+    monkeypatch.setenv("OMEGA_AUTH_SECRET", "пароль🔒")
     auth = load_auth_module(monkeypatch)
 
     assert auth.verify_token("пароль🔒") is True
@@ -68,7 +68,7 @@ def test_corrupt_saved_user_file_is_wrapped(monkeypatch, tmp_path):
 
 
 def test_saved_owner_blocks_auth_secret_reuse_after_restart(monkeypatch, tmp_path):
-    monkeypatch.setenv("OMEGACLAW_AUTH_SECRET", "one-time-secret")
+    monkeypatch.setenv("OMEGA_AUTH_SECRET", "one-time-secret")
 
     first_process = load_auth_module(monkeypatch)
     monkeypatch.setattr(first_process, "_MEMORY_DIRECTORY", str(tmp_path))

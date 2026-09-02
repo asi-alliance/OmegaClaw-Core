@@ -1,6 +1,6 @@
 # Reference — Orchestration
 
-OmegaClaw exposes two reasoning engines (NAL and PLN) plus direct memory recall. The LLM decides which to use, when to stop, and whether to act on a result. This page catalogues those decision policies. (ONA is a planned third engine — see [reference-lib-ona.md](./reference-lib-ona.md) for its experimental, not-installed status.)
+Omega exposes two reasoning engines (NAL and PLN) plus direct memory recall. The LLM decides which to use, when to stop, and whether to act on a result. This page catalogues those decision policies. (ONA is a planned third engine — see [reference-lib-ona.md](./reference-lib-ona.md) for its experimental, not-installed status.)
 
 ---
 
@@ -73,7 +73,7 @@ Revision produces a frequency that encodes the disagreement (drifts toward the m
 
 ## 5. The defense stack (four layers)
 
-OmegaClaw assembles these layers to resist noisy or adversarial input:
+Omega assembles these layers to resist noisy or adversarial input:
 
 ### Layer 1 — Novelty modulation
 New claims are discounted by their novelty:

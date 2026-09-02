@@ -23,7 +23,7 @@ class OpenAIProvider(providers.LLMProvider):
     def chat(self, prompt: str, max_tokens: int = 6000, reasoning_mode: str = "medium") -> str:
         return self.delegate.chat(prompt, max_tokens, reasoning_mode)
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     providers.registerLLMProvider("OpenAI", OpenAIProvider())
 
 class OpenAIProviderImpl(llm.AIProvider):

@@ -28,7 +28,7 @@ from helpers import (
 
 def test_memory_episode_mock(llm, comm):
     with Checker("memory episode recall (mock)") as c:
-        print(f"\n=== OmegaClaw: memory episode mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: memory episode mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.add_cleanup_marker("Barney")

@@ -10,7 +10,7 @@ spamShield: False
 sleepInterval: 1
 # LLM model to load overrides *_model parameters see below
 #model: 
-# LLM provider, see the list below in the Providers section
+# LLM provider id, see the list below in the Providers section
 provider: Anthropic
 # Output cap passed to the provider
 maxOutputToken: 6000
@@ -40,53 +40,64 @@ embeddingprovider: Local
 # Policy
 
 # Path to the security profile written using [OpenShell YAML](https://docs.nvidia.com/openshell/reference/policy-schema#filesystem-policy). See [./profile/policy.yaml](./profile/policy.yaml) as an example. Empty value disables restrictions.
-securityPolicyPath: "./repos/OmegaClaw-Core/profile/policy.yaml"
+securityPolicyPath: "./repos/Omega/profile/policy.yaml"
 # (internal) URL to the Nginx proxy isolating API keys from agent
 #GATEWAY_URL:
 
 # Channels
 
-# Type of the communication channel for agent to use
+# Identifier of the communication channel for agent to use
 # see the list below
 commchannel: irc
 
 # IRC
+# Enabled with commchannel: irc
 # IRC channel to join 
-IRC_channel: "##omegaclaw"
+IRC_channel: "##omega"
 # IRC server hostname
 IRC_server: "irc.quakenet.org"
 # IRC port
 IRC_port: 6667
 # IRC nickname
-IRC_user: "omegaclaw"
+IRC_user: "omega"
 
 # Mattermost
+# Enabled with commchannel: mattermost
 # Mattermost base URL.
 MM_URL: "https://chat.singularitynet.io"
 # Mattermost channel ID.
 MM_CHANNEL_ID: "8fjrmabjx7gupy7e5kjznpt5qh"
 
 # Slack
-# Slack channel ID (for example `C0123456789`). If empty, OmegaClaw auto-binds on first successful auth message.
+# Enabled with commchannel: slack
+# Slack channel ID (for example `C0123456789`). If empty, Omega auto-binds on first successful auth message.
 SL_CHANNEL_ID: ""
 # Slack polling interval in seconds (minimum effective value is 60).
 SL_POLL_INTERVAL: 60
+# Slack maximum attachment size to download, in MB.
+SL_MAX_FILE_SIZE_MB: 5
 
 # Telegram
-# Telegram chat ID. If empty, OmegaClaw auto-binds after first valid inbound auth/message.
+# Enabled with commchannel: telegram
+# Telegram chat ID. If empty, Omega auto-binds after first valid inbound auth/message.
 TG_CHAT_ID: ""
 # Telegram polling timeout in seconds.
 TG_POLL_TIMEOUT: 20
 
-# WSchat
+# Websocket
+# Enabled with commchannel: websocket
 # WebSocket endpoint URL (`ws://` or `wss://`). Required when `commchannel=websocket`.
 WS_URL: ""
 # Optional bearer token sent as `Authorization: Bearer <token>`.
 WS_TOKEN: ""
 
+# Mock channel
+# Enabled with commchannel: test
+
 # Providers
 
 # OpenAIAPI
+# Enabled with provider: OpenAIAPI
 # Name of the API key variable to read
 api_token_var: "OPENAIAPI_API_KEY"
 # LLM endpoint URL.
@@ -95,14 +106,17 @@ openaiapi_url: "http://localhost:11434/v1/"
 openaiapi_model: "qwen3.5:9b"
 
 # ASICloud
+# Enabled with provider: ASICloud
 # Default model
 asicloud_model: "minimax/minimax-m3"
 
 # Anthropic
+# Enabled with provider: Anthropic
 # Default model
 anthropic_model: "claude-opus-4-8"
 
 # OpenRouter
+# Enabled with provider: OpenRouter
 # Default model
 openrouter_model: "z-ai/glm-5.2"
 # Overrides session id
@@ -111,14 +125,19 @@ openrouter_model: "z-ai/glm-5.2"
 OPENROUTER_CACHE_TTL: 5m
 
 # OpenAI
+# Enabled with provider: OpenAI
 # Default model
 openai_model: "gpt-5.5"
 # Overrides prompt cache key
 #OPENAI_PROMPT_CACHE_KEY:
 
 # ASIOne
+# Enabled with provider: ASIOne
 # Default model
 asione_model: "asi1-ultra"
+
+# Mock provider
+# Enabled with provider: Test
 
 # Skills
 
@@ -136,7 +155,7 @@ asione_model: "asi1-ultra"
 # OpenClaw
 openClawEnabled: disabled
 # In Docker, openClawURL is only a fallback: the real Gateway target and its
-# token are set at container start (openclaw_url=, OMEGACLAW_OPENCLAW_TOKEN)
+# token are set at container start (openclaw_url=, OMEGA_OPENCLAW_TOKEN)
 # and injected by the local Nginx proxy, so the agent never sees the token.
 # See plugins/openclaw/README.md.
 openClawURL: "http://172.17.0.1:18789"

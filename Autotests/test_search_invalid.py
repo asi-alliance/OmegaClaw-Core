@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw invokes (search ...) for gibberish and reports no results.
+Test: Omega invokes (search ...) for gibberish and reports no results.
 
 Run:
     pytest test_search_invalid.py -s
@@ -15,7 +15,7 @@ SEARCH_SKILLS = ("websearch",)
 
 def test_search_invalid():
     with Checker("search invalid") as c:
-        print(f"\n=== OmegaClaw: invalid search (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: invalid search (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt via IRC")
         prompt = make_prompt(

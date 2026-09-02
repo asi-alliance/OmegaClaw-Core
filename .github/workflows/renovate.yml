@@ -14,7 +14,7 @@ jobs:
           private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
           client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
           owner: ${{ github.repository_owner }}
-          repositories: "asi-alliance/OmegaClaw-Core"
+          repositories: "singnet/Omega"
 
       - name: Checkout
         uses: actions/checkout@v7.0.0

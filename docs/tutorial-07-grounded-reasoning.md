@@ -63,7 +63,7 @@ Step 3: atomize with source-anchored confidence
 
 ## Step-by-step — add a grounded fact
 
-Ask the agent, in a running OmegaClaw session:
+Ask the agent, in a running Omega session:
 
 ```
 please verify Netflix's 2024 content spend from SEC EDGAR and

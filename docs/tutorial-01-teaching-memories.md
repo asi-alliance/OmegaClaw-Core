@@ -4,11 +4,11 @@
 
 ## Prerequisites
 
-- A running OmegaClaw (see [Usage](/README.md#usage)).
+- A running Omega (see [Usage](/README.md#usage)).
 
 ## Background
 
-OmegaClaw uses a **three-tier memory architecture**:
+Omega uses a **three-tier memory architecture**:
 
 1. **Working memory** — `pin` (volatile, single slot, session-local).
 2. **Long-term embedding memory** — `remember` / `query` (persistent across sessions).

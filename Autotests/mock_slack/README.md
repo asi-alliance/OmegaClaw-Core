@@ -1,6 +1,6 @@
 # Slack autotests — setup and run
 
-This section describes how to run the `test_*_slack_mock.py` suite against a local OmegaClaw container that talks to the real Slack Web API. Two Slack bots are used: an "agent" bot, which OmegaClaw runs as inside the container, and a "driver" bot, which the pytest harness uses to post prompts into a shared channel and to read the agent's replies. The LLM is still mocked (`provider="Test"`, deterministic answers from `Autotests/mock/llm.py`); only the message-delivery transport differs from `Autotests/mock/`.
+This section describes how to run the `test_*_slack_mock.py` suite against a local Omega container that talks to the real Slack Web API. Two Slack bots are used: an "agent" bot, which Omega runs as inside the container, and a "driver" bot, which the pytest harness uses to post prompts into a shared channel and to read the agent's replies. The LLM is still mocked (`provider="Test"`, deterministic answers from `Autotests/mock/llm.py`); only the message-delivery transport differs from `Autotests/mock/`.
 
 The 26 tests in this directory mirror `Autotests/mock/test_*_mock.py` 1:1: same mock-LLM answers, same prompts, same assertions. They are listed at the end of this document.
 
@@ -22,14 +22,14 @@ A free Slack workspace is enough. Create one at [slack.com/get-started](https://
 
 ### 2.2. Shared channel
 
-In the Slack client, click `+` next to **Channels** in the sidebar, choose **Create channel**, give it a name (for example `omegaclaw-qa`), keep it public, create. A private channel works too, but requires extra scopes on both apps (see 2.4).
+In the Slack client, click `+` next to **Channels** in the sidebar, choose **Create channel**, give it a name (for example `omega-qa`), keep it public, create. A private channel works too, but requires extra scopes on both apps (see 2.4).
 
 ### 2.3. Create the two apps
 
 For each role (agent and driver) repeat the same flow at [api.slack.com/apps](https://api.slack.com/apps), signed in with the same account that owns the workspace:
 
 1. Click **Create New App**, choose **From scratch**.
-2. Set **App Name** (for example `OmegaClaw Agent` for the first app and `OmegaClaw Driver` for the second; the names are arbitrary, only the resulting tokens matter).
+2. Set **App Name** (for example `Omega Agent` for the first app and `Omega Driver` for the second; the names are arbitrary, only the resulting tokens matter).
 3. Pick the workspace from 2.1.
 4. Click **Create App**. You land on the **Basic Information** page of the new app.
 
@@ -104,12 +104,12 @@ This value is `SL_AGENT_USER_ID`, used by pytest only (step 5).
 The mock infrastructure is part of the source tree, so the image must be built locally rather than pulled from the registry.
 
 ```
-docker build -t omegaclaw:mock .
+docker build -t omega:mock .
 ```
 
 ## 4. Start the container with the Test provider and the Slack channel
 
-Use the `scripts/omegaclaw` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
+Use the `scripts/omega` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
 
 The container connects back to the host on TCP port 9765 to reach the mock LLM controller. `TEST_SERVER_IP` must hold the host IP that is reachable from inside the container; under the default Docker bridge this is `172.17.0.1`. The Slack adapter inside the container talks directly to `slack.com/api`.
 
@@ -117,22 +117,22 @@ The container connects back to the host on TCP port 9765 to reach the mock LLM c
 env TEST_SERVER_IP=172.17.0.1 \
     SL_BOT_TOKEN="<agent_bot_token>" \
     SL_CHANNEL_ID="<channel_id>" \
-    ./scripts/omegaclaw start -s 0000 -p Test -t slack -d omegaclaw:mock
+    ./scripts/omega start -s 0000 -p Test -t slack -d omega:mock
 ```
 
 Notes:
 
 - `-t slack` selects the Slack adapter inside `src/channels.metta`.
 - `-p Test` selects the mock LLM dispatcher.
-- `-s 0000` sets `OMEGACLAW_AUTH_SECRET` inside the container; the test harness sends this same secret via the driver bot during `_sl_authenticate` once per session, binding the driver as the agent's owner.
-- `SL_BOT_TOKEN` is the agent bot token (the bot OmegaClaw runs as).
+- `-s 0000` sets `OMEGA_AUTH_SECRET` inside the container; the test harness sends this same secret via the driver bot during `_sl_authenticate` once per session, binding the driver as the agent's owner.
+- `SL_BOT_TOKEN` is the agent bot token (the bot Omega runs as).
 - `SL_CHANNEL_ID` is the shared channel both bots live in.
 - `TEST_SERVER_IP=172.17.0.1` is the host's docker-bridge address used by the mock LLM provider. It must be set even for the Slack channel, because `provider=Test` reads it.
 
 Wait until the agent loop is up. The first runtime `CHARS_SENT:` line (with a byte count after the colon) marks the end of `initChannels` / `initMemory`:
 
 ```
-until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
+until docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
 ```
 
 ## 5. Configure the test environment
@@ -140,22 +140,22 @@ until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; do
 Export the variables the test harness reads.
 
 ```
-export OMEGACLAW_CONTAINER=omegaclaw
-export OMEGACLAW_AUTH_SECRET=0000
+export OMEGA_CONTAINER=omega
+export OMEGA_AUTH_SECRET=0000
 export SL_DRIVER_TOKEN="<driver_bot_token>"
 export SL_CHANNEL_ID="<channel_id>"
 export SL_AGENT_USER_ID="<agent_bot_user_id>"
-export OMEGACLAW_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_slack_mock
+export OMEGA_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_slack_mock
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `OMEGACLAW_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name from step 4 (`omegaclaw` when using the script). |
-| `OMEGACLAW_AUTH_SECRET` | Yes | Auth secret used by the driver bot once per session. Must equal the `-s` value from step 4. |
+| `OMEGA_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name from step 4 (`omega` when using the script). |
+| `OMEGA_AUTH_SECRET` | Yes | Auth secret used by the driver bot once per session. Must equal the `-s` value from step 4. |
 | `SL_DRIVER_TOKEN` | Yes | Driver bot token. Tests are skipped if unset. |
 | `SL_CHANNEL_ID` | Yes | Shared channel id. Same value the container was started with. |
 | `SL_AGENT_USER_ID` | Yes | Bot user id of the agent app. The driver bot filters incoming messages by author and ignores everything except messages from this user id. |
-| `OMEGACLAW_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_slack_mock`. The test is skipped if this variable is unset. |
+| `OMEGA_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_slack_mock`. The test is skipped if this variable is unset. |
 
 ## 6. Run the suite
 
@@ -165,15 +165,15 @@ source venv/bin/activate
 pytest -s -v mock_slack/test_*_slack_mock.py
 ```
 
-The `LlmMockController` and the `SlackRealDriver` are provided by session-scoped fixtures in `mock_slack/conftest.py`, so both are started once per pytest session. Expected output: `26 passed` (or `25 passed, 1 skipped` if `OMEGACLAW_GIT_TOKEN` is not set).
+The `LlmMockController` and the `SlackRealDriver` are provided by session-scoped fixtures in `mock_slack/conftest.py`, so both are started once per pytest session. Expected output: `26 passed` (or `25 passed, 1 skipped` if `OMEGA_GIT_TOKEN` is not set).
 
 ## 7. Tear down
 
 ```
-./scripts/omegaclaw clean
+./scripts/omega clean
 ```
 
-This removes the `omegaclaw` container and the `omegaclaw-memory` volume created by the script in step 4.
+This removes the `omega` container and the `omega-memory` volume created by the script in step 4.
 
 # Tests description
 
@@ -324,7 +324,7 @@ Agent runs `git init`, `git add`, `git commit` locally inside the container.
 Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and pushes.
 
 - Mock answer: single `(shell "rm -rf ... && git clone ... && cd ... && git checkout -b ... && printf ... > <file> && git add -A && git commit -m '...' && git push -u origin ...")`.
-- Parameters via env vars: `OMEGACLAW_GIT_TOKEN` (token; never appears in code) and `OMEGACLAW_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
+- Parameters via env vars: `OMEGA_GIT_TOKEN` (token; never appears in code) and `OMEGA_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
 - Checks: branch present on remote (GitHub API 200), file present on branch, the shell call included `git push`, credentials wiped on teardown.
 
 ## Multi-skill tests

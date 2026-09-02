@@ -79,7 +79,7 @@ def _date_candidates(record_time):
 
 def test_memory_episode():
     with Checker("memory episode recall") as c:
-        print(f"\n=== OmegaClaw: memory episode (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: memory episode (run-id {c.run_id}) ===", flush=True)
 
         c.step("send 'dog lost tooth' fact message")
         fact_marker = c.run_id

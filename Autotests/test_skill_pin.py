@@ -25,7 +25,7 @@ STEP_KEYWORDS = ("step", "alpha", "beta", "gamma", "restart", "server", "done")
 
 def test_skill_pin():
     with Checker("pin skill invocation") as c:
-        print(f"\n=== OmegaClaw: pin skill (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: pin skill (run-id {c.run_id}) ===", flush=True)
 
         c.step("send a multi-step task that needs pinning")
         prompt = make_prompt(

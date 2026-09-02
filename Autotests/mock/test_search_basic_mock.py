@@ -29,7 +29,7 @@ SINGULARITYNET_DESCRIPTION = (
 
 def test_search_basic_mock(llm, comm):
     with Checker("search singularitynet (mock)") as c:
-        print(f"\n=== OmegaClaw: basic search mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: basic search mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via comm channel with mocked send response")

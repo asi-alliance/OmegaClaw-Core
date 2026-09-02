@@ -71,16 +71,16 @@ PY
 
 FROM builder AS versioned-source
 
-WORKDIR /omegaclaw-source
+WORKDIR /omega-source
 COPY . .
-RUN : > /tmp/omegaclaw-ignored-tracked \
+RUN : > /tmp/omega-ignored-tracked \
  && if [ -e .git ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-      git ls-files -ci --exclude-from=.dockerignore -z > /tmp/omegaclaw-ignored-tracked; \
-      git checkout-index --force --stdin -z < /tmp/omegaclaw-ignored-tracked; \
+      git ls-files -ci --exclude-from=.dockerignore -z > /tmp/omega-ignored-tracked; \
+      git checkout-index --force --stdin -z < /tmp/omega-ignored-tracked; \
     fi \
- && python3 -c 'from src.helper import omegaclaw_version; print(omegaclaw_version())' > /tmp/omegaclaw-version \
- && mv /tmp/omegaclaw-version ./version \
- && while IFS= read -r -d '' path; do rm -f -- "$path"; done < /tmp/omegaclaw-ignored-tracked \
+ && python3 -c 'from src.helper import omega_version; print(omega_version())' > /tmp/omega-version \
+ && mv /tmp/omega-version ./version \
+ && while IFS= read -r -d '' path; do rm -f -- "$path"; done < /tmp/omega-ignored-tracked \
  && rm -rf ./.git \
  && chmod 0444 ./version
 
@@ -124,24 +124,24 @@ RUN chown www-data:www-data /opt/nginx
 RUN chmod 0700 /opt/nginx
 COPY --chown=www-data:www-data --chmod=0600 ./proxy/* /opt/nginx/
 
-ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
-ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
+ENV OMEGA_DIR=/PeTTa/repos/Omega
+ENV MEMORY_DIR=${OMEGA_DIR}/memory
 # Start defaults for import-kb
 ENV IMPORT_KB_ON_START=0
 
 # Bring in the clean source tree and its version generated from Git metadata.
-COPY --from=versioned-source /omegaclaw-source ${OMEGACLAW_DIR}
+COPY --from=versioned-source /omega-source ${OMEGA_DIR}
 
-RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
+RUN cp ${OMEGA_DIR}/run.metta /PeTTa/run.metta \
  && mkdir -p ${MEMORY_DIR}/chroma_db \
  && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
- && chmod +x ${OMEGACLAW_DIR}/entrypoint.sh \
- && chmod +x ${OMEGACLAW_DIR}/scripts/import_knowledge.sh \
- && chmod +x ${OMEGACLAW_DIR}/scripts/omegaclaw \
+ && chmod +x ${OMEGA_DIR}/entrypoint.sh \
+ && chmod +x ${OMEGA_DIR}/scripts/import_knowledge.sh \
+ && chmod +x ${OMEGA_DIR}/scripts/omega \
  && chown -R 65534:65534 ${MEMORY_DIR} \
  && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers
 
-ENTRYPOINT ["/PeTTa/repos/OmegaClaw-Core/entrypoint.sh"]
+ENTRYPOINT ["/PeTTa/repos/Omega/entrypoint.sh"]
 CMD []

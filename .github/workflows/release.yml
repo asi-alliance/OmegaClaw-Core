@@ -13,12 +13,31 @@ jobs:
       move_latest: false
     secrets: inherit
 
-  update-tags:
+  qa-approval:
     needs: build
     runs-on: ubuntu-latest
 
     environment:
       name: dockerhub-production
+
+    steps:
+      - name: QA approval
+        run: echo "QA approval received"
+
+  admin-approval:
+    needs: qa-approval
+    runs-on: ubuntu-latest
+
+    environment:
+      name: dockerhub-admin-approval
+
+    steps:
+      - name: Admin approval
+        run: echo "Admin approval received"
+
+  update-tags:
+    needs: admin-approval
+    runs-on: ubuntu-latest
 
     steps:
       - name: Login to Docker Hub
@@ -34,6 +53,6 @@ jobs:
       - name: Update release tags
         run: |
           docker buildx imagetools create \
-            -t singularitynet/omegaclaw:${{ github.event.release.tag_name }} \
-            -t singularitynet/omegaclaw:latest \
-            singularitynet/omegaclaw:${{ github.sha }}
+            -t singularitynet/omega:${{ github.event.release.tag_name }} \
+            -t singularitynet/omega:latest \
+            singularitynet/omega:${{ github.sha }}

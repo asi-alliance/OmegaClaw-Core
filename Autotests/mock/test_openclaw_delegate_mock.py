@@ -43,7 +43,7 @@ def _read_json(path):
 
 def test_delegate_isolated_and_success_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent mock") as c:
-        print(f"\n=== OmegaClaw: openclaw delegate mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw delegate mock (run-id {c.run_id}) ===", flush=True)
 
         ####################################
         # Phase 1: check isolated skill call
@@ -141,7 +141,7 @@ def test_delegate_isolated_and_success_mock(llm, comm, gateway):
 
 def test_delegate_empty_message_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent empty message mock") as c:
-        print(f"\n=== OmegaClaw: openclaw delegate empty mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw delegate empty mock (run-id {c.run_id}) ===", flush=True)
 
         out_path = f"/tmp/openclaw_empty_{c.run_id}.json"
 
@@ -177,7 +177,7 @@ def test_delegate_empty_message_mock(llm, comm, gateway):
 
 def test_delegate_new_session_per_call_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent new session per call mock") as c:
-        print(f"\n=== OmegaClaw: openclaw delegate session isolation mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw delegate session isolation mock (run-id {c.run_id}) ===", flush=True)
 
         first_path = f"/tmp/openclaw_session1_{c.run_id}.json"
         second_path = f"/tmp/openclaw_session2_{c.run_id}.json"
@@ -244,7 +244,7 @@ def test_delegate_new_session_per_call_mock(llm, comm, gateway):
 
 def test_delegate_stays_async_under_a_slow_gateway_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent stays async") as c:
-        print(f"\n=== OmegaClaw: openclaw slow-gateway mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw slow-gateway mock (run-id {c.run_id}) ===", flush=True)
 
         out_path = f"/tmp/openclaw_slow_{c.run_id}.json"
 
@@ -313,7 +313,7 @@ def test_delegate_stays_async_under_a_slow_gateway_mock(llm, comm, gateway):
 
 def test_delegate_reports_gateway_rejection_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent reports a rejection") as c:
-        print(f"\n=== OmegaClaw: openclaw rejection mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw rejection mock (run-id {c.run_id}) ===", flush=True)
 
         out_path = f"/tmp/openclaw_401_{c.run_id}.json"
 
@@ -358,7 +358,7 @@ def test_delegate_reports_gateway_rejection_mock(llm, comm, gateway):
 
 def test_delegate_retries_a_starting_gateway_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent retries a starting Gateway") as c:
-        print(f"\n=== OmegaClaw: openclaw startup-retry mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw startup-retry mock (run-id {c.run_id}) ===", flush=True)
 
         out_path = f"/tmp/openclaw_503_{c.run_id}.json"
         marker = f"RETRIED-{c.run_id}"
@@ -404,7 +404,7 @@ def test_delegate_retries_a_starting_gateway_mock(llm, comm, gateway):
 
 def test_delegate_reports_a_reply_without_text_mock(llm, comm, gateway):
     with Checker("delegate-task-to-openclaw-agent reports an empty Gateway reply") as c:
-        print(f"\n=== OmegaClaw: openclaw no-text mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw no-text mock (run-id {c.run_id}) ===", flush=True)
 
         out_path = f"/tmp/openclaw_notext_{c.run_id}.json"
 
@@ -438,7 +438,7 @@ def test_delegate_reports_a_reply_without_text_mock(llm, comm, gateway):
 
 def test_delegation_is_authenticated_by_the_proxy_mock(llm, comm, gateway):
     with Checker("delegation is authenticated by the proxy, not by the agent") as c:
-        print(f"\n=== OmegaClaw: openclaw token-injection mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: openclaw token-injection mock (run-id {c.run_id}) ===", flush=True)
 
         c.step("delegate a task and let it reach the Gateway")
         prompt = make_prompt(c.run_id, "Delegate a task.")

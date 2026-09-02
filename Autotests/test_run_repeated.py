@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw runs dateupdate.sh 10 times, producing 10 lines in update.txt.
+Test: Omega runs dateupdate.sh 10 times, producing 10 lines in update.txt.
 
 Graded 0/1/2: weaker models occasionally interpret "run 10 times" as a
 single invocation (treating the script as a loop) and stop after one
@@ -32,7 +32,7 @@ def _line_count():
 
 def test_run_repeated():
     with Checker("run repeated script", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: run 10x (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: run 10x (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

@@ -36,7 +36,7 @@ def history_tail(n):
 
 def test_memory_history_byte_window_truncation_mock(llm, comm):
     with Checker("history.metta byte-window truncation (mock)") as c:
-        print(f"\n=== OmegaClaw: history window truncation (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: history window truncation (run-id {c.run_id}) ===",
               flush=True)
 
         early_marker = f"EARLY-{c.run_id}"

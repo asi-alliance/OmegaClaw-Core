@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- A local clone of OmegaClaw-Core (so you can edit MeTTa source).
+- A local clone of Omega (so you can edit MeTTa source).
 - Familiarity with running the agent — see [Usage](/README.md#usage).
 
 ## The anatomy of a skill

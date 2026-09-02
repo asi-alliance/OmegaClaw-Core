@@ -1,6 +1,6 @@
-# OmegaClaw Documentation
+# Omega Documentation
 
-This directory contains the full documentation for OmegaClaw. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
+This directory contains the full documentation for Omega. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
 
 - `intro-*` — conceptual introduction
 - `tutorial-NN-*` — numbered, task-oriented walkthroughs
@@ -12,9 +12,9 @@ If you are new, read the Introduction in order, then pick tutorials that match w
 
 ## Introduction
 
-Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
+Start here to understand what Omega is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
 
-- [introduction.md](./introduction.md) — What OmegaClaw is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
+- [introduction.md](./introduction.md) — What Omega is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
 - [installation instruction](/README.md#installation) — Manual MeTTa setup, environment variables, API keys.
 
 ---
@@ -57,6 +57,14 @@ User-facing MeTTa skills the agent invokes. Each page follows the template **Sig
 - [reference-configuration.md](./reference-configuration.md) — `configure` form and all runtime parameters
 - [reference-channels.md](./reference-channels.md) — IRC, Telegram, Slack, Mattermost, WebSocket, and websearch adapters plus the channel contract
 - [reference-python-bridges.md](./reference-python-bridges.md) — `lib_llm_ext.py`, `src/helper.py`, `src/skills.pl`
+
+### Plugin API
+
+- [reference-plugin-api.md](./reference-plugin-api.md) - Plugin API documentation
+
+### Plugin publishing
+
+- [reference-plugins-publishing.md](./reference-plugins-publishing.md) — how to submit a plugin for the catalog
 
 ### Internals
 

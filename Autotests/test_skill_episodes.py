@@ -25,7 +25,7 @@ from helpers import (
 
 def test_skill_episodes():
     with Checker("episodes skill recall") as c:
-        print(f"\n=== OmegaClaw: episodes skill (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: episodes skill (run-id {c.run_id}) ===", flush=True)
 
         marker = f"BEACON-{c.run_id}"
         c.add_cleanup_marker(marker)

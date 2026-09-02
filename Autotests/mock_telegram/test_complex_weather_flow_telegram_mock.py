@@ -35,7 +35,7 @@ FORECAST_TEXT = "New York tomorrow: clear, high 22 degrees Celsius."
 
 def test_complex_weather_flow_telegram_mock(llm, tg):
     with Checker("complex weather flow (telegram mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: complex flow telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: complex flow telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

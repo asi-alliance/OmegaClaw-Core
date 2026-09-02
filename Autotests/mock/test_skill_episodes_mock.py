@@ -25,7 +25,7 @@ from helpers import (
 
 def test_skill_episodes_mock(llm, comm):
     with Checker("episodes skill recall (mock)") as c:
-        print(f"\n=== OmegaClaw: episodes mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: episodes mock (run-id {c.run_id}) ===",
               flush=True)
 
         marker = f"BEACON-{c.run_id}"

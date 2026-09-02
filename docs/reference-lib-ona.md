@@ -1,6 +1,6 @@
 # Reference — ONA (OpenNARS for Applications)
 
-ONA is a lightweight, real-time implementation of NARS created by Dr. Patrick Hammer. **ONA is not installed by default in OmegaClaw.** There are no ONA bindings in the repository, no `lib_ona.metta`, and no dedicated operator in the `(metta ...)` skill surface. The stock install ships two formal engines — symbolic NAL (`|-`) and probabilistic PLN (`|~`).
+ONA is a lightweight, real-time implementation of NARS created by Dr. Patrick Hammer. **ONA is not installed by default in Omega.** There are no ONA bindings in the repository, no `lib_ona.metta`, and no dedicated operator in the `(metta ...)` skill surface. The stock install ships two formal engines — symbolic NAL (`|-`) and probabilistic PLN (`|~`).
 
 This page exists because ONA is named in the project's architectural vision and has been an experimental target — see [Status](#status-partly-successful-self-building-experiment) below.
 
@@ -25,13 +25,13 @@ Today, with ONA absent, the current practical fallback for temporal questions is
 
 ## Invocation surface
 
-**There is no stock invocation surface for ONA in OmegaClaw.** `lib_omegaclaw.metta` does not load ONA bindings. The `(metta ...)` skill has no ONA operator.
+**There is no stock invocation surface for ONA in Omega.** `lib_omega.metta` does not load ONA bindings. The `(metta ...)` skill has no ONA operator.
 
 Any integration has to be built — either by calling an external ONA binary through `(shell ...)` and parsing its output, or by constructing MeTTa-side wrappers that emulate ONA's temporal operators. This is a non-trivial tools-authoring task and is the subject of the experiment described below.
 
 ## Status: partly-successful self-building experiment
 
-OmegaClaw's architectural vision lists ONA as a third engine, but in practice ONA support has been pursued as an experiment in whether the agent can **itself build the tools** to interface with that reasoning system. Results so far: partly successful.
+Omega's architectural vision lists ONA as a third engine, but in practice ONA support has been pursued as an experiment in whether the agent can **itself build the tools** to interface with that reasoning system. Results so far: partly successful.
 
 What this means concretely:
 
@@ -40,7 +40,7 @@ What this means concretely:
 - There is no native mechanism for belief revision triggered by time — confidence does not automatically decay for stale claims.
 - Real-time feedback loops require careful phase tracking and frequently break due to state-management failures when the agent attempts to orchestrate them end-to-end.
 
-Treat ONA in OmegaClaw as a research direction, not a feature. The limits of agent-authored self-improvement (which is effectively what this experiment is) are documented in [reference-failure-modes.md §6](./reference-failure-modes.md) — self-authored improvements should be taken as signals but validated externally before being relied upon.
+Treat ONA in Omega as a research direction, not a feature. The limits of agent-authored self-improvement (which is effectively what this experiment is) are documented in [reference-failure-modes.md §6](./reference-failure-modes.md) — self-authored improvements should be taken as signals but validated externally before being relied upon.
 
 ## See also
 

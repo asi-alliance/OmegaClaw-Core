@@ -25,7 +25,7 @@ EXPECTED_DIRS = ["test1", "test2", "test3"]
 
 def test_run_create_dirs_mock(llm, comm):
     with Checker("create dirs script (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create dirs mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: create dirs mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

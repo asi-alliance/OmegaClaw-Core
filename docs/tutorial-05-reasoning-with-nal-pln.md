@@ -1,10 +1,10 @@
 # Tutorial 05 — Reasoning with NAL and PLN
 
-**Goal:** invoke Non-Axiomatic Logic and Probabilistic Logic Networks from inside OmegaClaw using the `(metta ...)` skill, and read the truth values the engines emit.
+**Goal:** invoke Non-Axiomatic Logic and Probabilistic Logic Networks from inside Omega using the `(metta ...)` skill, and read the truth values the engines emit.
 
 ## Prerequisites
 
-- A running OmegaClaw.
+- A running Omega.
 - Reading familiarity with `(stv frequency confidence)` truth values.
 
 ## The `metta` skill

@@ -29,7 +29,7 @@ def docker_logs():
 
 def test_last_skill_results_visible_next_turn_mock(llm, comm):
     with Checker("LAST_SKILL_USE_RESULTS carries to next iteration (mock)") as c:
-        print(f"\n=== OmegaClaw: lastresults carry (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: lastresults carry (run-id {c.run_id}) ===",
               flush=True)
 
         sentinel = f"UNIQ{c.run_id}"  # appears in the metta expression

@@ -25,7 +25,7 @@ KEY_PHRASES = ["My Title", "Some paragraph text", "item one", "item two"]
 
 def test_convert_md_to_txt_telegram_mock(llm, tg):
     with Checker("convert .md to .txt (telegram mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: convert format telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: convert format telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

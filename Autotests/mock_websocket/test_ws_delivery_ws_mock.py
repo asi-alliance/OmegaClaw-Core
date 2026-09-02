@@ -35,7 +35,7 @@ def _wait_for_reply(ws, needle, timeout):
 
 def test_ws_delivery_ws_mock(llm, ws):
     with Checker("ws delivery round-trip") as c:
-        print(f"\n=== OmegaClaw: ws delivery (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: ws delivery (run-id {c.run_id}) ===", flush=True)
 
         c.step("wait for agent WebSocket connection")
         if not ws.wait_for_connection(timeout=60):

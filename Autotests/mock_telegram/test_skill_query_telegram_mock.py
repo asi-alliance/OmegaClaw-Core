@@ -23,7 +23,7 @@ from tg_helpers import tg_send_prompt
 
 def test_skill_query_telegram_mock(llm, tg):
     with Checker("query skill recall (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: query telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: query telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         secret_color = f"azure-{c.run_id}"

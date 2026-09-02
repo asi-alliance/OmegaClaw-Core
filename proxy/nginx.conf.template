@@ -80,7 +80,7 @@ http {
         # start via the openclaw_url= argument (see entrypoint.sh).
         location = /openclaw/v1/responses {
             proxy_pass ${OPENCLAW_URL}v1/responses;
-            proxy_set_header Authorization "Bearer ${OMEGACLAW_OPENCLAW_TOKEN}";
+            proxy_set_header Authorization "Bearer ${OMEGA_OPENCLAW_TOKEN}";
             proxy_set_header Content-Type $content_type;
             proxy_ssl_server_name on;
             proxy_ssl_protocols TLSv1.2 TLSv1.3;
@@ -138,9 +138,21 @@ http {
             proxy_http_version 1.1;
         }
 
+        # Slack private file downloads.
+        location /slack-files/ {
+            proxy_pass https://files.slack.com/;
+
+            proxy_set_header Authorization "Bearer ${SL_BOT_TOKEN}";
+            proxy_set_header Host files.slack.com;
+
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_http_version 1.1;
+        }
+
         # Auth secret verification — agent sends candidate token, proxy compares.
-        # After envsubst, ${OMEGACLAW_AUTH_SECRET} becomes the literal secret.
-        set $auth_secret_value "${OMEGACLAW_AUTH_SECRET}";
+        # After envsubst, ${OMEGA_AUTH_SECRET} becomes the literal secret.
+        set $auth_secret_value "${OMEGA_AUTH_SECRET}";
 
         location = /auth/status {
             default_type application/json;
@@ -155,7 +167,7 @@ http {
             if ($auth_secret_value = "") {
                 return 200 '{"match":true}';
             }
-            if ($http_x_auth_token = "${OMEGACLAW_AUTH_SECRET}") {
+            if ($http_x_auth_token = "${OMEGA_AUTH_SECRET}") {
                 return 200 '{"match":true}';
             }
             return 200 '{"match":false}';

@@ -70,7 +70,7 @@ Slack adapter using Slack Web API polling.
 
 Minimal JSON chat adapter over a WebSocket connection. Selected with `commchannel=websocket` — the Python module is `wschat`, exposing `start_websocket` / `stop_websocket` alongside the usual `getLastMessage` / `send_message`.
 
-- `start_websocket(ws_url, ws_token)` — connect and spawn the listener thread. URL and optional token are read from `WS_URL` / `WS_TOKEN`, or passed directly. `WS_URL` is required when `commchannel=websocket`; if it is missing, OmegaClaw still starts, the adapter logs that the WebSocket channel is disabled, and the process continues without an active WebSocket connection.
+- `start_websocket(ws_url, ws_token)` — connect and spawn the listener thread. URL and optional token are read from `WS_URL` / `WS_TOKEN`, or passed directly. `WS_URL` is required when `commchannel=websocket`; if it is missing, Omega still starts, the adapter logs that the WebSocket channel is disabled, and the process continues without an active WebSocket connection.
 - `stop_websocket()` — stop the listener thread and close the socket.
 - Requires the `websockets` Python package.
 - When `WS_TOKEN` is set it is sent as an `Authorization: Bearer <token>` header. Unlike the IRC/Telegram/Slack adapters there is no one-time `auth <secret>` gate — trust is established by the endpoint URL and bearer token.

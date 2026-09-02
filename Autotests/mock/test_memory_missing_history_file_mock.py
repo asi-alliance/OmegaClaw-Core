@@ -18,7 +18,7 @@ HISTORY_BAK = "/tmp/history.metta.bak"
 
 def test_history_recreation_mock(llm, comm):
     with Checker("history recreation on missing file") as c:
-        print(f"\n=== OmegaClaw: history recreation mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: history recreation mock (run-id {c.run_id}) ===", flush=True)
 
         try:
             c.step("Move history.metta to a temporary backup")

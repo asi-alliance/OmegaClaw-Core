@@ -34,7 +34,7 @@ def history_tail(n):
 
 def test_transition_episodes_after_eviction_mock(llm, comm):
     with Checker("episodes retrieves evicted block (mock)") as c:
-        print(f"\n=== OmegaClaw: episodes after eviction (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: episodes after eviction (run-id {c.run_id}) ===",
               flush=True)
 
         beacon_marker = f"BEACON-{c.run_id}"

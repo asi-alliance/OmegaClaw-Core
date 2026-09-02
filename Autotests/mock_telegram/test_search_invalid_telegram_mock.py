@@ -32,7 +32,7 @@ NEGATION_PHRASES = [
 
 def test_search_invalid_telegram_mock(llm, tg):
     with Checker("search invalid (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: invalid search telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: invalid search telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via Telegram with mocked negation response")
