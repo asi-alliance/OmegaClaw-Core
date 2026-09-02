@@ -40,6 +40,7 @@ Numbered in suggested reading order. Each tutorial is self-contained.
 - [reference-lib-nal.md](./reference-lib-nal.md) — NAL rules with truth formulas; confirmed vs. non-functional patterns
 - [reference-lib-pln.md](./reference-lib-pln.md) — Modus Ponens, abduction, revision; current limits
 - [reference-lib-ona.md](./reference-lib-ona.md) — OpenNARS for Applications — planned real-time / temporal engine (experimental, not installed by default)
+- [reference-lib-telos-goals.md](./reference-lib-telos-goals.md) — Optional goal graph: `goal` / `rel` schema, conflict / blocked / aligned lenses, `telos-enable` prompt extension (opt-in, not loaded by `lib_omega.metta`)
 - [reference-orchestration.md](./reference-orchestration.md) — Engine selection, stopping criteria, action thresholds, defense stack
 - [reference-failure-modes.md](./reference-failure-modes.md) — Documented failures, error rates, mitigations
 
