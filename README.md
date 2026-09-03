@@ -1,5 +1,3 @@
-![Omega banner](/docs/assets/banner.png)
-
 # Meet Oma
 
 Oma is the first Telegram agent built on the Omega framework. Interacting
