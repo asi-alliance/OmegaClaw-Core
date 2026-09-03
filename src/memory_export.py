@@ -54,8 +54,7 @@ def _get_transfer():
             raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
 
         os.environ["EMBEDDING_PROVIDER"] = embedding_provider
-        # import-kb 0.2.1 uses this legacy metadata key for the source version.
-        os.environ["OMEGACLAW_VERSION"] = omega_version()
+        os.environ["OMEGA_VERSION"] = omega_version()
         _transfer = MemoryTransfer(
             transfer_dir=_TRANSFER_DIR,
             store=create_memory_store(),

@@ -136,10 +136,10 @@ def test_transfer_exposes_runtime_omega_version(handler, monkeypatch):
         def __init__(self, **kwargs):
             created.append({
                 **kwargs,
-                "omegaclaw_version": os.environ.get("OMEGACLAW_VERSION"),
+                "omega_version": os.environ.get("OMEGA_VERSION"),
             })
 
-    monkeypatch.delenv("OMEGACLAW_VERSION", raising=False)
+    monkeypatch.delenv("OMEGA_VERSION", raising=False)
     package = types.ModuleType("memory_portability")
     package.MemoryTransfer = FakeTransfer
     monkeypatch.setitem(sys.modules, "memory_portability", package)
@@ -153,7 +153,7 @@ def test_transfer_exposes_runtime_omega_version(handler, monkeypatch):
     assert created == [{
         "transfer_dir": handler._TRANSFER_DIR,
         "store": "configured-store",
-        "omegaclaw_version": "Omega version=v1.2.3",
+        "omega_version": "Omega version=v1.2.3",
     }]
 
 
