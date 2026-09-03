@@ -64,6 +64,12 @@ def test_module_import_does_not_require_memory_portability(handler):
     assert "memory_portability" not in sys.modules
     assert handler.is_export_command("/memory-export both")
 
+
+def test_entrypoint_configures_memory_transfer_directory():
+    entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert 'transfer_dir="/memory-transfer"' in entrypoint
+
 @pytest.mark.parametrize("component", ["history", "ltm", "both"])
 def test_export_runs_immediately(handler, component):
     exported = []

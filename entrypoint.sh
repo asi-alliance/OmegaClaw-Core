@@ -46,7 +46,10 @@ from memory_export import create_memory_store
 from memory_portability import MemoryTransfer
 
 init_config([])
-transfer = MemoryTransfer(store=create_memory_store())
+transfer = MemoryTransfer(
+    transfer_dir="/memory-transfer",
+    store=create_memory_store(),
+)
 operation = os.environ["MEMORY_PORTABILITY_OPERATION"]
 if operation == "recover":
     transfer.recover()
