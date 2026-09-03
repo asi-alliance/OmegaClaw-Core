@@ -31,6 +31,8 @@ This reads a command-line override via `argk` (`name=value` on the MeTTa command
 | `maxRecallItems` | 20 | Items returned by `query`. |
 | `maxEpisodeRecallLines` | 20 | Lines returned by `episodes`. |
 | `maxHistory` | 30000 (chars) | Tail of `memory/history.metta` included in the prompt. |
+| `memoryDirectory` | `./repos/Omega/memory` | Directory containing persistent memory files such as `history.metta`. |
+| `chromaDbPath` | `./chroma_db` | ChromaDB persistence directory used for memory backup and restore. |
 | `embeddingprovider` | `Local` | `Local` (Python-side model) or `OpenAI`. |
 
 ## Channels (`src/channels.metta`, `initChannels`)
@@ -68,7 +70,7 @@ metta run.metta provider=Anthropic LLM=claude-opus-4-6 commchannel=mattermost
 ```
 
 Configuration values are resolved in this order: command-line `key=value`,
-`OMEGACLAW_<KEY>` environment variable, `config/config.yaml`, then the caller's
+`OMEGA_<KEY>` environment variable, `config/config.yaml`, then the caller's
 default. `TG_BOT_TOKEN` and `OMEGA_AUTH_SECRET` are read directly from the
 environment and must be placed before the `metta`/`petta` command.
 

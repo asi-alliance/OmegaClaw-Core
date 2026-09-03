@@ -134,11 +134,14 @@ COPY --from=versioned-source /omega-source ${OMEGA_DIR}
 
 RUN cp ${OMEGA_DIR}/run.metta /PeTTa/run.metta \
  && mkdir -p ${MEMORY_DIR}/chroma_db \
+ && mkdir -p /memory-transfer \
  && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
  && chmod +x ${OMEGA_DIR}/entrypoint.sh \
  && chmod +x ${OMEGA_DIR}/scripts/import_knowledge.sh \
  && chmod +x ${OMEGA_DIR}/scripts/omega \
  && chown -R 65534:65534 ${MEMORY_DIR} \
+ && chown 65534:65534 /memory-transfer \
+ && chmod 0700 /memory-transfer \
  && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \
  && chown -R 65534:65534 /opt/huggingface /opt/sentence_transformers

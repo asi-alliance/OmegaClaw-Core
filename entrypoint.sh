@@ -40,11 +40,49 @@ if [[ "${IMPORT_KB_ON_START}" == "1" ]]; then
   su nobody -s /bin/sh -c "${OMEGA_DIR}/scripts/import_knowledge.sh"
 fi
 
+MEMORY_PORTABILITY_PYTHON='import os
+from config import init_config
+from memory_export import create_memory_store
+from memory_portability import MemoryTransfer
+
+init_config([])
+transfer = MemoryTransfer(
+    transfer_dir="/memory-transfer",
+    store=create_memory_store(),
+)
+operation = os.environ["MEMORY_PORTABILITY_OPERATION"]
+if operation == "recover":
+    transfer.recover()
+elif operation == "import":
+    transfer.import_archive(
+        os.environ["MEMORY_IMPORT_FILE"],
+        mode=os.environ.get("MEMORY_IMPORT_MODE", "overwrite"),
+        include_history=os.environ.get("MEMORY_IMPORT_NO_HISTORY") != "1",
+        include_vectors=os.environ.get("MEMORY_IMPORT_NO_VECTOR") != "1",
+    )
+else:
+    raise ValueError(f"Unsupported memory portability operation: {operation!r}")'
+export MEMORY_PORTABILITY_PYTHON
+export PYTHONPATH="${OMEGA_DIR}:${OMEGA_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+export MEMORY_PORTABILITY_OPERATION=recover
+su nobody -s /bin/sh -c 'exec python3 -c "$MEMORY_PORTABILITY_PYTHON"' \
+  || { echo "Memory import recovery failed. Aborting startup." >&2; exit 1; }
+
+if [[ -n "${MEMORY_IMPORT_FILE:-}" ]]; then
+  echo "memory_portability: importing ${MEMORY_IMPORT_FILE}"
+  export MEMORY_PORTABILITY_OPERATION=import
+  su nobody -s /bin/sh -c 'exec python3 -c "$MEMORY_PORTABILITY_PYTHON"' \
+    || { echo "Memory import failed. Aborting startup." >&2; exit 1; }
+  echo "memory_portability: import complete"
+fi
+unset MEMORY_PORTABILITY_OPERATION MEMORY_PORTABILITY_PYTHON PYTHONPATH
+
 # Scrub environment: only allowlisted vars survive.
 SAFE_VARS="HOME USER PATH HOSTNAME TERM LANG LC_ALL \
   PYTHONDONTWRITEBYTECODE PYTHONUNBUFFERED \
   HF_HOME SENTENCE_TRANSFORMERS_HOME HF_HUB_OFFLINE TRANSFORMERS_OFFLINE \
-  OMEGA_DIR MEMORY_DIR TEST_SERVER_IP"
+  CHROMA_DB_PATH EMBEDDING_PROVIDER OMEGA_DIR MEMORY_DIR TEST_SERVER_IP"
 
 env_args=""
 for var in $SAFE_VARS; do
