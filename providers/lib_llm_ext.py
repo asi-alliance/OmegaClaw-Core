@@ -23,9 +23,12 @@ def _log_completion(provider: str, model: str, response) -> None:
     finish_reason = getattr(response.choices[0], "finish_reason", None)
     usage = getattr(response, "usage", None)
     details = getattr(usage, "completion_tokens_details", None)
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
     line = (
         f"[LLM_USAGE] provider={provider} model={model} "
         f"finish_reason={finish_reason} "
+        f"prompt_tokens={getattr(usage, 'prompt_tokens', None)} "
+        f"cached_tokens={getattr(prompt_details, 'cached_tokens', None)} "
         f"completion_tokens={getattr(usage, 'completion_tokens', None)} "
         f"reasoning_tokens={getattr(details, 'reasoning_tokens', None)} "
     )
