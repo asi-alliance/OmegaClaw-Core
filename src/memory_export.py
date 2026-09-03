@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from config import config_get_by_key
-from helper import projectRootDirectory
+from helper import omegaclaw_version, projectRootDirectory
 from src.logger import get_logger
 
 logger = get_logger(__name__)
@@ -54,6 +54,7 @@ def _get_transfer():
             raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
 
         os.environ["EMBEDDING_PROVIDER"] = embedding_provider
+        os.environ["OMEGACLAW_VERSION"] = omegaclaw_version()
         _transfer = MemoryTransfer(
             transfer_dir=_TRANSFER_DIR,
             store=create_memory_store(),

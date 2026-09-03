@@ -63,8 +63,8 @@ scripts/omegaclaw start -d singularitynet/omegaclaw:<tag> -p OpenAI -t telegram 
 
 `overwrite` replaces the selected components after validation and rollback
 preparation. `append` preserves existing history and adds imported LTM records
-under new IDs. Select components with `--only-history`, `--no-history`, or
-`--no-vector`.
+under new IDs. Select a single component with `--only-history` or
+`--only-vector`. Without either option, both components are imported.
 
 The importer validates archive paths, checksums, manifest metadata, record
 counts, and embedding compatibility before changing live memory. It runs before

@@ -129,6 +129,34 @@ def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch
     }]
 
 
+def test_transfer_exposes_runtime_omegaclaw_version(handler, monkeypatch):
+    created = []
+
+    class FakeTransfer:
+        def __init__(self, **kwargs):
+            created.append({
+                **kwargs,
+                "omegaclaw_version": os.environ.get("OMEGACLAW_VERSION"),
+            })
+
+    monkeypatch.delenv("OMEGACLAW_VERSION", raising=False)
+    package = types.ModuleType("memory_portability")
+    package.MemoryTransfer = FakeTransfer
+    monkeypatch.setitem(sys.modules, "memory_portability", package)
+    monkeypatch.setattr(handler, "create_memory_store", lambda: "configured-store")
+    monkeypatch.setattr(handler, "omegaclaw_version", lambda: "OmegaClaw version=v1.2.3")
+    handler._transfer = None
+
+    transfer = handler._get_transfer()
+
+    assert transfer is handler._transfer
+    assert created == [{
+        "transfer_dir": handler._TRANSFER_DIR,
+        "store": "configured-store",
+        "omegaclaw_version": "OmegaClaw version=v1.2.3",
+    }]
+
+
 def test_memory_store_receives_explicit_omegaclaw_storage_configuration(
     handler,
     monkeypatch,

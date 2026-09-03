@@ -554,8 +554,7 @@ help() {
     echo -e "\t--memory-import <filename> restore archive from transfer directory before startup"
     echo -e "\t--memory-mode overwrite|append import mode (default: overwrite)"
     echo -e "\t--only-history restore history only"
-    echo -e "\t--no-history skip history during import"
-    echo -e "\t--no-vector skip long-term memory during import"
+    echo -e "\t--only-vector restore long-term memory only"
 }
 
 require_option_value() {
@@ -584,8 +583,8 @@ options() {
     memory_transfer_dir=""
     memory_import_file=""
     memory_import_mode="overwrite"
-    memory_import_no_history=0
-    memory_import_no_vector=0
+    memory_import_only_history=0
+    memory_import_only_vector=0
     memory_export_enabled=0
 
     if [[ "$#" -eq 0 ]]; then
@@ -637,16 +636,12 @@ options() {
                 memory_import_mode="${2}"
                 shift 2
                 ;;
-            --no-history)
-                memory_import_no_history=1
-                shift
-                ;;
-            --no-vector)
-                memory_import_no_vector=1
-                shift
-                ;;
             --only-history)
-                memory_import_no_vector=1
+                memory_import_only_history=1
+                shift
+                ;;
+            --only-vector)
+                memory_import_only_vector=1
                 shift
                 ;;
             --version|-v) version; return 0;;
@@ -734,13 +729,13 @@ options() {
         return 1
     fi
 
-    if [[ "${memory_import_no_history}" == "1" && "${memory_import_no_vector}" == "1" ]]; then
-        echo "--no-history cannot be combined with --no-vector or --only-history" >&2
+    if [[ "${memory_import_only_history}" == "1" && "${memory_import_only_vector}" == "1" ]]; then
+        echo "--only-history and --only-vector cannot be combined" >&2
         return 1
     fi
     if [[ -z "${memory_import_file}" &&
-          ( "${memory_import_no_history}" == "1" ||
-            "${memory_import_no_vector}" == "1" ) ]]; then
+          ( "${memory_import_only_history}" == "1" ||
+            "${memory_import_only_vector}" == "1" ) ]]; then
         echo "Import component flags require --memory-import" >&2
         return 1
     fi
@@ -790,11 +785,11 @@ start() {
             -e "MEMORY_IMPORT_FILE=${memory_import_file}"
             -e "MEMORY_IMPORT_MODE=${memory_import_mode}"
         )
-        if [[ "${memory_import_no_history}" == "1" ]]; then
-            memory_import_env+=(-e MEMORY_IMPORT_NO_HISTORY=1)
-        fi
-        if [[ "${memory_import_no_vector}" == "1" ]]; then
+        if [[ "${memory_import_only_history}" == "1" ]]; then
             memory_import_env+=(-e MEMORY_IMPORT_NO_VECTOR=1)
+        fi
+        if [[ "${memory_import_only_vector}" == "1" ]]; then
+            memory_import_env+=(-e MEMORY_IMPORT_NO_HISTORY=1)
         fi
     fi
 
