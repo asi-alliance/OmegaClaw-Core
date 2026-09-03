@@ -179,6 +179,22 @@ def _channel_auth_group_path():
     return os.path.join(_MEMORY_DIRECTORY, _CHANNEL_DIR_NAME, _CHANNEL_AUTH_GROUP_FILE)
 
 
+def _append_json_line(path, payload):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    prefix = ""
+    try:
+        with open(path, "rb") as probe:
+            probe.seek(0, os.SEEK_END)
+            if probe.tell():
+                probe.seek(-1, os.SEEK_END)
+                if probe.read(1) != b"\n":
+                    prefix = "\n"
+    except FileNotFoundError:
+        pass
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(prefix + json.dumps(payload, separators=(",", ":")) + "\n")
+
+
 def load_channel_auth_state(channel_identifier):
     """Validate and load one channel's persisted owner and active groups."""
     channel_identifier = str(channel_identifier or "").strip()
@@ -187,7 +203,7 @@ def load_channel_auth_state(channel_identifier):
 
     def read_records(path, label):
         try:
-            with open(path, "r", encoding="utf-8") as source:
+            with open(path, "r", encoding="utf-8", errors="replace") as source:
                 records = []
                 for line_number, line in enumerate(source, 1):
                     if not line.strip():
@@ -263,10 +279,8 @@ def store_channel_authenticated_group_id(channel_identifier, group_id, authorize
         "authorized_by": authorized_by_user_id,
     }
     path = _channel_auth_group_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, separators=(",", ":")) + "\n")
+        _append_json_line(path, payload)
     except OSError as e:
         raise RuntimeError("Failed to write channel authenticated group record") from e
     return True
@@ -284,7 +298,7 @@ def get_channel_saved_group_id(channel_identifier, group_id):
 
     authorized = False
     try:
-        with open(_channel_auth_group_path(), "r", encoding="utf-8") as f:
+        with open(_channel_auth_group_path(), "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 try:
                     record = json.loads(line)
@@ -354,10 +368,8 @@ def revoke_channel_group(channel_identifier, group_id, requester_user_id):
         "revoked": True,
     }
     path = _channel_auth_group_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, separators=(",", ":")) + "\n")
+        _append_json_line(path, payload)
     except OSError as e:
         raise RuntimeError("Failed to write channel group revocation record") from e
 

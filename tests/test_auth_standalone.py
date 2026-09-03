@@ -190,3 +190,34 @@ def test_load_channel_auth_state_skips_malformed_records(
         "Skipping malformed channel authenticated group record at line 2" in warning
         for warning in warnings
     )
+
+
+def test_load_channel_auth_state_skips_undecodable_bytes(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("ab") as target:
+        target.write(b"\xff\xfe garbage\n")
+
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", {"active"})
+
+
+def test_a_record_written_after_an_unterminated_one_is_kept(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("a", encoding="utf-8") as target:
+        target.write('{"time":"2026-09-02T10:00:00Z","channel_ident')
+
+    assert auth.revoke_channel_group("TELEGRAM", "active", "owner") == "group_unbound"
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", set())
