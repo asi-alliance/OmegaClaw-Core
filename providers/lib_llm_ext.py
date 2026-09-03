@@ -2,8 +2,13 @@ import os, hashlib
 import openai
 from typing import Optional, Tuple, Dict, Any
 from config import config_get_by_key
+from src.helper import quote_arg
 
 PROMPT_DELIMITER = ":-:-:-:"
+LLM_EMPTY_RESPONSE_MESSAGE = (
+    'The entire configured "maxOutputTokens" budget was consumed by thinking, '
+    "leaving no tokens available to generate the final answer."
+)
 
 from src.logger import get_logger
 
@@ -12,6 +17,25 @@ logger = get_logger(__name__)
 
 def _log_raw(provider: str, model: str, raw: str) -> None:
     logger.debug(f"[LLM_RAW] provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
+
+def _log_completion(provider: str, model: str, response) -> None:
+    """Report how the completion budget was actually spent."""
+    finish_reason = getattr(response.choices[0], "finish_reason", None)
+    usage = getattr(response, "usage", None)
+    details = getattr(usage, "completion_tokens_details", None)
+    line = (
+        f"[LLM_USAGE] provider={provider} model={model} "
+        f"finish_reason={finish_reason} "
+        f"completion_tokens={getattr(usage, 'completion_tokens', None)} "
+        f"reasoning_tokens={getattr(details, 'reasoning_tokens', None)} "
+    )
+    logger.debug(line)
+
+def _llm_empty_response_command() -> str:
+    """Return an explanatory message as a MeTTa `send` command when the LLM
+    spends the entire output token budget on reasoning and returns no content.
+    """
+    return f"(send {quote_arg(LLM_EMPTY_RESPONSE_MESSAGE)})"
 
 def _split_system_user(content: str) -> Tuple[str, str]:
     """
@@ -130,6 +154,10 @@ class AIProvider(AbstractAIProvider):
 
             raw = response.choices[0].message.content or ""
             _log_raw(self._name, self._model_name, raw)
+            _log_completion(self._name, self._model_name, response)
+            if not raw:
+                logger.warning("LLM returned an empty response")
+                raw = _llm_empty_response_command()
             resp = self._clean_text(raw)
             return resp
         except Exception as e:
