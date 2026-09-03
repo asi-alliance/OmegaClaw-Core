@@ -1,6 +1,6 @@
-# OmegaClaw Documentation
+# Omega Documentation
 
-This directory contains the full documentation for OmegaClaw. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
+This directory contains the full documentation for Omega. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
 
 - `intro-*` — conceptual introduction
 - `tutorial-NN-*` — numbered, task-oriented walkthroughs
@@ -12,9 +12,9 @@ If you are new, read the Introduction in order, then pick tutorials that match w
 
 ## Introduction
 
-Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
+Start here to understand what Omega is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
 
-- [introduction.md](./introduction.md) — What OmegaClaw is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
+- [introduction.md](./introduction.md) — What Omega is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
 - [installation instruction](/README.md#installation) — Manual MeTTa setup, environment variables, API keys.
 
 ---

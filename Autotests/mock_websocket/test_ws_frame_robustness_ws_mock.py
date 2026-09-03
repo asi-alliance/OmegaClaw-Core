@@ -27,7 +27,7 @@ def _wait_for_reply(ws, needle, timeout):
 
 def test_ws_frame_robustness_ws_mock(llm, ws):
     with Checker("ws frame robustness") as c:
-        print(f"\n=== OmegaClaw: ws frame robustness (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: ws frame robustness (run-id {c.run_id}) ===", flush=True)
 
         c.step("wait for agent WebSocket connection")
         if not ws.wait_for_connection(timeout=60):

@@ -27,7 +27,7 @@ The captured stdout of the command as a string.
 ```
 
 ### Notes / Limits
-- Runs with the permissions of the OmegaClaw process.
+- Runs with the permissions of the Omega process.
 - No sandboxing. Run in a container for anything resembling untrusted use.
 - Prefer writing complex commands to a file and invoking the file rather than embedding quotes-within-quotes.
 
@@ -44,7 +44,7 @@ The captured stdout of the command as a string.
 Read a file into a string.
 
 ### Parameters
-- `path` — absolute or relative filesystem path. MeTTa library paths of the form `(library OmegaClaw-Core ./memory/prompt.txt)` are also accepted (see `getPrompt`).
+- `path` — absolute or relative filesystem path. MeTTa library paths of the form `(library Omega ./memory/prompt.txt)` are also accepted (see `getPrompt`).
 
 ### Returns
 The file's contents as a single string.
@@ -162,7 +162,7 @@ read back from disk — or `APPEND-FAILED file=<path>: <error>` (e.g. when the f
 
 ### Purpose
 
-Return the filesystem paths allowed by OmegaClaw's active security policy.
+Return the filesystem paths allowed by Omega's active security policy.
 
 Agent should use this skill before reading, writing, appending, or otherwise modifying a
 file when the target path is not known to be allowed.

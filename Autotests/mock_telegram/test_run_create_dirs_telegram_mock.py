@@ -26,7 +26,7 @@ EXPECTED_DIRS = ["test1", "test2", "test3"]
 
 def test_run_create_dirs_telegram_mock(llm, tg):
     with Checker("create dirs script (telegram mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create dirs telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: create dirs telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

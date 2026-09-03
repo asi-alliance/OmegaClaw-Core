@@ -37,7 +37,7 @@ def chromadb_vector_count():
 
 def test_transition_metta_to_remember_mock(llm, comm):
     with Checker("metta reasoning -> remember (mock)") as c:
-        print(f"\n=== OmegaClaw: metta->remember (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: metta->remember (run-id {c.run_id}) ===",
               flush=True)
 
         conclusion_marker = f"conclusion-{c.run_id}"

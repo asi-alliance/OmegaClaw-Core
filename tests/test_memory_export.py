@@ -129,7 +129,7 @@ def test_transfer_uses_effective_runtime_embedding_provider(handler, monkeypatch
     }]
 
 
-def test_transfer_exposes_runtime_omegaclaw_version(handler, monkeypatch):
+def test_transfer_exposes_runtime_omega_version(handler, monkeypatch):
     created = []
 
     class FakeTransfer:
@@ -144,7 +144,7 @@ def test_transfer_exposes_runtime_omegaclaw_version(handler, monkeypatch):
     package.MemoryTransfer = FakeTransfer
     monkeypatch.setitem(sys.modules, "memory_portability", package)
     monkeypatch.setattr(handler, "create_memory_store", lambda: "configured-store")
-    monkeypatch.setattr(handler, "omegaclaw_version", lambda: "OmegaClaw version=v1.2.3")
+    monkeypatch.setattr(handler, "omega_version", lambda: "Omega version=v1.2.3")
     handler._transfer = None
 
     transfer = handler._get_transfer()
@@ -153,11 +153,11 @@ def test_transfer_exposes_runtime_omegaclaw_version(handler, monkeypatch):
     assert created == [{
         "transfer_dir": handler._TRANSFER_DIR,
         "store": "configured-store",
-        "omegaclaw_version": "OmegaClaw version=v1.2.3",
+        "omegaclaw_version": "Omega version=v1.2.3",
     }]
 
 
-def test_memory_store_receives_explicit_omegaclaw_storage_configuration(
+def test_memory_store_receives_explicit_omega_storage_configuration(
     handler,
     monkeypatch,
     tmp_path,
@@ -192,7 +192,7 @@ def test_memory_store_receives_explicit_omegaclaw_storage_configuration(
     ]
 
 
-def test_storage_paths_are_resolved_from_omegaclaw_config(
+def test_storage_paths_are_resolved_from_omega_config(
     handler,
     monkeypatch,
     tmp_path,

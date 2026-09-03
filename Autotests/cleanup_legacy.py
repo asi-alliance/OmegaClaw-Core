@@ -22,8 +22,8 @@ LEGACY_MARKERS = [
     "CI smoke",
     "CI smokes",
     "smoke test marker",
-    "OmegaClaw CI smoke",
-    "OmegaClaw smoke",
+    "Omega CI smoke",
+    "Omega smoke",
     "/root/testcat",
     "testcat/",
     "IDLE SPIN PATTERN NOTE 2026-04-14",
@@ -36,7 +36,7 @@ LEGACY_MARKERS = [
 
 
 def test_cleanup_legacy():
-    print("\n=== OmegaClaw: legacy cleanup ===", flush=True)
+    print("\n=== Omega: legacy cleanup ===", flush=True)
 
     print(f">> history.metta: searching for {len(LEGACY_MARKERS)} markers", flush=True)
     removed_blocks = history_cleanup_by_markers(LEGACY_MARKERS)

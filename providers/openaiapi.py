@@ -47,7 +47,7 @@ class OpenAIAPIPreconfigured(OpenAIAPI):
     def base_url(self):
         return self._base_url
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     providers.registerLLMProvider("OpenAIAPI", OpenAIAPI("OpenAIAPI"))
     asicloud_model = config_get_by_key("asicloud_model", "minimax/minimax-m3")
     providers.registerLLMProvider("ASICloud", OpenAIAPIPreconfigured("ASICloud", "ASI_API_KEY", asicloud_model, "https://inference.asicloud.cudos.org/v1"))

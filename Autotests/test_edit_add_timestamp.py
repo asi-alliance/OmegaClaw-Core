@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw adds a timestamp to an existing note.txt file.
+Test: Omega adds a timestamp to an existing note.txt file.
 
 Run:
     pytest test_edit_add_timestamp.py -s
@@ -17,7 +17,7 @@ INITIAL_CONTENT = "This is a test note.\n"
 
 def test_edit_add_timestamp():
     with Checker("edit add timestamp", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: add timestamp (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: add timestamp (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

@@ -24,7 +24,7 @@ LINE3 = "Third line"
 
 def test_edit_delete_line_telegram_mock(llm, tg):
     with Checker("edit delete line (telegram mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: delete second line telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: delete second line telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

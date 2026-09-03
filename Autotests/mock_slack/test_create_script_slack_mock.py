@@ -33,7 +33,7 @@ def _current_year_strs():
 
 def test_create_date_script_slack_mock(llm, sl):
     with Checker("create date.sh (slack mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create date.sh slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: create date.sh slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

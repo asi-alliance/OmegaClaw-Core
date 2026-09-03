@@ -19,7 +19,7 @@ from helpers import (
 
 def test_skill_metta_mock(llm, comm):
     with Checker("metta skill invocation (mock)") as c:
-        print(f"\n=== OmegaClaw: metta mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: metta mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via comm channel with mocked metta + send response")

@@ -29,7 +29,7 @@ SINGULARITYNET_DESCRIPTION = (
 
 def test_search_basic_telegram_mock(llm, tg):
     with Checker("search singularitynet (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: basic search telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: basic search telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via Telegram with mocked send response")

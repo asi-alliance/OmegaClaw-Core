@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from config import config_get_by_key
-from helper import omegaclaw_version, projectRootDirectory
+from helper import omega_version, projectRootDirectory
 from src.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +34,7 @@ def _resolve_chroma_path() -> Path:
 
 
 def create_memory_store():
-    """Build an import-kb store from OmegaClaw's effective configuration."""
+    """Build an import-kb store from Omega's effective configuration."""
     from memory_portability.storage import MemoryStore
 
     return MemoryStore(
@@ -54,7 +54,8 @@ def _get_transfer():
             raise ValueError(f"Unsupported embedding provider: {embedding_provider!r}")
 
         os.environ["EMBEDDING_PROVIDER"] = embedding_provider
-        os.environ["OMEGACLAW_VERSION"] = omegaclaw_version()
+        # import-kb 0.2.1 uses this legacy metadata key for the source version.
+        os.environ["OMEGACLAW_VERSION"] = omega_version()
         _transfer = MemoryTransfer(
             transfer_dir=_TRANSFER_DIR,
             store=create_memory_store(),

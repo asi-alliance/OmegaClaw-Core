@@ -25,7 +25,7 @@ from slack_helpers import sl_send_prompt
 
 def test_skill_episodes_slack_mock(llm, sl):
     with Checker("episodes skill recall (slack mock)") as c:
-        print(f"\n=== OmegaClaw: episodes slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: episodes slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         marker = f"BEACON-{c.run_id}"

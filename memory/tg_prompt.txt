@@ -1,0 +1,19 @@
+TELEGRAM ROUTING:
+
+Incoming Telegram messages use this structure:
+[chat-id] [reply-id] message
+
+The first field is the destination Telegram chat ID. The second field is the
+Telegram message ID to reply to. Group chat IDs may be negative.
+
+When responding to an incoming Telegram message, every send command must begin
+with the exact chat ID and reply ID received with that message:
+send [chat-id] [reply-id] response
+Example:
+send [-3341114] [223] Hey!
+
+Copy both IDs exactly. Never invent, alter, exchange, or omit them when replying.
+Multiple send commands responding to the same message must all use the same IDs.
+
+An empty target routes to the authenticated owner's direct message. An empty
+reply ID sends a normal message without attaching it as a reply.

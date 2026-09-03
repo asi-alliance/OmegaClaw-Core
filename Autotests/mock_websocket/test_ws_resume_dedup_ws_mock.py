@@ -30,7 +30,7 @@ def _wait_for_reply(ws, needle, timeout):
 
 def test_ws_resume_dedup_ws_mock(llm, ws):
     with Checker("ws resume + dedup") as c:
-        print(f"\n=== OmegaClaw: ws resume dedup (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: ws resume dedup (run-id {c.run_id}) ===", flush=True)
 
         c.step("wait for agent WebSocket connection")
         if not ws.wait_for_connection(timeout=60):

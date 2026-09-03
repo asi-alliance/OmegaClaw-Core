@@ -37,7 +37,7 @@ su www-data -s /bin/sh -c "sh /opt/nginx/nginx.sh"
 
 # Optional knowledge-base import
 if [[ "${IMPORT_KB_ON_START}" == "1" ]]; then
-  su nobody -s /bin/sh -c "${OMEGACLAW_DIR}/scripts/import_knowledge.sh"
+  su nobody -s /bin/sh -c "${OMEGA_DIR}/scripts/import_knowledge.sh"
 fi
 
 MEMORY_PORTABILITY_PYTHON='import os
@@ -60,7 +60,7 @@ elif operation == "import":
 else:
     raise ValueError(f"Unsupported memory portability operation: {operation!r}")'
 export MEMORY_PORTABILITY_PYTHON
-export PYTHONPATH="${OMEGACLAW_DIR}:${OMEGACLAW_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="${OMEGA_DIR}:${OMEGA_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 export MEMORY_PORTABILITY_OPERATION=recover
 su nobody -s /bin/sh -c 'exec python3 -c "$MEMORY_PORTABILITY_PYTHON"' \
@@ -79,7 +79,7 @@ unset MEMORY_PORTABILITY_OPERATION MEMORY_PORTABILITY_PYTHON PYTHONPATH
 SAFE_VARS="HOME USER PATH HOSTNAME TERM LANG LC_ALL \
   PYTHONDONTWRITEBYTECODE PYTHONUNBUFFERED \
   HF_HOME SENTENCE_TRANSFORMERS_HOME HF_HUB_OFFLINE TRANSFORMERS_OFFLINE \
-  CHROMA_DB_PATH EMBEDDING_PROVIDER OMEGACLAW_DIR MEMORY_DIR TEST_SERVER_IP"
+  CHROMA_DB_PATH EMBEDDING_PROVIDER OMEGA_DIR MEMORY_DIR TEST_SERVER_IP"
 
 env_args=""
 for var in $SAFE_VARS; do

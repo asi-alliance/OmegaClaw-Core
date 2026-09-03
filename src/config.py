@@ -30,14 +30,14 @@ def init_config(command_line):
 
 def config_get_by_key(key, default=None):
     """Get configuration parameter from the list of sources: (1) command line
-    parameters, (2) environment variable with OMEGACLAW_$key name, (3)
+    parameters, (2) environment variable with OMEGA_$key name, (3)
     configuration file, (4) use $default value."""
     global _CONFIG, _COMMAND_LINE, _CONFIG_FILE
     if key in _CONFIG:
         return _CONFIG.get(key)
     if key in _COMMAND_LINE:
         return _cache_config(key, _COMMAND_LINE.get(key), "command line")
-    envkey = f"OMEGACLAW_{key}"
+    envkey = f"OMEGA_{key}"
     if envkey in os.environ:
         return _cache_config(key, os.environ.get(envkey), "environment variable")
     if key in _CONFIG_FILE:

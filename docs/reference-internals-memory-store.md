@@ -1,6 +1,6 @@
 # Internals — Memory Store
 
-OmegaClaw uses a **three-tier memory architecture**. Each tier has distinct semantics, persistence, and purpose. Choosing the wrong tier is one of the easier performance and reliability foot-guns.
+Omega uses a **three-tier memory architecture**. Each tier has distinct semantics, persistence, and purpose. Choosing the wrong tier is one of the easier performance and reliability foot-guns.
 
 ## Overview
 
@@ -78,7 +78,7 @@ Reads lines around `$time` from `memory/history.metta` — the **episodic trace*
 
 ### Startup knowledge priors
 
-At startup, OmegaClaw also checks for a folder named `knowledge-priors` in the OmegaClaw-Core project root. If that folder exists and contains Markdown files (`*.md`), their contents are chunked, embedded, and loaded into the ChromaDB `memories` collection for semantic lookup.
+At startup, Omega also checks for a folder named `knowledge-priors` in the Omega project root. If that folder exists and contains Markdown files (`*.md`), their contents are chunked, embedded, and loaded into the ChromaDB `memories` collection for semantic lookup.
 
 The loader skips the step when the folder is missing, or when the folder exists but has no `.md` files. Indexed chunks are tagged with `time = knowledge_prior` instead of an actual time.
 

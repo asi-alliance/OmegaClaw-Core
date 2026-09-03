@@ -605,5 +605,5 @@ class SlackChannel(channels.CommChannel):
     def send(self, message: str) -> None:
         send_message(message)
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("slack", SlackChannel())

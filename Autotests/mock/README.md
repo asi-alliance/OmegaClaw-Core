@@ -1,8 +1,8 @@
 # Mock autotests — setup and run
 
-This section describes how to bring up a local OmegaClaw container running with the deterministic LLM mock and run the `test_*_mock.py` suite against it.
+This section describes how to bring up a local Omega container running with the deterministic LLM mock and run the `test_*_mock.py` suite against it.
 
-For the live-provider counterpart (real LLM, grading scheme, parameters table) see `Autotests/README_live.pdf`.
+For the live-provider counterpart (real LLM, grading scheme, parameters table) see `Autotests/README_live.md`.
 
 ## 1. Prerequisites
 
@@ -15,32 +15,32 @@ For the live-provider counterpart (real LLM, grading scheme, parameters table) s
 The mock infrastructure is part of the source tree, so the image must be built locally rather than pulled from the registry.
 
 ```
-docker build -t omegaclaw:mock .
+docker build -t omega:mock .
 ```
 
 ## 3. Start the container with the Test provider
 
-Use the `scripts/omegaclaw` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
+Use the `scripts/omega` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
 
 The container connects back to the host on TCP port 9765 to reach the mock LLM controller and on TCP port 9766 to reach the test communication channel server. `TEST_SERVER_IP` must hold the host IP that is reachable from inside the container; under the default Docker bridge this is `172.17.0.1`.
 
 ```
-env TEST_SERVER_IP=172.17.0.1 ./scripts/omegaclaw start -s 0000 -p Test -t test -d omegaclaw:mock
+env TEST_SERVER_IP=172.17.0.1 ./scripts/omega start -s 0000 -p Test -t test -d omega:mock
 ```
 
 Notes:
 
 - `-t test` selects the in-process test communication channel; messages travel over a TCP RPC between the container and the host fixture, not over IRC, Telegram, or Slack.
 - `-p Test` selects the mock LLM dispatcher.
-- `-s 0000` sets `OMEGACLAW_AUTH_SECRET` inside the container.
-- `-d omegaclaw:mock` points at the local image built in step 2.
+- `-s 0000` sets `OMEGA_AUTH_SECRET` inside the container.
+- `-d omega:mock` points at the local image built in step 2.
 - `TEST_SERVER_IP=172.17.0.1` is the host's docker-bridge address used by both the mock LLM provider and the test channel client.
-- The container is created with the name `omegaclaw` (the script default).
+- The container is created with the name `omega` (the script default).
 
 Wait until the agent loop is up. The first runtime `CHARS_SENT:` line (with a byte count after the colon) in the container log marks the end of `initChannels` / `initMemory` and the start of real iterations; the bare `CHARS_SENT:` string also appears earlier as part of the MeTTa source dump, so match on the numeric form to avoid a premature exit:
 
 ```
-until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
+until docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
 ```
 
 ## 4. Configure the test environment
@@ -48,14 +48,14 @@ until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; do
 Export the variables the test harness reads.
 
 ```
-export OMEGACLAW_CONTAINER=omegaclaw
-export OMEGACLAW_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_mock
+export OMEGA_CONTAINER=omega
+export OMEGA_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_mock
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `OMEGACLAW_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name created in step 3 (`omegaclaw` when using the script). |
-| `OMEGACLAW_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_mock`. The test is skipped if this variable is unset. |
+| `OMEGA_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name created in step 3 (`omega` when using the script). |
+| `OMEGA_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_mock`. The test is skipped if this variable is unset. |
 
 ## 5. Run the suite
 
@@ -65,7 +65,7 @@ source venv/bin/activate
 pytest -s -v mock/test_*_mock.py
 ```
 
-The `LlmMockController`, `CommMockServer`, and the OpenClaw Gateway stub are provided by session-scoped fixtures in `mock/conftest.py`, so all three are started once per pytest session. Expected output: `42 passed`, minus the ones whose optional variables are unset - `test_git_push_to_remote_mock` skips without `OMEGACLAW_GIT_TOKEN`, and the six OpenClaw tests skip without `OMEGACLAW_OPENCLAW_TOKEN` (see "OpenClaw plugin" below).
+The `LlmMockController`, `CommMockServer`, and the OpenClaw Gateway stub are provided by session-scoped fixtures in `mock/conftest.py`, so all three are started once per pytest session. Expected output: `42 passed`, minus the ones whose optional variables are unset - `test_git_push_to_remote_mock` skips without `OMEGA_GIT_TOKEN`, and the six OpenClaw tests skip without `OMEGA_OPENCLAW_TOKEN` (see "OpenClaw plugin" below).
 
 ## 5a. OpenClaw plugin (`test_openclaw_delegate_mock.py`)
 
@@ -88,23 +88,23 @@ Two things must still be true of the container, because the plugin is configured
 1. **Start it with `-g`**, which points Nginx's `/openclaw/` proxy at the stub and sets `openClawEnabled`/`openClawURL` - no `config/config.yaml` edit needed:
 
    ```bash
-   env TEST_SERVER_IP=172.17.0.1 OMEGACLAW_OPENCLAW_TOKEN=<token> \
-     ./scripts/omegaclaw start -s 0000 -p Test -t test -d omegaclaw:mock -g "http://172.17.0.1:18789"
+   env TEST_SERVER_IP=172.17.0.1 OMEGA_OPENCLAW_TOKEN=<token> \
+     ./scripts/omega start -s 0000 -p Test -t test -d omega:mock -g "http://172.17.0.1:18789"
    ```
 
    Use the address the container reaches the host on: `172.17.0.1` under the default Docker bridge, `host.docker.internal` in CI. Starting the container by hand instead of through the script? Pass `openclaw_url=<gateway URL>` as a container argument, same as `openaiapi_url=` (see `entrypoint.sh`).
 
-2. **Export `OMEGACLAW_OPENCLAW_TOKEN`.** The stub accepts exactly this value, so the tests fail if Nginx does not inject it. Nginx reads it before the agent's environment is scrubbed, which is also what gives `test_credentials_scrubbed_mock.py` a real token to catch a leak of - with the variable unset, that assertion passes without proving anything.
+2. **Export `OMEGA_OPENCLAW_TOKEN`.** The stub accepts exactly this value, so the tests fail if Nginx does not inject it. Nginx reads it before the agent's environment is scrubbed, which is also what gives `test_credentials_scrubbed_mock.py` a real token to catch a leak of - with the variable unset, that assertion passes without proving anything.
 
 If the token is unset the suite skips, since the plugin cannot be exercised at all. If the token is set but the container was started without `-g`, the fixture fails instead of skipping: a token with a disabled plugin means the run would look green while testing nothing.
 
 ## 6. Tear down
 
 ```
-./scripts/omegaclaw clean
+./scripts/omega clean
 ```
 
-This removes the `omegaclaw` container and the `omegaclaw-memory` volume created by the script in step 3.
+This removes the `omega` container and the `omega-memory` volume created by the script in step 3.
 
 # Tests description
 
@@ -255,7 +255,7 @@ Agent runs `git init`, `git add`, `git commit` locally inside the container.
 Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and pushes.
 
 - Mock answer: single `(shell "rm -rf ... && git clone ... && cd ... && git checkout -b ... && printf ... > <file> && git add -A && git commit -m '...' && git push -u origin ...")`.
-- Parameters via env vars: `OMEGACLAW_GIT_TOKEN` (token; never appears in code) and `OMEGACLAW_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
+- Parameters via env vars: `OMEGA_GIT_TOKEN` (token; never appears in code) and `OMEGA_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
 - Checks: branch present on remote (GitHub API 200), file present on branch, the shell call included `git push`, credentials wiped on teardown.
 
 ## Multi-skill tests
@@ -360,7 +360,7 @@ Explicit working-memory to long-term-memory transition.
 Verifies that provider keys, channel tokens, and the auth secret are scrubbed from the agent process environment after startup. The agent runs as `nobody` under an entrypoint that rebuilds the environment from a fixed allowlist, so secrets passed into the container reach the proxy/entrypoint but never the agent process itself.
 
 - Mock answer: `(shell "env > /tmp/omega38_agentenv.txt")` — the agent dumps its own environment (only the process owner can read it).
-- Checks: `PATH` is present (positive control that the environment was captured); none of the forbidden secret variable names are present in the agent environment (`OMEGACLAW_AUTH_SECRET`, the provider API keys `ANTHROPIC_API_KEY` / `ASI_API_KEY` / `ASIONE_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `OPENAIAPI_API_KEY`, and the channel tokens `TG_BOT_TOKEN` / `SL_BOT_TOKEN` / `MM_BOT_TOKEN`). A leak fails with `leaked into agent env: [...]`. The check is by variable name, so it is independent of the secret values.
+- Checks: `PATH` is present (positive control that the environment was captured); none of the forbidden secret variable names are present in the agent environment (`OMEGA_AUTH_SECRET`, the provider API keys `ANTHROPIC_API_KEY` / `ASI_API_KEY` / `ASIONE_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `OPENAIAPI_API_KEY`, and the channel tokens `TG_BOT_TOKEN` / `SL_BOT_TOKEN` / `MM_BOT_TOKEN`). A leak fails with `leaked into agent env: [...]`. The check is by variable name, so it is independent of the secret values.
 
 ## OpenClaw plugin (`test_openclaw_delegate_mock.py`)
 
@@ -426,4 +426,4 @@ The delegation path is authenticated by Nginx rather than by the agent, checked 
 - Mock answer: `(delegate-task-to-openclaw-agent "Reply with exactly: TOKEN-<run_id>") (send "Token delegation sent <run_id>")`.
 - Checks: the stub recorded at least one request whose `Authorization` header matched the token, and no request arrived without that header. Since the agent process never holds the token, a matching header can only have come from the proxy.
 
-The other half of this property - that `OMEGACLAW_OPENCLAW_TOKEN` never reaches the agent process - belongs to `test_credentials_scrubbed_mock.py`, which reads the environment the agent dumps for itself. Do not check it with `dexec`: `docker exec` starts a new process from the container's own configuration, which does carry the token by design, so such a check fails while the scrubbing works correctly.
+The other half of this property - that `OMEGA_OPENCLAW_TOKEN` never reaches the agent process - belongs to `test_credentials_scrubbed_mock.py`, which reads the environment the agent dumps for itself. Do not check it with `dexec`: `docker exec` starts a new process from the container's own configuration, which does carry the token by design, so such a check fails while the scrubbing works correctly.

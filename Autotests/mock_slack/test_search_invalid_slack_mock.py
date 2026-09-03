@@ -32,7 +32,7 @@ NEGATION_PHRASES = [
 
 def test_search_invalid_slack_mock(llm, sl):
     with Checker("search invalid (slack mock)") as c:
-        print(f"\n=== OmegaClaw: invalid search slack mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: invalid search slack mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via Slack with mocked negation response")

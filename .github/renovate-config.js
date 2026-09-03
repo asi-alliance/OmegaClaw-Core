@@ -7,7 +7,7 @@ module.exports = {
   requireConfig: false,
   platform: "github",
   forkProcessing: "disable",
-  repositories: ["asi-alliance/OmegaClaw-Core"],
+  repositories: ["singnet/Omega"],
   extends: ["config:recommended"],
   dependencyDashboardAutoclose: true,
   prCreation: "approval",

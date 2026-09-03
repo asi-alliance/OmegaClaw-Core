@@ -6,7 +6,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LAUNCHER = REPO_ROOT / "scripts" / "omegaclaw"
+LAUNCHER = REPO_ROOT / "scripts" / "omega"
 
 
 def _run_launcher(tmp_path: Path, *component_options: str) -> subprocess.CompletedProcess:

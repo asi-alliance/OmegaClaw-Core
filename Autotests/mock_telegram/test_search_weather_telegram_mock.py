@@ -22,7 +22,7 @@ REF_TEMP_C = 18.0
 
 def test_search_weather_telegram_mock(llm, tg):
     with Checker("search weather valencia (telegram mock)") as c:
-        print(f"\n=== OmegaClaw: Valencia weather telegram mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: Valencia weather telegram mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.step("send prompt via Telegram with mocked send response")

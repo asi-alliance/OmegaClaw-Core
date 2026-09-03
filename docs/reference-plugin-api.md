@@ -1,10 +1,10 @@
 # Reference - Plugin API
 
-OmegaClaw provides a plugin API which allows writing plugins to extend the
+Omega provides a plugin API which allows writing plugins to extend the
 agent's functionality. A plugin is a MeTTa or Python module which provides the
-entry point function `loadOmegaClawPlugin`. 
+entry point function `loadOmegaPlugin`. 
 
-The `loadOmegaClawPlugin` function calls the OmegaClaw plugin API in order to 
+The `loadOmegaPlugin` function calls the Omega plugin API in order to 
 implement new agent's features. The plugin API provides functions to:
 - add communication channel integrations
 - add LLM provider integrations
@@ -14,10 +14,10 @@ implement new agent's features. The plugin API provides functions to:
 
 In order to be loaded the plugin should be included into the
 [config/plugins.yaml](/config/plugins.yaml) file. The agent loads each module
-listed in this file on start and calls `loadOmegaClawPlugin` entry function of
+listed in this file on start and calls `loadOmegaPlugin` entry function of
 each loaded module. All communication channels and LLM integrations of
-OmegaClaw are implemented using this API. The full list of plugins available in
-the OmegaClaw repository can be found in the
+Omega are implemented using this API. The full list of plugins available in
+the Omega repository can be found in the
 [config/plugins.yaml](/config/plugins.yaml) file.
 
 Plugin can be implemented as a MeTTa module, a single Python file or a Python
@@ -31,13 +31,13 @@ module. The plugin record has the following fields:
   - `location` (optional) - must be specified if plugin is a single Python file
     or MeTTa module. In such case it provides the path to the directory where
     `name` module is located. Can include `{REPO}` placeholder to designate the
-    root folder of the OmegaClaw source repository.
+    root folder of the Omega source repository.
 
 As an example of a MeTTa plugin one can look at the code of the [workflow
 plugin](/plugins/workflow/workflow.metta). As an example of a Python plugin
 one can look at the code of the [IRC communication channel](/channels/irc.py).
 
-The OmegaClaw plugin API is under construction. This is the reason why some
+The Omega plugin API is under construction. This is the reason why some
 APIs are available only as the Python modules and others only as the MeTTa
 modules. Partially it is because writing some kinds of plugins is simpler using
 Python.
@@ -50,7 +50,7 @@ There are two ways of doing this:
      file into the container using custom `docker run` command.
 
 This document doesn't describe using Docker in details it is a subject to the
-future OmegaClaw improvements.
+future Omega improvements.
 
 ## Communication channel integration
 
@@ -90,7 +90,7 @@ register the instance of the `ExampleCommChannel` in the system using
 `registerCommChannel` function.
 
 ```python
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("Example", ExampleCommChannel())
 ```
 
@@ -103,7 +103,7 @@ The communication channel identifier should be used as the value for the
 agent (see [README.md](/README.md#configuration-options)):
 
 For example one can use the following command to run the agent using `Example`
-as the communication plugin. This command requires OmegaClaw to be installed in
+as the communication plugin. This command requires Omega to be installed in
 the system first (see [README.md](/README.md#installation)):
 ```sh
 sh run.sh run.metta commchannel=Example
@@ -147,7 +147,7 @@ register the instance of the `ExampleLLMProvider` in the system using
 `registerLLMProvider` function.
 
 ```python
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     providers.registerLLMProvider("Example", ExampleLLMProvider())
 ```
 
@@ -160,7 +160,7 @@ configuration parameter to use the LLM provider with the agent (see
 [README.md](/README.md#configuration-options)):
 
 For example one can use the following command to run the agent using `Example`
-as the LLM provider plugin. This command requires OmegaClaw to be installed in
+as the LLM provider plugin. This command requires Omega to be installed in
 the system first (see [README.md](/README.md#installation)):
 ```sh
 sh run.sh run.metta provider=Example

@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw creates an empty file hello.txt.
+Test: Omega creates an empty file hello.txt.
 
 Run:
     pytest test_create_empty_file.py -s
@@ -16,7 +16,7 @@ TARGET_FILE = "/tmp/test_empty/hello.txt"
 
 def test_create_empty_file():
     with Checker("create empty file", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create empty file (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: create empty file (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

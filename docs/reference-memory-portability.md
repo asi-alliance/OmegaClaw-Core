@@ -11,8 +11,8 @@ needed and mounts it at the fixed container path `/memory-transfer`; the agent
 never accepts arbitrary runtime export paths.
 
 ```sh
-scripts/omegaclaw start -p OpenAI -t telegram \
-  --memory-transfer-dir "$HOME/omegaclaw-transfers" \
+scripts/omega start -p OpenAI -t telegram \
+  --memory-transfer-dir "$HOME/omega-transfers" \
   --enable-memory-export
 ```
 
@@ -55,8 +55,8 @@ Import is an administrative startup operation. The archive argument is a plain
 filename in the chosen transfer directory:
 
 ```sh
-scripts/omegaclaw start -d singularitynet/omegaclaw:<tag> -p OpenAI -t telegram \
-  --memory-transfer-dir "$HOME/omegaclaw-transfers" \
+scripts/omega start -d singularitynet/omega:<tag> -p OpenAI -t telegram \
+  --memory-transfer-dir "$HOME/omega-transfers" \
   --memory-import omegaclaw-memory-<timestamp>.tar.gz \
   --memory-mode overwrite
 ```

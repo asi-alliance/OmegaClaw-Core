@@ -22,7 +22,7 @@ from helpers import (
 
 def test_skill_query():
     with Checker("query skill recall") as c:
-        print(f"\n=== OmegaClaw: query skill (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: query skill (run-id {c.run_id}) ===", flush=True)
 
         secret_color = f"azure-{c.run_id}"
         c.add_cleanup_marker(secret_color)
