@@ -1,5 +1,3 @@
-![Omega banner](/docs/assets/banner.png)
-
 # Meet Oma
 
 Oma is the first Telegram agent built on the Omega framework. Interacting
@@ -95,6 +93,25 @@ docker start omega
 To reset Omega's memory:
 ```
 docker volume rm omega-memory
+```
+
+### Memory portability
+
+Memory export is disabled by default. See the [memory portability reference](./docs/reference-memory-portability.md)
+for setup, export controls, archive contents, and import modes.
+
+> **Current limitation:** Memory import does not work in a standalone Omega
+> run. Import and interrupted-import recovery are supported only through Docker
+> using `scripts/omega`, because both operations run from the container
+> entrypoint before the agent loop starts.
+
+To restore an archive while upgrading to a tagged image, use the same transfer directory:
+
+```sh
+scripts/omega start -d singularitynet/omega:<tag> -p OpenAI -t telegram \
+  --memory-transfer-dir "$HOME/omega-transfers" \
+  --memory-import omegaclaw-memory-<timestamp>.tar.gz \
+  --memory-mode overwrite
 ```
 
 ---

@@ -87,6 +87,23 @@ def test_saved_owner_blocks_auth_secret_reuse_after_restart(monkeypatch, tmp_pat
     assert owner_process.authenticate_channel_user("IRC", "owner") == "allow"
 
 
+def test_saved_owner_cannot_be_replaced_by_a_reused_secret(monkeypatch, tmp_path):
+    monkeypatch.setenv("OMEGA_AUTH_SECRET", "one-time-secret")
+
+    first_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(first_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert first_process.authenticate_channel_user(
+        "TELEGRAM", "owner", "one-time-secret"
+    ) == "auth_bound"
+
+    restarted_process = load_auth_module(monkeypatch)
+    monkeypatch.setattr(restarted_process, "_MEMORY_DIRECTORY", str(tmp_path))
+    assert restarted_process.authenticate_channel_user(
+        "TELEGRAM", "attacker", "one-time-secret"
+    ) == "ignore"
+    assert restarted_process.get_channel_authenticated_user_id("TELEGRAM") == "owner"
+
+
 def test_plain_message_does_not_verify_a_token(monkeypatch):
     auth = load_auth_module(monkeypatch)
     monkeypatch.setattr(
@@ -95,3 +112,112 @@ def test_plain_message_does_not_verify_a_token(monkeypatch):
     monkeypatch.setattr(auth, "get_channel_authenticated_user_id", lambda *args: None)
 
     assert auth.authenticate_channel_user("IRC", "alice") == "ignore"
+
+
+def test_owner_can_revoke_an_authorized_group(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    monkeypatch.setattr(auth, "get_channel_authenticated_user_id", lambda _channel: "owner")
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "group", "owner") is True
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+    assert auth.revoke_channel_group("TELEGRAM", "group", "attacker") == "ignore"
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+    assert auth.revoke_channel_group("TELEGRAM", "group", "owner") == "group_unbound"
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is False
+
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "group", "owner") is True
+    assert auth.get_channel_saved_group_id("TELEGRAM", "group") is True
+
+
+def test_group_record_requires_authorizing_owner(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    with pytest.raises(ValueError, match="authorized_by_user_id is required"):
+        auth.store_channel_authenticated_group_id("TELEGRAM", "group", "")
+
+
+def test_group_records_from_non_owner_are_not_loaded(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "forged-group", "attacker"
+    ) is True
+
+    assert auth.get_channel_saved_group_id("TELEGRAM", "forged-group") is False
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", set())
+
+
+def test_load_channel_auth_state_validates_and_loads_records(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "active", "owner") is True
+    assert auth.store_channel_authenticated_group_id("TELEGRAM", "revoked", "owner") is True
+    assert auth.revoke_channel_group("TELEGRAM", "revoked", "owner") == "group_unbound"
+
+    owner, groups = auth.load_channel_auth_state("TELEGRAM")
+
+    assert owner == "owner"
+    assert groups == {"active"}
+
+
+@pytest.mark.parametrize("damaged_record", ["not-json\n", '{"time":'])
+def test_load_channel_auth_state_skips_malformed_records(
+    monkeypatch, tmp_path, damaged_record
+):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+    warnings = []
+    monkeypatch.setattr(auth.logger, "warning", warnings.append)
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("a", encoding="utf-8") as target:
+        target.write(damaged_record)
+
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", {"active"})
+    assert any(
+        "Skipping malformed channel authenticated group record at line 2" in warning
+        for warning in warnings
+    )
+
+
+def test_load_channel_auth_state_skips_undecodable_bytes(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("ab") as target:
+        target.write(b"\xff\xfe garbage\n")
+
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", {"active"})
+
+
+def test_a_record_written_after_an_unterminated_one_is_kept(monkeypatch, tmp_path):
+    auth = load_auth_module(monkeypatch)
+    monkeypatch.setattr(auth, "_MEMORY_DIRECTORY", str(tmp_path))
+
+    assert auth.store_channel_authenticated_user_id("TELEGRAM", "owner") is True
+    assert auth.store_channel_authenticated_group_id(
+        "TELEGRAM", "active", "owner"
+    ) is True
+    path = tmp_path / ".channel" / "authenticated-group.json"
+    with path.open("a", encoding="utf-8") as target:
+        target.write('{"time":"2026-09-02T10:00:00Z","channel_ident')
+
+    assert auth.revoke_channel_group("TELEGRAM", "active", "owner") == "group_unbound"
+    assert auth.load_channel_auth_state("TELEGRAM") == ("owner", set())
