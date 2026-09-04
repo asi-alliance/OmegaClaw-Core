@@ -18,4 +18,4 @@
    True)
 
 !(test (loadPlugin (metta "test_plugin_error" "./tests/res"))
-   (Error (_loadOmegaClawPlugin) "Plugin internal error"))
+   (Error (_loadOmegaPlugin) "Plugin internal error"))

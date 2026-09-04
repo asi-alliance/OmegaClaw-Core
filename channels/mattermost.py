@@ -26,7 +26,7 @@ _outbox = PendingMessages()
 
 # ---- Mattermost config (dummy token ok) ----
 MM_URL = "https://chat.singularitynet.io"
-CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "omegaclaw"x
+CHANNEL_ID = "8fjrmabjx7gupy7e5kjznpt5qh" #NOT AN ID JUST NAME: "omega"x
 BOT_TOKEN = ""
 
 def _get_bot_user_id():
@@ -244,5 +244,5 @@ class MattermostChannel(channels.CommChannel):
     def send(self, message: str) -> None:
         send_message(message)
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("mattermost", MattermostChannel())

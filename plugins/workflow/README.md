@@ -27,22 +27,22 @@ format](https://agentskills.io/specification). For example:
 ```md
 ---
 name: test-workflow
-description: Created to check how SKILL.md is loaded to OmegaClaw.
+description: Created to check how SKILL.md is loaded to Omega.
 ---
 Next are instructions and MeTTa  functions  that should be performed step by step
-# Test Workflow (OmegaClaw)
+# Test Workflow (Omega)
 ## Step 1 - demonstrate usage of skills
 - Call test-skill with "This is a test workflow demonstration" message
 ## Step 2 - complete workflow
 - Call `(workflow-unload-instructions)`
 ```
 
-`skill.metta` (optional) contains the list of the OmegaClaw skills to load
+`skill.metta` (optional) contains the list of the Omega skills to load
 when workflow is active and additional MeTTa functions which are mentioned in
 `SKILL.md` file.
 
 Skill description are added as high-level expressions. Each such expression
-adds one skill to the OmegaClaw. First atom of the expression is `skill` symbol
+adds one skill to the Omega. First atom of the expression is `skill` symbol
 and other atoms are parameters of the `add-skill` function. See
 [skills.metta](/src/skills.metta) for details. Skill implementations are
 added as MeTTa functions.
@@ -62,7 +62,7 @@ send: `Demonstrate workflow plugin`
 
 ## Workflow parameters
 
-Wofkflow plugin OmegaClaw configuration parameters:
+Wofkflow plugin Omega configuration parameters:
 - `pluginWorkflowInstructionsDir` - path to the directory which contains
   available workflows. Default value is `<project
   root>/plugins/workflow/instructions`

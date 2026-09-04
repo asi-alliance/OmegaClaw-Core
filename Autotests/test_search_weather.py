@@ -12,7 +12,7 @@ from helpers import (
     try_with_clarification, wait_for_skill_match,
 )
 
-SEARCH_SKILLS = ("search", "tavily-search")
+SEARCH_SKILLS = ("websearch",)
 
 VALENCIA_LAT = 39.47
 VALENCIA_LON = -0.38
@@ -71,7 +71,7 @@ def test_search_weather():
         c.set_grade(grade)
         if grade == Checker.GRADE_FAIL:
             seen = {s: find_skill_calls(c.run_id, s) or [] for s in SEARCH_SKILLS}
-            c.fail("search invoked", f"no search/tavily with 'valencia'. Got: {seen}")
+            c.fail("search invoked", f"no search with 'valencia'. Got: {seen}")
         skill, arg = hit
         c.ok(f"{skill} invoked", f"arg={arg!r} (grade={grade})")
 

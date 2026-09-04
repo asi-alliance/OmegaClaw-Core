@@ -14,6 +14,7 @@ chmod 0600 "$tmp_py_file"
 cat >"$tmp_py_file" <<'PY'
 import getpass
 import json
+import os
 import secrets
 import string
 import shlex
@@ -28,7 +29,7 @@ LICENSE_TEXT = """\
 
 ** DISCLAIMER **
 
-OmegaClaw is experimental, open-source software developed by SingularityNET Foundation, a Swiss foundation, and distributed and promoted by Superintelligence Alliance Ltd., a Singapore company (collectively, the "Parties"), and is provided "AS IS" and "AS AVAILABLE," without warranty of any kind, express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement. OmegaClaw is an autonomous AI agent that is designed to independently set goals, make decisions, and take actions (including actions that the user did not specifically request or anticipate) and whose behavior is influenced by large language models provided by third parties, the outputs of which are inherently non-deterministic. Depending on its configuration and the permissions granted to it, OmegaClaw may execute operating-system shell commands, read, write, modify, or delete files, access network resources, send and receive messages through connected communication channels, and modify its own skills, memory, and operational logic at runtime. OmegaClaw may also be susceptible to prompt injection and other adversarial manipulation techniques whereby malicious content embedded in data sources consumed by the agent could influence its behavior in unintended ways. OmegaClaw supports third-party skills and extensions that have not necessarily been reviewed, audited, or endorsed by either of the Parties and that may introduce security vulnerabilities, cause data loss, or result in unintended behavior including data exfiltration. OmegaClaw relies on third-party services, including large language model providers, whose availability, accuracy, cost, and conduct are outside the control of the Parties and whose use is subject to their respective terms, conditions, and privacy policies. The user is solely responsible for configuring appropriate access controls, sandboxing, and permission boundaries, for monitoring, supervising, and constraining OmegaClaw's actions, for ensuring that no sensitive personal data is exposed to the agent without adequate safeguards, and for all actions taken by OmegaClaw on the user's systems or on the user's behalf, including communications sent and files modified. The user is strongly advised to run OmegaClaw in an isolated environment with the minimum permissions necessary for the intended use case. To the maximum extent permitted by applicable law, in no event shall the Parties, their respective board members, directors, contributors, employees, or affiliates be liable for any direct, indirect, incidental, special, consequential, or exemplary damages (including but not limited to damages for loss of data, loss of profits, business interruption, unauthorized transactions, reputational harm, or any damages arising from the autonomous actions taken by OmegaClaw) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise), even if advised of the possibility of such damages. By downloading, installing, running, or otherwise using OmegaClaw, the user acknowledges that they have read, understood, and agreed to this disclaimer in its entirety. This disclaimer supplements but does not replace the terms of the MIT License under which OmegaClaw is released.
+Omega is experimental, open-source software developed by SingularityNET Foundation, a Swiss foundation, and distributed and promoted by Superintelligence Alliance Ltd., a Singapore company (collectively, the "Parties"), and is provided "AS IS" and "AS AVAILABLE," without warranty of any kind, express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement. Omega is an autonomous AI agent that is designed to independently set goals, make decisions, and take actions (including actions that the user did not specifically request or anticipate) and whose behavior is influenced by large language models provided by third parties, the outputs of which are inherently non-deterministic. Depending on its configuration and the permissions granted to it, Omega may execute operating-system shell commands, read, write, modify, or delete files, access network resources, send and receive messages through connected communication channels, and modify its own skills, memory, and operational logic at runtime. Omega may also be susceptible to prompt injection and other adversarial manipulation techniques whereby malicious content embedded in data sources consumed by the agent could influence its behavior in unintended ways. Omega supports third-party skills and extensions that have not necessarily been reviewed, audited, or endorsed by either of the Parties and that may introduce security vulnerabilities, cause data loss, or result in unintended behavior including data exfiltration. Omega relies on third-party services, including large language model providers, whose availability, accuracy, cost, and conduct are outside the control of the Parties and whose use is subject to their respective terms, conditions, and privacy policies. The user is solely responsible for configuring appropriate access controls, sandboxing, and permission boundaries, for monitoring, supervising, and constraining Omega's actions, for ensuring that no sensitive personal data is exposed to the agent without adequate safeguards, and for all actions taken by Omega on the user's systems or on the user's behalf, including communications sent and files modified. The user is strongly advised to run Omega in an isolated environment with the minimum permissions necessary for the intended use case. To the maximum extent permitted by applicable law, in no event shall the Parties, their respective board members, directors, contributors, employees, or affiliates be liable for any direct, indirect, incidental, special, consequential, or exemplary damages (including but not limited to damages for loss of data, loss of profits, business interruption, unauthorized transactions, reputational harm, or any damages arising from the autonomous actions taken by Omega) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise), even if advised of the possibility of such damages. By downloading, installing, running, or otherwise using Omega, the user acknowledges that they have read, understood, and agreed to this disclaimer in its entirety. This disclaimer supplements but does not replace the terms of the Apache License, Version 2.0, under which Omega is released.
 
 
 """
@@ -135,7 +136,7 @@ def _choose_channel():
                 print("Telegram bot token validated.")
                 if username:
                     print(f"Talk to your bot here: https://t.me/{username}")
-                print("No Telegram chat ID is needed. OmegaClaw will auto-bind after your first auth message.")
+                print("No Telegram chat ID is needed. Omega will auto-bind after your first auth message.")
 
                 return {
                     "commchannel": "telegram",
@@ -180,7 +181,7 @@ def _choose_channel():
                     print(f"Slack channel ID: {channel_id}")
                     print("Invite the bot user to that channel before sending messages.")
                 else:
-                    print("No channel ID set. OmegaClaw will auto-bind to the first channel where auth succeeds.")
+                    print("No channel ID set. Omega will auto-bind to the first channel where auth succeeds.")
 
                 return {
                     "commchannel": "slack",
@@ -282,6 +283,42 @@ def _choose_import_kb():
         print("Please enter y or n.")
 
 
+def _choose_memory_transfer():
+    while True:
+        answer = input("Set up a directory for memory transfer archives? [y/N]: ").strip().lower()
+        if answer in ("", "n", "no"):
+            return "", "0"
+        if answer == "q":
+            sys.exit(1)
+        if answer not in ("y", "yes"):
+            print("Please enter y or n.")
+            continue
+
+        value = input("Host directory for memory archives: ").strip()
+        if not value:
+            print("A directory is required.", file=sys.stderr)
+            continue
+        path = os.path.abspath(os.path.expanduser(value))
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as exc:
+            print(f"Could not create {path}: {exc}", file=sys.stderr)
+            continue
+        if not os.access(path, os.W_OK):
+            print(f"Directory is not writable: {path}", file=sys.stderr)
+            continue
+
+        while True:
+            enable = input("Enable memory export for this instance? [y/N]: ").strip().lower()
+            if enable in ("", "n", "no"):
+                return path, "0"
+            if enable in ("y", "yes"):
+                return path, "1"
+            if enable == "q":
+                sys.exit(1)
+            print("Please enter y or n.")
+
+
 def _prompt_llm_token():
     while True:
         token = getpass.getpass("Please paste your LLM token and press ENTER or 'q' to exit: ").strip()
@@ -300,54 +337,67 @@ def _write_kv(fp, key, value):
     fp.write(f"{key}={shlex.quote(str(value))}\n")
 
 
-def config_run_omegaclaw(config_output_path):
+def config_run_omega(
+    config_output_path,
+    configured_memory_transfer_dir="",
+    configured_memory_export_enabled="0",
+):
     print(" ")
-    print("Welcome to OmegaClaw!")
+    print("Welcome to Omega!")
     print(" ")
     require_license_acceptance()
 
     channel_config = _choose_channel()
     provider, embeddingprovider, api_token_var, model, openaiapi_url, token = _choose_provider()
     import_kb_on_start = _choose_import_kb()
+    if configured_memory_transfer_dir:
+        memory_transfer_dir = configured_memory_transfer_dir
+        memory_export_enabled = configured_memory_export_enabled
+        print(f"Using memory transfer directory: {memory_transfer_dir}")
+    else:
+        memory_transfer_dir, memory_export_enabled = _choose_memory_transfer()
 
     with open(config_output_path, "w", encoding="utf-8") as f:
         _write_kv(f, "api_token_var", api_token_var)
         _write_kv(f, "api_token", token)
-        _write_kv(f, "OMEGACLAW_AUTH_SECRET", "".join(secrets.choice(string.digits) for _ in range(6)))
+        _write_kv(f, "OMEGA_AUTH_SECRET", "".join(secrets.choice(string.digits) for _ in range(6)))
         _write_kv(f, "provider", provider)
         _write_kv(f, "embeddingprovider", embeddingprovider)
         _write_kv(f, "model", model)
         _write_kv(f, "openaiapi_url", openaiapi_url)
         _write_kv(f, "IMPORT_KB_ON_START", import_kb_on_start)
+        _write_kv(f, "memory_transfer_dir", memory_transfer_dir)
+        _write_kv(f, "memory_export_enabled", memory_export_enabled)
         for key, value in channel_config.items():
             _write_kv(f, key, value)
 
 
 if __name__ == "__main__":
-    config_run_omegaclaw(sys.argv[1])
+    config_run_omega(*sys.argv[1:4])
 PY
 
-python3 "$tmp_py_file" "$tmp_config_file" </dev/tty
+python3 "$tmp_py_file" "$tmp_config_file" \
+    "${memory_transfer_dir:-}" "${memory_export_enabled:-0}" </dev/tty
 
 . "$tmp_config_file"
 
 cat <<EOF
 
 ============================================
- HOW TO START AND STOP OMEGACLAW
+ HOW TO START AND STOP OMEGA
 ============================================
 
-Stop OmegaClaw:
-  docker stop omegaclaw
+Stop Omega:
+  docker stop omega
 
-Restart OmegaClaw:
-  docker start omegaclaw
+Restart Omega:
+  docker start omega
 
 To switch to a different channel or token:
   Rerun this script
 
 Examine log file in case of problem:
-  docker logs -f omegaclaw
+  docker logs -f omega
 
 EOF
 
@@ -369,13 +419,13 @@ elif [ "${commchannel}" = "irc" ]; then
 cat <<EOF
 
 Auth secret (required once on first message in supported channels):
-  $OMEGACLAW_AUTH_SECRET
+  $OMEGA_AUTH_SECRET
 
 EOF
 cat <<EOF
 
 ============================================
- HOW TO INTERACT WITH OMEGACLAW IRC
+ HOW TO INTERACT WITH OMEGA IRC
 ============================================
 
 Please go to https://webchat.quakenet.org/ or any IRC client.
@@ -384,7 +434,7 @@ Then, enter a unique username and this channel:
 
 Authentication step (required):
   Once in the $IRC_channel channel, send this one-time secret exactly once:
-  auth ${OMEGACLAW_AUTH_SECRET}
+  auth ${OMEGA_AUTH_SECRET}
   The first nickname that sends it becomes the only accepted user.
   Messages from all other users will be silently ignored.
 
@@ -393,17 +443,17 @@ elif [ "${commchannel}" = "telegram" ]; then
 cat <<EOF
 
 Auth secret (required once on first message in supported channels):
-  $OMEGACLAW_AUTH_SECRET
+  $OMEGA_AUTH_SECRET
 
 EOF
 cat <<EOF
 
 ============================================
- HOW TO INTERACT WITH OMEGACLAW TELEGRAM
+ HOW TO INTERACT WITH OMEGA TELEGRAM
 ============================================
 
 Open Telegram and send this auth message to your bot:
-  auth $OMEGACLAW_AUTH_SECRET
+  auth $OMEGA_AUTH_SECRET
 
 EOF
 
@@ -416,14 +466,14 @@ EOF
 fi
 
 cat <<EOF
-No chat ID is required. OmegaClaw binds to your chat automatically after successful auth.
+No chat ID is required. Omega binds to your chat automatically after successful auth.
 
 EOF
 elif [ "${commchannel}" = "slack" ]; then
 cat <<EOF
 
 ============================================
- HOW TO INTERACT WITH OMEGACLAW SLACK
+ HOW TO INTERACT WITH OMEGA SLACK
 ============================================
 
 EOF
@@ -434,13 +484,13 @@ Invite your Slack bot user to channel:
   ${SL_CHANNEL_NAME:-$SL_CHANNEL_ID}
 
 Then send this auth message in that channel:
-  auth $OMEGACLAW_AUTH_SECRET
+  auth $OMEGA_AUTH_SECRET
 
 EOF
 else
 cat <<EOF
 Invite your Slack bot user to at least one channel, then send:
-  auth $OMEGACLAW_AUTH_SECRET
+  auth $OMEGA_AUTH_SECRET
 
 The first channel where auth succeeds will be bound automatically.
 
@@ -468,7 +518,7 @@ version() {
     repo_root="$(cd -- "${script_dir}/.." && pwd)"
     (
         cd -- "$repo_root"
-        python3 -c 'from src.helper import omegaclaw_version; print(omegaclaw_version())'
+        python3 -c 'from src.helper import omega_version; print(omega_version())'
     )
 }
 
@@ -490,21 +540,36 @@ help() {
     echo -e "\t-m <model> set LLM model to use with provider (default depends on provider)."
     echo -e "\t-u <LLM API url> set LLM API URL for the OpenAIAPI provider"
     echo -e "\t-g <OpenClaw Gateway url> enable the openclaw plugin against this Gateway"
-    echo -e "\t              Pass the Gateway token via OMEGACLAW_OPENCLAW_TOKEN"
+    echo -e "\t              Pass the Gateway token via OMEGA_OPENCLAW_TOKEN"
     echo -e "\t-c <IRC channel> set IRC channel"
     echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket|mattermost|test"
-    echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
+    echo -e "\t-d <Docker image> set Docker image name (default omega:latest)"
     echo -e "\t-l <logging config> set Python logging config file"
-    echo -e "\t--version, -v show the OmegaClaw version"
+    echo -e "\t--version, -v show the Omega version"
     echo -e "\t--help, -h show this help"
+    echo
+    echo -e "Memory portability options:"
+    echo -e "\t--memory-transfer-dir <absolute-path> mount host directory for memory export/import archives"
+    echo -e "\t--enable-memory-export enable memory export"
+    echo -e "\t--memory-import <filename> restore archive from transfer directory before startup"
+    echo -e "\t--memory-mode overwrite|append import mode (default: overwrite)"
+    echo -e "\t--only-history restore history only"
+    echo -e "\t--only-vector restore long-term memory only"
+}
+
+require_option_value() {
+    if [[ "$#" -lt 2 || -z "${2}" ]]; then
+        echo "${1} requires a value" >&2
+        return 1
+    fi
 }
 
 options() {
-    OMEGACLAW_AUTH_SECRET=0000
+    OMEGA_AUTH_SECRET=0000
     provider=ASICloud
-    image=singularitynet/omegaclaw:latest
+    image=singularitynet/omega:latest
     commchannel=irc
-    IRC_channel="${IRC_channel:-##omegaclaw}"
+    IRC_channel="${IRC_channel:-##omega}"
     TG_BOT_TOKEN="${TG_BOT_TOKEN:-}"
     TG_POLL_TIMEOUT="${TG_POLL_TIMEOUT:-20}"
     SL_BOT_TOKEN="${SL_BOT_TOKEN:-}"
@@ -512,9 +577,15 @@ options() {
     SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
     WS_URL="${WS_URL:-}"
     WS_TOKEN="${WS_TOKEN:-}"
-    OMEGACLAW_OPENCLAW_TOKEN="${OMEGACLAW_OPENCLAW_TOKEN:-}"
+    OMEGA_OPENCLAW_TOKEN="${OMEGA_OPENCLAW_TOKEN:-}"
     commchannel=irc
     log_config_path=""
+    memory_transfer_dir=""
+    memory_import_file=""
+    memory_import_mode="overwrite"
+    memory_import_only_history=0
+    memory_import_only_vector=0
+    memory_export_enabled=0
 
     if [[ "$#" -eq 0 ]]; then
         help
@@ -524,18 +595,57 @@ options() {
     command=${1}
     shift 1
 
-    while getopts s:t:p:u:g:c:d:l:m: flag
-    do
-        case "${flag}" in
-            s) OMEGACLAW_AUTH_SECRET=${OPTARG};;
-            t) commchannel=${OPTARG};;
-            p) provider=${OPTARG};;
-            u) openaiapi_url=${OPTARG};;
-            g) openclaw_url=${OPTARG};;
-            c) IRC_channel=${OPTARG};;
-            d) image=${OPTARG};;
-            l) log_config_path=${OPTARG};;
-            m) model=${OPTARG};;
+    while [[ "$#" -gt 0 ]]; do
+        case "${1}" in
+            -s?*) OMEGA_AUTH_SECRET=${1:2}; shift; continue;;
+            -t?*) commchannel=${1:2}; shift; continue;;
+            -p?*) provider=${1:2}; shift; continue;;
+            -u?*) openaiapi_url=${1:2}; shift; continue;;
+            -g?*) openclaw_url=${1:2}; shift; continue;;
+            -c?*) IRC_channel=${1:2}; shift; continue;;
+            -d?*) image=${1:2}; shift; continue;;
+            -l?*) log_config_path=${1:2}; shift; continue;;
+            -m?*) model=${1:2}; shift; continue;;
+            -s|-t|-p|-u|-g|-c|-d|-l|-m|--memory-transfer-dir|--memory-import|--memory-mode)
+                require_option_value "${1}" "${2:-}" || return 1
+                ;;
+        esac
+        case "${1}" in
+            -s) OMEGA_AUTH_SECRET=${2}; shift 2;;
+            -t) commchannel=${2}; shift 2;;
+            -p) provider=${2}; shift 2;;
+            -u) openaiapi_url=${2}; shift 2;;
+            -g) openclaw_url=${2}; shift 2;;
+            -c) IRC_channel=${2}; shift 2;;
+            -d) image=${2}; shift 2;;
+            -l) log_config_path=${2}; shift 2;;
+            -m) model=${2}; shift 2;;
+            --memory-transfer-dir)
+                memory_transfer_dir="${2}"
+                shift 2
+                ;;
+            --enable-memory-export)
+                memory_export_enabled=1
+                shift
+                ;;
+            --memory-import)
+                memory_import_file="${2}"
+                shift 2
+                ;;
+            --memory-mode)
+                memory_import_mode="${2}"
+                shift 2
+                ;;
+            --only-history)
+                memory_import_only_history=1
+                shift
+                ;;
+            --only-vector)
+                memory_import_only_vector=1
+                shift
+                ;;
+            --version|-v) version; return 0;;
+            --help|-h) help; return 0;;
             *) help
                return 1
                ;;
@@ -583,14 +693,67 @@ options() {
             return 1
         fi
     fi
+
+    if [[ -n "${memory_transfer_dir}" ]]; then
+        if [[ "${memory_transfer_dir}" != /* ]]; then
+            echo "--memory-transfer-dir must be an absolute path: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+        if ! mkdir -p "${memory_transfer_dir}"; then
+            echo "Could not create --memory-transfer-dir: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+        if [[ ! -w "${memory_transfer_dir}" ]]; then
+            echo "--memory-transfer-dir is not writable: ${memory_transfer_dir}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ -n "${memory_import_file}" ]]; then
+        if [[ ! "${memory_import_file}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.gz$ ]]; then
+            echo "--memory-import must be a plain filename, not a path: ${memory_import_file}" >&2
+            return 1
+        fi
+        if [[ -z "${memory_transfer_dir}" ]]; then
+            echo "--memory-import requires --memory-transfer-dir to be set" >&2
+            return 1
+        fi
+        if [[ ! -f "${memory_transfer_dir}/${memory_import_file}" ]]; then
+            echo "--memory-import archive not found: ${memory_transfer_dir}/${memory_import_file}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${memory_export_enabled}" == "1" && -z "${memory_transfer_dir}" ]]; then
+        echo "--enable-memory-export requires --memory-transfer-dir" >&2
+        return 1
+    fi
+
+    if [[ "${memory_import_only_history}" == "1" && "${memory_import_only_vector}" == "1" ]]; then
+        echo "--only-history and --only-vector cannot be combined" >&2
+        return 1
+    fi
+    if [[ -z "${memory_import_file}" &&
+          ( "${memory_import_only_history}" == "1" ||
+            "${memory_import_only_vector}" == "1" ) ]]; then
+        echo "Import component flags require --memory-import" >&2
+        return 1
+    fi
+
+    if [[ "${memory_import_mode}" != "overwrite" && "${memory_import_mode}" != "append" ]]; then
+        echo "--memory-mode must be overwrite or append" >&2
+        return 1
+    fi
 }
 
 start() {
-    docker rm -f omegaclaw 2>/dev/null || true
     docker pull "${image}" 2>/dev/null || true
 
     container_log_config_path=""
     log_config_volume=()
+    memory_transfer_volume=()
+    memory_import_env=()
+    memory_export_option=()
 
     if [ -n "${log_config_path}" ]; then
         if [ ! -f "${log_config_path}" ]; then
@@ -599,33 +762,64 @@ start() {
         fi
 
         log_config_abs="$(cd -- "$(dirname -- "${log_config_path}")" && pwd)/$(basename -- "${log_config_path}")"
-        container_log_config_path="/tmp/omegaclaw-logging.conf"
+        container_log_config_path="/tmp/omega-logging.conf"
         log_config_volume=(--volume "${log_config_abs}:${container_log_config_path}:ro")
     fi
 
+    if [ -n "${memory_transfer_dir}" ]; then
+        memory_transfer_volume=(--volume "${memory_transfer_dir}:/memory-transfer")
+        if ! docker run --rm --user 65534:65534 --entrypoint /bin/sh \
+            --volume "${memory_transfer_dir}:/memory-transfer" "${image}" \
+            -c 'test -d /memory-transfer && test -w /memory-transfer'; then
+            echo "--memory-transfer-dir must be writable by container user 65534:65534" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${memory_export_enabled}" == "1" ]]; then
+        memory_export_option=("memoryExportEnabled=true")
+    fi
+
+    if [ -n "${memory_import_file}" ]; then
+        memory_import_env=(
+            -e "MEMORY_IMPORT_FILE=${memory_import_file}"
+            -e "MEMORY_IMPORT_MODE=${memory_import_mode}"
+        )
+        if [[ "${memory_import_only_history}" == "1" ]]; then
+            memory_import_env+=(-e MEMORY_IMPORT_NO_VECTOR=1)
+        fi
+        if [[ "${memory_import_only_vector}" == "1" ]]; then
+            memory_import_env+=(-e MEMORY_IMPORT_NO_HISTORY=1)
+        fi
+    fi
+
+    docker rm -f omega 2>/dev/null || true
+
     docker_cmd=(
         docker run -d -it
-            --name omegaclaw
+            --name omega
             --security-opt no-new-privileges:true
             --init
             --add-host=host.docker.internal:host-gateway
             --tmpfs /tmp:size=64m,mode=1777
             --tmpfs /var/tmp:size=64m,mode=1777
             --tmpfs /run:size=16m,mode=755
-            --volume omegaclaw-memory:/PeTTa/repos/OmegaClaw-Core/memory
+            --volume omega-memory:/PeTTa/repos/Omega/memory
             ${log_config_volume[@]+"${log_config_volume[@]}"}
+            ${memory_transfer_volume[@]+"${memory_transfer_volume[@]}"}
             -e "${api_token_var}"="${api_token}"
             -e "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}"
             -e "SL_BOT_TOKEN=${SL_BOT_TOKEN:-}"
-            -e "OMEGACLAW_OPENCLAW_TOKEN=${OMEGACLAW_OPENCLAW_TOKEN:-}"
-            -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET"
+            -e "OMEGA_OPENCLAW_TOKEN=${OMEGA_OPENCLAW_TOKEN:-}"
+            -e OMEGA_AUTH_SECRET="$OMEGA_AUTH_SECRET"
             -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-0}"
+            ${memory_import_env[@]+"${memory_import_env[@]}"}
             "$image"
             "commchannel=${commchannel}"
             "provider=${provider}"
             "embeddingprovider=${embeddingprovider}"
-            "securityPolicyPath=/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
-            "memoryDirectory=\$MEMORY_DIR"
+            "securityPolicyPath=/PeTTa/repos/Omega/profile/policy.yaml"
+            ${memory_export_option[@]+"${memory_export_option[@]}"}
     )
 
     if [ -n "${container_log_config_path}" ]; then
@@ -667,12 +861,12 @@ start() {
 }
 
 stop() {
-    docker stop omegaclaw
+    docker stop omega
 }
 
 clean() {
-    docker rm -f omegaclaw
-    docker volume rm omegaclaw-memory
+    docker rm -f omega
+    docker volume rm omega-memory
 }
 
 set -euo pipefail

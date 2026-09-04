@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw invokes (search ...) for gibberish and reports no results.
+Test: Omega invokes (search ...) for gibberish and reports no results.
 
 Run:
     pytest test_search_invalid.py -s
@@ -10,12 +10,12 @@ from helpers import (
 )
 
 GIBBERISH = "dfghjkgkfjghj"
-SEARCH_SKILLS = ("search", "tavily-search")
+SEARCH_SKILLS = ("websearch",)
 
 
 def test_search_invalid():
     with Checker("search invalid") as c:
-        print(f"\n=== OmegaClaw: invalid search (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: invalid search (run-id {c.run_id}) ===", flush=True)
 
         c.step("send prompt via IRC")
         prompt = make_prompt(
@@ -27,13 +27,13 @@ def test_search_invalid():
             c.fail("irc", "could not deliver prompt within 60s")
         c.ok("irc", f"run-id={c.run_id}")
 
-        c.step(f"verify agent invoked search/tavily-search with '{GIBBERISH}'")
+        c.step(f"verify agent invoked search with '{GIBBERISH}'")
         skill, arg = wait_for_any_skill_call(
             c.run_id, SEARCH_SKILLS, timeout=60, arg_substr=GIBBERISH,
         )
         if arg is None:
             seen = {s: find_skill_calls(c.run_id, s) or [] for s in SEARCH_SKILLS}
-            c.fail("search invoked", f"no search/tavily with gibberish arg. Got: {seen}")
+            c.fail("search invoked", f"no search with gibberish arg. Got: {seen}")
         c.ok(f"{skill} invoked", f"arg={arg!r}")
 
         c.step("verify (send ...) message indicates no results / unknown term")

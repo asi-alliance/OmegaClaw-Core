@@ -38,6 +38,9 @@ _outbox = PendingMessages()
 
 _SL_URL = "https://slack.com"
 
+SL_MAX_FILE_SIZE_MB = int(config_get_by_key("SL_MAX_FILE_SIZE_MB", 5))
+SL_MAX_FILE_SIZE_BYTES = SL_MAX_FILE_SIZE_MB * 1024 * 1024
+
 class _SlackRateLimitError(Exception):
     def __init__(self, retry_after):
         super().__init__(f"Slack rate limited (retry after {retry_after}s)")
@@ -57,7 +60,44 @@ def _slack_unwrap(text):
     text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
     return text
 
-
+def _download_file(url, timeout=30):
+    global _bot_token
+    # Only use genuine Slack file URLs.
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme == "https" and parsed.netloc in {"files.slack.com", "slack-files.com"}:
+        pass
+    else:
+        logger.warning(f"Refusing unexpected Slack file URL: {url}")
+        return None
+    proxy = auth.get_proxy_url()
+    if proxy:
+        # Route private Slack file downloads through the local nginx credential proxy.
+        # Preserve the original Slack path while switching to the local proxy endpoint.
+        download_url = f"{proxy}/slack-files{parsed.path}"
+        if parsed.query:
+            download_url += f"?{parsed.query}"
+        logger.info(f"Downloading Slack attachment using proxy: {download_url}")
+        req = urllib.request.Request(download_url, method="GET")
+    else:
+        # Direct mode requires the real Slack bot token.
+        if not _bot_token:
+            logger.warning("Slack bot token is not available")
+            return None
+        logger.info(f"Downloading Slack attachment directly: {url}")
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {_bot_token}"}, method="GET")
+    # Fetch the attachment and reject login/error HTML returned in place of file data.
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        content_type = response.headers.get("Content-Type", "").lower()
+        if "text/html" in content_type:
+            logger.warning(f"Slack file download returned HTML instead of file data: {url}")
+            return None
+        try:
+            attach = response.read()
+        except:
+            logger.exception(f"Slack file download failed: {url}")
+            attach = None
+        return attach
+        
 def _set_last(msg):
     global _last_message
     with _msg_lock:
@@ -339,18 +379,25 @@ def _poll_channel(channel_id):
 
     ordered = sorted(messages, key=lambda m: float(m.get("ts", 0.0)))
     max_ts = oldest
+
+    # Process each received message including attachments while minding user authentication rules
     for message in ordered:
         ts = str(message.get("ts", "")).strip()
         if ts:
             max_ts = ts
 
         # Ignore bot/system messages and process regular user text.
-        if message.get("subtype"):
+        if message.get("subtype") and message.get("subtype") != "file_share":
             continue
-
+        # retrieve text for this message
         text = _slack_unwrap(str(message.get("text", "")).strip())
+        # retrieve attachment information for this message (just the info, not the attachment data!)
+        files = message.get("files") or []
+
         user_id = str(message.get("user", "")).strip()
-        if not text or not user_id:
+        if not user_id:
+            continue
+        if (not text or not text.strip()) and not files:
             continue
 
         with _state_lock:
@@ -361,7 +408,41 @@ def _poll_channel(channel_id):
         state = _is_allowed_message(channel_id, user_id, text)
         display_name = _get_display_name(user_id)
         if state == "allow":
-            _set_last(f"{display_name}: {text}")
+            # after user validated, read attachments
+            if files:
+                file_info = []
+                for f in files:
+                    name = f.get("name", "unknown")
+                    url = f.get("url_private_download") or f.get("url_private", "")
+                    mime = f.get("mimetype", "")
+                    size = f.get("size", 0)
+                    file_info.append(f"[ATTACHMENT: {name} | {mime} | {size} bytes | {url}]")
+                    # Download content to /tmp for agent access, check file size first -- must be below maximum.
+                    if url:
+                        if size <= SL_MAX_FILE_SIZE_BYTES:
+                            file_data = _download_file(url, timeout=30)
+                            if file_data:
+                                safe_name = name.replace("/", "_")
+                                tmp_path = f"/tmp/slack_attachment_{safe_name}"
+                                try:
+                                    with open(tmp_path, "wb") as fh:
+                                        fh.write(file_data)
+                                    file_info.append(f"[SAVED: {tmp_path}]")
+                                except Exception as exc:
+                                    logger.exception(f"Failed to save Slack attachment: {exc}")
+                                    file_info.append(f"[ATTACHMENT DOWNLOAD FAILED: {name} {exc}]")
+                            else:
+                                file_info.append(f"[ATTACHMENT DOWNLOAD FAILED, NO DATA: {name}]")
+                        else:
+                            file_info.append(f"[ATTACHMENT DOWNLOAD SIZE TOO LARGE, FAILED: {name} Size: {size}]")
+                    else:
+                        file_info.append(f"[ATTACHMENT DOWNLOAD BAD URL, FAILED: {name} url: {url}]")
+                if text:
+                    text = text + "\n" + "\n".join(file_info)
+                else:
+                    text = "\n".join(file_info)
+
+            _set_last(f"<@{user_id}> ({display_name}): {text}")
         elif state == "auth_bound":
             send_message(f"Authentication successful for {display_name}.")
 
@@ -524,5 +605,5 @@ class SlackChannel(channels.CommChannel):
     def send(self, message: str) -> None:
         send_message(message)
 
-def loadOmegaClawPlugin():
+def loadOmegaPlugin():
     channels.registerCommChannel("slack", SlackChannel())

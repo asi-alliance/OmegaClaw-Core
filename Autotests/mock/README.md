@@ -1,8 +1,8 @@
 # Mock autotests — setup and run
 
-This section describes how to bring up a local OmegaClaw container running with the deterministic LLM mock and run the `test_*_mock.py` suite against it.
+This section describes how to bring up a local Omega container running with the deterministic LLM mock and run the `test_*_mock.py` suite against it.
 
-For the live-provider counterpart (real LLM, grading scheme, parameters table) see `Autotests/README_live.pdf`.
+For the live-provider counterpart (real LLM, grading scheme, parameters table) see `Autotests/README_live.md`.
 
 ## 1. Prerequisites
 
@@ -15,32 +15,32 @@ For the live-provider counterpart (real LLM, grading scheme, parameters table) s
 The mock infrastructure is part of the source tree, so the image must be built locally rather than pulled from the registry.
 
 ```
-docker build -t omegaclaw:mock .
+docker build -t omega:mock .
 ```
 
 ## 3. Start the container with the Test provider
 
-Use the `scripts/omegaclaw` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
+Use the `scripts/omega` wrapper. It takes care of `--init`, `--user`, the `--tmpfs` mounts, `--security-opt no-new-privileges`, the persistent memory volume, and the `commchannel`/`provider`/`embeddingprovider` arguments, so the test setup stays in sync with how the agent is started in production and in CI.
 
 The container connects back to the host on TCP port 9765 to reach the mock LLM controller and on TCP port 9766 to reach the test communication channel server. `TEST_SERVER_IP` must hold the host IP that is reachable from inside the container; under the default Docker bridge this is `172.17.0.1`.
 
 ```
-env TEST_SERVER_IP=172.17.0.1 ./scripts/omegaclaw start -s 0000 -p Test -t test -d omegaclaw:mock
+env TEST_SERVER_IP=172.17.0.1 ./scripts/omega start -s 0000 -p Test -t test -d omega:mock
 ```
 
 Notes:
 
 - `-t test` selects the in-process test communication channel; messages travel over a TCP RPC between the container and the host fixture, not over IRC, Telegram, or Slack.
 - `-p Test` selects the mock LLM dispatcher.
-- `-s 0000` sets `OMEGACLAW_AUTH_SECRET` inside the container.
-- `-d omegaclaw:mock` points at the local image built in step 2.
+- `-s 0000` sets `OMEGA_AUTH_SECRET` inside the container.
+- `-d omega:mock` points at the local image built in step 2.
 - `TEST_SERVER_IP=172.17.0.1` is the host's docker-bridge address used by both the mock LLM provider and the test channel client.
-- The container is created with the name `omegaclaw` (the script default).
+- The container is created with the name `omega` (the script default).
 
 Wait until the agent loop is up. The first runtime `CHARS_SENT:` line (with a byte count after the colon) in the container log marks the end of `initChannels` / `initMemory` and the start of real iterations; the bare `CHARS_SENT:` string also appears earlier as part of the MeTTa source dump, so match on the numeric form to avoid a premature exit:
 
 ```
-until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
+until docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; done
 ```
 
 ## 4. Configure the test environment
@@ -48,14 +48,14 @@ until docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; do sleep 2; do
 Export the variables the test harness reads.
 
 ```
-export OMEGACLAW_CONTAINER=omegaclaw
-export OMEGACLAW_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_mock
+export OMEGA_CONTAINER=omega
+export OMEGA_GIT_TOKEN=<github_pat>     # only required by test_git_push_to_remote_mock
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `OMEGACLAW_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name created in step 3 (`omegaclaw` when using the script). |
-| `OMEGACLAW_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_mock`. The test is skipped if this variable is unset. |
+| `OMEGA_CONTAINER` | Yes | Container name passed to `docker exec` from the harness. Must equal the container name created in step 3 (`omega` when using the script). |
+| `OMEGA_GIT_TOKEN` | No | GitHub PAT used by `test_git_push_to_remote_mock`. The test is skipped if this variable is unset. |
 
 ## 5. Run the suite
 
@@ -65,7 +65,7 @@ source venv/bin/activate
 pytest -s -v mock/test_*_mock.py
 ```
 
-The `LlmMockController`, `CommMockServer`, and the OpenClaw Gateway stub are provided by session-scoped fixtures in `mock/conftest.py`, so all three are started once per pytest session. Expected output: `42 passed`, minus the ones whose optional variables are unset - `test_git_push_to_remote_mock` skips without `OMEGACLAW_GIT_TOKEN`, and the six OpenClaw tests skip without `OMEGACLAW_OPENCLAW_TOKEN` (see "OpenClaw plugin" below).
+The `LlmMockController`, `CommMockServer`, and the OpenClaw Gateway stub are provided by session-scoped fixtures in `mock/conftest.py`, so all three are started once per pytest session. Expected output: `42 passed`, minus the ones whose optional variables are unset - `test_git_push_to_remote_mock` skips without `OMEGA_GIT_TOKEN`, and the six OpenClaw tests skip without `OMEGA_OPENCLAW_TOKEN` (see "OpenClaw plugin" below).
 
 ## 5a. OpenClaw plugin (`test_openclaw_delegate_mock.py`)
 
@@ -88,23 +88,23 @@ Two things must still be true of the container, because the plugin is configured
 1. **Start it with `-g`**, which points Nginx's `/openclaw/` proxy at the stub and sets `openClawEnabled`/`openClawURL` - no `config/config.yaml` edit needed:
 
    ```bash
-   env TEST_SERVER_IP=172.17.0.1 OMEGACLAW_OPENCLAW_TOKEN=<token> \
-     ./scripts/omegaclaw start -s 0000 -p Test -t test -d omegaclaw:mock -g "http://172.17.0.1:18789"
+   env TEST_SERVER_IP=172.17.0.1 OMEGA_OPENCLAW_TOKEN=<token> \
+     ./scripts/omega start -s 0000 -p Test -t test -d omega:mock -g "http://172.17.0.1:18789"
    ```
 
    Use the address the container reaches the host on: `172.17.0.1` under the default Docker bridge, `host.docker.internal` in CI. Starting the container by hand instead of through the script? Pass `openclaw_url=<gateway URL>` as a container argument, same as `openaiapi_url=` (see `entrypoint.sh`).
 
-2. **Export `OMEGACLAW_OPENCLAW_TOKEN`.** The stub accepts exactly this value, so the tests fail if Nginx does not inject it. Nginx reads it before the agent's environment is scrubbed, which is also what gives `test_credentials_scrubbed_mock.py` a real token to catch a leak of - with the variable unset, that assertion passes without proving anything.
+2. **Export `OMEGA_OPENCLAW_TOKEN`.** The stub accepts exactly this value, so the tests fail if Nginx does not inject it. Nginx reads it before the agent's environment is scrubbed, which is also what gives `test_credentials_scrubbed_mock.py` a real token to catch a leak of - with the variable unset, that assertion passes without proving anything.
 
 If the token is unset the suite skips, since the plugin cannot be exercised at all. If the token is set but the container was started without `-g`, the fixture fails instead of skipping: a token with a disabled plugin means the run would look green while testing nothing.
 
 ## 6. Tear down
 
 ```
-./scripts/omegaclaw clean
+./scripts/omega clean
 ```
 
-This removes the `omegaclaw` container and the `omegaclaw-memory` volume created by the script in step 3.
+This removes the `omega` container and the `omega-memory` volume created by the script in step 3.
 
 # Tests description
 
@@ -202,30 +202,16 @@ Asks about a gibberish string.
 - Mock answer: `(send "No results found for <gibberish>. The string appears to be gibberish, no meaningful matches.")`.
 - Checks: the reply contains a negation phrase (`no results`, `not found`, `gibberish`, `nonsense`, `no meaning`, `unknown`, ...).
 
-### 13. test_tavily_search_mock.py
-
-Live variant exercises the external Tavily uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the answer directly via `(send ...)` and the assertion narrows to "did the agent surface a real Fetch.ai-specific reply".
-
-- Mock answer: `(send "Fetch.ai (FET) is a decentralized AI blockchain platform powering autonomous economic agents (uAgents). Recent news covers the ASI Alliance roadmap, FET token activity, and integration work with SingularityNET and CUDOS.")`. The `tavily-search` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body contains at least one strict Fetch keyword (`fetch.ai`, `fetch ai`, `fet `, `asi alliance`, `humayun`, `uagent`, `decentralized`, `blockchain`, `token`) AND none of the delivery-error markers (`delivery failed`, `tavily-search failed`, `currently unavailable`, ...).
-
-### 14. test_technical_analysis_mock.py
-
-Live variant exercises the external technical-analysis uAgent. The mock variant cannot reach it deterministically, so the mocked response delivers the TA summary directly via `(send ...)` and the assertion narrows to "did the agent surface TA-style content for the requested ticker".
-
-- Mock answer: `(send "AAPL (Apple) is showing bullish momentum: RSI is rising, MACD crossed above its signal line, and the 50-day SMA is above the 200-day. Composite indicators point to a buy signal with strong trend strength.")`. The `technical-analysis` skill itself is **not** invoked under the mock.
-- Checks: a `(send ...)` exists whose body mentions the ticker (`aapl` or `apple`) AND at least one TA indicator (`rsi`, `macd`, `sma`, `bullish`, `bearish`, `buy signal`, `trend`, `momentum`, ...) AND none of the delivery-error markers.
-
 ## Memory
 
-### 15. test_memory_chromadb_mock.py
+### 13. test_memory_chromadb_mock.py
 
 Requests the agent to remember a fact tagged with marker `CI-SMOKE-<run_id>`.
 
 - Mock answer: `(remember "Unique smoke marker CI-SMOKE-<run_id> was emitted by CI.")`.
 - Checks: `(remember ...)` was invoked with the marker; vector count in the `embeddings` table of `chroma.sqlite3` grew by ≥ 1.
 
-### 16. test_memory_history_mock.py
+### 14. test_memory_history_mock.py
 
 Sends "Acknowledge with one short line that you received marker `<run_id>`." and verifies the entry in `history.metta`.
 
@@ -234,14 +220,14 @@ Sends "Acknowledge with one short line that you received marker `<run_id>`." and
 
 ## Skills
 
-### 17. test_skill_metta_mock.py
+### 15. test_skill_metta_mock.py
 
 Asks the agent to evaluate a short MeTTa expression and report the result.
 
 - Mock answer: `(metta "(+ 2 2)") (send "The metta skill evaluated (+ 2 2) and returned 4.")`.
 - Checks: `(metta ...)` was invoked; the agent then issued a `(send ...)`. Semantic correctness of the MeTTa expression is not checked; the goal is to exercise the skill.
 
-### 18. test_skill_pin_mock.py
+### 16. test_skill_pin_mock.py
 
 Gives a multi-step task ("restarting servers alpha → beta → gamma, just finished alpha") and expects the agent to track progress with `pin`.
 
@@ -250,38 +236,38 @@ Gives a multi-step task ("restarting servers alpha → beta → gamma, just fini
 
 ## Working with git
 
-### 19. test_git_pull_public_mock.py
+### 17. test_git_pull_public_mock.py
 
 Agent clones a public repository over anonymous HTTPS, no token.
 
 - Mock answer: `(shell "rm -rf {TARGET_DIR} && git clone {remote} {TARGET_DIR}")`.
 - Checks: `.git/` appears, HEAD points to a real commit, ≥ 1 tracked file in HEAD, origin matches the expected remote URL (normalized, trailing `/` and `.git` ignored).
 
-### 20. test_git_local_commit_mock.py
+### 18. test_git_local_commit_mock.py
 
 Agent runs `git init`, `git add`, `git commit` locally inside the container.
 
 - Mock answer: chain of `(shell "git -C {TARGET_DIR} init") (shell "...write file...") (shell "git -C {TARGET_DIR} add -A") (shell "git -C {TARGET_DIR} commit -m 'add hello <run_id>'")`.
 - Checks: HEAD has at least one commit, commit subject contains the `run_id` (warning, not failure), the file is present in the tree.
 
-### 21. test_git_push_to_remote_mock.py
+### 19. test_git_push_to_remote_mock.py
 
 Agent clones a remote, creates branch `qa/run-<id>`, adds a file, commits, and pushes.
 
 - Mock answer: single `(shell "rm -rf ... && git clone ... && cd ... && git checkout -b ... && printf ... > <file> && git add -A && git commit -m '...' && git push -u origin ...")`.
-- Parameters via env vars: `OMEGACLAW_GIT_TOKEN` (token; never appears in code) and `OMEGACLAW_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
+- Parameters via env vars: `OMEGA_GIT_TOKEN` (token; never appears in code) and `OMEGA_GIT_REMOTE` (default `https://github.com/OmegaSing/Test-Repopo`). Test is skipped if the token variable is unset.
 - Checks: branch present on remote (GitHub API 200), file present on branch, the shell call included `git push`, credentials wiped on teardown.
 
 ## Multi-skill tests
 
-### 22. test_run_create_dirs_mock.py
+### 20. test_run_create_dirs_mock.py
 
 Agent writes `mkdirs.sh` and runs it. The script must create `test1`, `test2`, `test3` inside `/tmp/test_dirs/`.
 
 - Mock answer: `(write-file "{SCRIPT_PATH}" "#!/bin/bash\nmkdir -p .../test1 .../test2 .../test3\n") (shell "chmod +x {SCRIPT_PATH}") (shell "{SCRIPT_PATH}")`.
 - Checks: all three directories exist with fresh mtimes; agent invoked `(write-file ...)` referencing `mkdirs.sh`; agent invoked `(shell ...)` to run the script. Diagnostics print `wf=<count>, sh=<count>, perms=<...>` to make stalls obvious.
 
-### 23. test_memory_episode_mock.py
+### 21. test_memory_episode_mock.py
 
 Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, waits 5 seconds, then asks to recall when this happened.
 
@@ -289,7 +275,7 @@ Two-turn flow: tells the agent that the user's dog Barney lost a baby tooth, wai
 - Turn 2 mock answer: `(query "Barney tooth") (send "Barney the dog lost his first baby tooth on <YYYY-MM-DD>. The milestone is recorded in my notes.")`.
 - Checks (turn 1): `(remember ...)` was invoked whose argument contains `tooth` or `Barney`. Checks (turn 2): `(query ...)` or `(episodes ...)` was invoked; the reply contains at least one of `dog` / `tooth` / `lost`; the reply contains the captured seed date in `YYYY-MM-DD` format.
 
-### 24. test_skill_query_mock.py
+### 22. test_skill_query_mock.py
 
 Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for embeddings to settle, then ask the agent to recall it via `query` (embedding lookup, not timestamp lookup).
 
@@ -297,7 +283,7 @@ Two-turn flow: plant a unique color (`azure-<run_id>`) via `remember`, wait for 
 - Turn 2 mock answer: `(query "favorite color") (send "Your favorite color is azure-<run_id>.")`.
 - Checks (turn 1): `(remember ...)` carried the secret color. Checks (turn 2): `(query ...)` was invoked; the reply mentions the secret color verbatim.
 
-### 25. test_skill_episodes_mock.py
+### 23. test_skill_episodes_mock.py
 
 Two-turn flow: send a message tagged with a unique keyword (no `remember`), capture the timestamp, then ask the agent to use `episodes` (timestamp lookup, not `query`) to recall what was discussed at that earlier time.
 
@@ -305,7 +291,7 @@ Two-turn flow: send a message tagged with a unique keyword (no `remember`), capt
 - Turn 2 mock answer: `(episodes "<seed_ts>") (send "The unique keyword was <marker>.")`.
 - Checks (turn 1): the turn is recorded in `history.metta` with a timestamp. Checks (turn 2): `(episodes ...)` was invoked for the seed timestamp; the reply mentions the original marker.
 
-### 26. test_complex_weather_flow_mock.py
+### 24. test_complex_weather_flow_mock.py
 
 Four-step pipeline: search NY weather → write `w.txt` with the forecast → write `p.sh` extracting the first Celsius number into `t.txt` → run `p.sh`. Because the mock controls only the LLM dispatch (the network-bound `search` skill is not exercised), the mocked response provides the forecast text directly.
 
@@ -314,21 +300,21 @@ Four-step pipeline: search NY weather → write `w.txt` with the forecast → wr
 
 ## Memory tiers and transitions
 
-### 27. test_last_skill_results_visible_next_turn_mock.py
+### 25. test_last_skill_results_visible_next_turn_mock.py
 
 Verifies the one-iteration carry of `LAST_SKILL_USE_RESULTS`. Output of a skill call in turn N is exposed to the LLM at turn N+1 via this prompt section. The test does not require the agent to "behave intelligently"; it confirms the carry exists.
 
 - Mock answer (turn 1): `(metta "(+ 1 1)")`.
 - Checks: the docker log line `CHARS_SENT:` for the next iteration contains a `LAST_SKILL_USE_RESULTS` section that reflects the metta output.
 
-### 28. test_memory_history_byte_window_truncation_mock.py
+### 26. test_memory_history_byte_window_truncation_mock.py
 
 Verifies that `history.metta` is a sliding byte-window. A marker placed early in the trace, then pushed past the `maxHistory` boundary by a large follow-up entry, must remain in the file on disk yet be absent from the trailing `maxHistory` bytes (the slice fed back to the agent as HISTORY).
 
 - Mock answer: an initial `(remember ...)` with the marker, followed by a sequence that emits enough bytes to evict it from the trailing window.
 - Checks: marker present in `history.metta` on disk; marker absent from the trailing `maxHistory` bytes returned by `getHistory`.
 
-### 29. test_memory_pin_window_visibility_mock.py
+### 27. test_memory_pin_window_visibility_mock.py
 
 A `(pin ...)` emitted in turn 1 must land in `history.metta` and remain inside the agent's rolling HISTORY window when turn 2 fires.
 
@@ -336,14 +322,14 @@ A `(pin ...)` emitted in turn 1 must land in `history.metta` and remain inside t
 - Turn 2 mock answer: `(send "ack")`.
 - Checks: the pin block is on disk; the pin block sits within the trailing `maxHistory` byte window at turn 2.
 
-### 30. test_pin_invisible_within_iteration_mock.py
+### 28. test_pin_invisible_within_iteration_mock.py
 
 Negative test: a `(pin ...)` emitted within an iteration is NOT visible inside that same iteration's HISTORY context. The prompt is assembled before skill evaluation, so the pin block, written by `addToHistory` at the end of the iteration, only enters HISTORY at the next prompt-build.
 
 - Mock answer: `(pin "<marker>")` followed by a `(send ...)`.
 - Checks: the `CHARS_SENT` line carrying the PROMPT for the iteration that contained the pin does NOT contain the pin's unique marker; the next iteration's `CHARS_SENT` line does.
 
-### 31. test_transition_episodes_after_eviction_mock.py
+### 29. test_transition_episodes_after_eviction_mock.py
 
 A marker pushed out of the trailing `maxHistory` window is still recoverable via the `episodes` skill (timestamp-based history scan).
 
@@ -352,14 +338,14 @@ A marker pushed out of the trailing `maxHistory` window is still recoverable via
 - Turn 3 mock answer: `(episodes "<seed_ts>")` against the captured timestamp.
 - Checks: `(episodes ...)` was invoked with the captured timestamp. The skill's return value itself is mock-irrelevant; the test exercises the path against history the agent can no longer see in HISTORY.
 
-### 32. test_transition_metta_to_remember_mock.py
+### 30. test_transition_metta_to_remember_mock.py
 
 Tier-3 to Tier-2 transition. A reasoning conclusion produced inside an AtomSpace via `(metta ...)` is ephemeral by design; if the agent wants to keep it, it must call `(remember ...)` on the conclusion.
 
 - Mock answer: a `(metta ...)` inference call AND a `(remember "<conclusion>")` call.
 - Checks: both skill calls fired; ChromaDB vector count grew by exactly one.
 
-### 33. test_transition_pin_to_remember_mock.py
+### 31. test_transition_pin_to_remember_mock.py
 
 Explicit working-memory to long-term-memory transition.
 
@@ -369,12 +355,12 @@ Explicit working-memory to long-term-memory transition.
 
 ## Security
 
-### 34. test_credentials_scrubbed_mock.py
+### 32. test_credentials_scrubbed_mock.py
 
 Verifies that provider keys, channel tokens, and the auth secret are scrubbed from the agent process environment after startup. The agent runs as `nobody` under an entrypoint that rebuilds the environment from a fixed allowlist, so secrets passed into the container reach the proxy/entrypoint but never the agent process itself.
 
 - Mock answer: `(shell "env > /tmp/omega38_agentenv.txt")` — the agent dumps its own environment (only the process owner can read it).
-- Checks: `PATH` is present (positive control that the environment was captured); none of the forbidden secret variable names are present in the agent environment (`OMEGACLAW_AUTH_SECRET`, the provider API keys `ANTHROPIC_API_KEY` / `ASI_API_KEY` / `ASIONE_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `OPENAIAPI_API_KEY`, and the channel tokens `TG_BOT_TOKEN` / `SL_BOT_TOKEN` / `MM_BOT_TOKEN`). A leak fails with `leaked into agent env: [...]`. The check is by variable name, so it is independent of the secret values.
+- Checks: `PATH` is present (positive control that the environment was captured); none of the forbidden secret variable names are present in the agent environment (`OMEGA_AUTH_SECRET`, the provider API keys `ANTHROPIC_API_KEY` / `ASI_API_KEY` / `ASIONE_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `OPENAIAPI_API_KEY`, and the channel tokens `TG_BOT_TOKEN` / `SL_BOT_TOKEN` / `MM_BOT_TOKEN`). A leak fails with `leaked into agent env: [...]`. The check is by variable name, so it is independent of the secret values.
 
 ## OpenClaw plugin (`test_openclaw_delegate_mock.py`)
 
@@ -382,7 +368,7 @@ The Gateway is the stub started by the `openclaw_gateway` fixture - see "5a. Ope
 
 Delegation is asynchronous, so these tests assert two stages: the acceptance envelope returned immediately (captured with `write-file`), and the `OPENCLAW_RESULT ...` line the plugin appends to `history.metta` once the Gateway answers (polled with `wait_for_history_keyword`).
 
-### 35. test_delegate_isolated_and_success_mock
+### 33. test_delegate_isolated_and_success_mock
 
 Two phases:
 
@@ -391,53 +377,53 @@ Two phases:
 
   The wait keys on the task id rather than on the `PONG-<run_id>` marker alone: history also stores the agent's own response text, which quotes the `delegate-task-to-openclaw-agent "…PONG-<run_id>"` command verbatim, so the marker is present immediately and would satisfy a marker-only wait before any reply exists.
 
-### 36. test_delegate_empty_message_mock
+### 34. test_delegate_empty_message_mock
 
 Delegates an empty message - no network call and no worker thread, since the skill rejects it before queueing:
 
 - Mock answer: `(metta (write-file "<out>.json" (delegate-task-to-openclaw-agent ""))) (send "Empty delegation checked <run_id>")`.
 - Checks: the agent doesn't crash; the JSON result has `status: "error"`, `type: "invalid_input"`. Validation stays synchronous precisely so this failure is still reported in the same turn.
 
-### 37. test_delegate_new_session_per_call_mock
+### 35. test_delegate_new_session_per_call_mock
 
 Verifies the "new session per delegation" contract from the plugin README: two independent delegations in the same turn must not share a Gateway session:
 
 - Mock answer: two `(metta (write-file ... (delegate-task-to-openclaw-agent "Reply with exactly: FIRST-<run_id>" / "SECOND-<run_id>")))` calls, then `(send "Both delegations saved <run_id>")`.
 - Checks: both envelopes are `accepted` with different `id` values; an `id=<task id> status=ok` record for each of them later reaches history (keyed on the task id for the reason given under test 35); the run's slice of history carries two distinct `responseId=` values. The scoping to this run's window keeps ids left by test 35 from satisfying the check on their own.
 
-### 38. test_delegate_stays_async_under_a_slow_gateway_mock
+### 36. test_delegate_stays_async_under_a_slow_gateway_mock
 
 The one test that can tell an asynchronous delegation from a synchronous one. The rest of this group answers against a Gateway that replies instantly, so a blocking implementation would clear their budgets too.
 
 - Mock answer: `(delegate-task-to-openclaw-agent "OCGW_SLEEP:30 Reply with exactly: SLOW-<run_id>") (send "Long delegation started <run_id>")`, then a second, unrelated prompt answered with `(send "STILL-ALIVE-<run_id>")`.
 - Checks: the acknowledgement lands within 15s while the Gateway is still holding the reply for 30s, so a delegation that blocked the loop cannot pass; the unrelated prompt is answered before the Gateway releases; the slow reply still reaches history afterwards.
 
-### 39. test_delegate_reports_gateway_rejection_mock
+### 37. test_delegate_reports_gateway_rejection_mock
 
 A Gateway rejection must reach the agent instead of disappearing, since the skill returns before the call is made.
 
 - Mock answer: `(metta (write-file "<out>.json" (delegate-task-to-openclaw-agent "OCGW_UNAUTHORIZED <run_id>"))) (send "Refused delegation checked <run_id>")`.
 - Checks: the envelope still says `accepted`; an `id=<task id> status=error` record carrying `401` later reaches history; the agent stays responsive throughout.
 
-### 40. test_delegate_retries_a_starting_gateway_mock
+### 38. test_delegate_retries_a_starting_gateway_mock
 
 A Gateway that is still booting answers `503`, which the worker retries up to `STARTUP_RETRY_ATTEMPTS` times.
 
 - Mock answer: `(metta (write-file "<out>.json" (delegate-task-to-openclaw-agent "OCGW_503:2 Reply with exactly: RETRIED-<run_id>"))) (send "Retry delegation started <run_id>")`.
 - Checks: the agent acknowledges without waiting out the retries, so they run off the loop; the delegation eventually succeeds with `status=ok`; the stub recorded three attempts, two refused and one served, rather than a single call.
 
-### 41. test_delegate_reports_a_reply_without_text_mock
+### 39. test_delegate_reports_a_reply_without_text_mock
 
 A terminal response whose `output` holds only reasoning items carries no visible reply, and must not be reported as an empty success.
 
 - Mock answer: `(metta (write-file "<out>.json" (delegate-task-to-openclaw-agent "OCGW_NOTEXT <run_id>"))) (send "Empty reply checked <run_id>")`.
 - Checks: the agent survives; an `id=<task id> status=error` record reaches history.
 
-### 42. test_delegation_is_authenticated_by_the_proxy_mock
+### 40. test_delegation_is_authenticated_by_the_proxy_mock
 
 The delegation path is authenticated by Nginx rather than by the agent, checked at the receiving end.
 
 - Mock answer: `(delegate-task-to-openclaw-agent "Reply with exactly: TOKEN-<run_id>") (send "Token delegation sent <run_id>")`.
 - Checks: the stub recorded at least one request whose `Authorization` header matched the token, and no request arrived without that header. Since the agent process never holds the token, a matching header can only have come from the proxy.
 
-The other half of this property - that `OMEGACLAW_OPENCLAW_TOKEN` never reaches the agent process - belongs to `test_credentials_scrubbed_mock.py`, which reads the environment the agent dumps for itself. Do not check it with `dexec`: `docker exec` starts a new process from the container's own configuration, which does carry the token by design, so such a check fails while the scrubbing works correctly.
+The other half of this property - that `OMEGA_OPENCLAW_TOKEN` never reaches the agent process - belongs to `test_credentials_scrubbed_mock.py`, which reads the environment the agent dumps for itself. Do not check it with `dexec`: `docker exec` starts a new process from the container's own configuration, which does carry the token by design, so such a check fails while the scrubbing works correctly.

@@ -87,8 +87,8 @@ jobs:
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |
-            singularitynet/omegaclaw:${{ inputs.tag_name }}
-            ${{ inputs.move_latest && 'singularitynet/omegaclaw:latest' || '' }}
+            singularitynet/omega:${{ inputs.tag_name }}
+            ${{ inputs.move_latest && 'singularitynet/omega:latest' || '' }}
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=min
@@ -103,8 +103,8 @@ jobs:
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.publish_docker }}
           tags: |
-            singularitynet/omegaclaw:${{ inputs.tag_name }}
-            ${{ inputs.move_latest && 'singularitynet/omegaclaw:latest' || '' }}
+            singularitynet/omega:${{ inputs.tag_name }}
+            ${{ inputs.move_latest && 'singularitynet/omega:latest' || '' }}
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=min

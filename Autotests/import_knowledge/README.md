@@ -3,14 +3,14 @@
 Tests for the knowledge-base import that runs on container startup (PR #168): the `scripts/import_knowledge.sh` gating logic and the entrypoint wiring that triggers it.
 
 - `test_import_knowledge.py` — unit tests for `scripts/import_knowledge.sh`, with the `import-knowledge` binary stubbed on PATH.
-- `test_import_knowledge_integration.py` — startup tests that launch the image through `scripts/omegaclaw` and check the entrypoint gating and that a local import lands in the `chroma_db` the agent reads.
+- `test_import_knowledge_integration.py` — startup tests that launch the image through `scripts/omega` and check the entrypoint gating and that a local import lands in the `chroma_db` the agent reads.
 
 ## Build the image
 
 The integration tests need a locally built image. Build it from the repository root:
 
 ```
-docker build -t omegaclaw:kb-test .
+docker build -t omega:kb-test .
 ```
 
 The unit tests need no image.
@@ -24,14 +24,14 @@ cd Autotests
 pytest -s import_knowledge/test_import_knowledge.py
 ```
 
-Integration (point `OMEGACLAW_KB_IMAGE` at the image built above):
+Integration (point `OMEGA_KB_IMAGE` at the image built above):
 
 ```
 cd Autotests
-OMEGACLAW_KB_IMAGE=omegaclaw:kb-test pytest -s import_knowledge/test_import_knowledge_integration.py
+OMEGA_KB_IMAGE=omega:kb-test pytest -s import_knowledge/test_import_knowledge_integration.py
 ```
 
-The integration tests start and remove the container themselves through `scripts/omegaclaw` (fixed name `omegaclaw`, one at a time), so there is no manual `docker run` step. They are skipped unless `OMEGACLAW_KB_IMAGE` is set and Docker and `scripts/omegaclaw` are available.
+The integration tests start and remove the container themselves through `scripts/omega` (fixed name `omega`, one at a time), so there is no manual `docker run` step. They are skipped unless `OMEGA_KB_IMAGE` is set and Docker and `scripts/omega` are available.
 
 # Tests description
 
@@ -101,7 +101,7 @@ When `import-knowledge` exits non-zero, no sentinel is written, so the next star
 
 ## Integration: container startup
 
-They launch the image through `scripts/omegaclaw`, so the real entrypoint runs (nginx, env scrub, import gating).
+They launch the image through `scripts/omega`, so the real entrypoint runs (nginx, env scrub, import gating).
 
 ### 11. test_entrypoint_imports_when_enabled
 

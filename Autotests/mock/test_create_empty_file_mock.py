@@ -22,7 +22,7 @@ WAIT = 30
 
 def test_create_empty_file_mock(llm, comm):
     with Checker("create empty file (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: create empty file mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: create empty file mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

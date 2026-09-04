@@ -52,17 +52,17 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     env:
-      AUTOTESTS_OMEGACLAW_CONTAINER: omegaclaw
-      AUTOTESTS_OMEGACLAW_TAG: 'cicd-${{ github.run_id }}'
+      AUTOTESTS_OMEGA_CONTAINER: omega
+      AUTOTESTS_OMEGA_TAG: 'cicd-${{ github.run_id }}'
       # Not a real credential: it authenticates against the stub Gateway that
       # the openclaw fixture starts. It also gives test_credentials_scrubbed_mock
       # a token that is really present, so that check can fail if one leaks.
-      OMEGACLAW_OPENCLAW_TOKEN: 'ci-openclaw-stub-token'
+      OMEGA_OPENCLAW_TOKEN: 'ci-openclaw-stub-token'
     steps:
       - name: Complete tag name
         run: |
-          NEW_TAG="$AUTOTESTS_OMEGACLAW_TAG-${PLATFORM////-}"
-          echo "AUTOTESTS_OMEGACLAW_TAG=$NEW_TAG" >> "$GITHUB_ENV"
+          NEW_TAG="$AUTOTESTS_OMEGA_TAG-${PLATFORM////-}"
+          echo "AUTOTESTS_OMEGA_TAG=$NEW_TAG" >> "$GITHUB_ENV"
           echo "Completed image tag $NEW_TAG"
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -86,29 +86,29 @@ jobs:
           platforms: ${{ matrix.platform }}
           load: true
           push: false
-          tags: singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }}
+          tags: singularitynet/omega:${{ env.AUTOTESTS_OMEGA_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
           no-cache: ${{ inputs.no_build_cache }}
 
       - name: Verify version in release image
         run: |
-          expected="OmegaClaw version=$(git describe --tags --dirty --always)"
-          test "$(./scripts/omegaclaw --version)" = "$expected"
+          expected="Omega version=$(git describe --tags --dirty --always)"
+          test "$(./scripts/omega --version)" = "$expected"
           actual="$(docker run --rm \
-            --entrypoint /PeTTa/repos/OmegaClaw-Core/scripts/omegaclaw \
-            singularitynet/omegaclaw:${AUTOTESTS_OMEGACLAW_TAG} --version)"
+            --entrypoint /PeTTa/repos/Omega/scripts/omega \
+            singularitynet/omega:${AUTOTESTS_OMEGA_TAG} --version)"
           test "$actual" = "$expected"
 
       - name: Autotests - Set up
         run: |
-          chmod +x ./scripts/omegaclaw
-          ./scripts/omegaclaw start -p Test -t test -d singularitynet/omegaclaw:${{ env.AUTOTESTS_OMEGACLAW_TAG }} -g "http://host.docker.internal:18789"
+          chmod +x ./scripts/omega
+          ./scripts/omega start -p Test -t test -d singularitynet/omega:${{ env.AUTOTESTS_OMEGA_TAG }} -g "http://host.docker.internal:18789"
           pip install pytest
           echo "Waiting for agent to become ready..."
           ready=
           for i in $(seq 1 90); do
-            if docker logs omegaclaw 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; then
+            if docker logs omega 2>&1 | grep -qE "CHARS_SENT: [0-9]+"; then
               echo "Agent ready after ${i}s"
               ready=1
               break
@@ -117,7 +117,7 @@ jobs:
           done
           if [ -z "$ready" ]; then
             echo "::error::Agent did not become ready in 90s"
-            docker logs omegaclaw 2>&1 | tail -100
+            docker logs omega 2>&1 | tail -100
             exit 1
           fi
         env:
@@ -127,9 +127,9 @@ jobs:
       - name: MeTTa and Python unit tests
         env:
           PETTA_PATH: '/PeTTa'
-          PROJECT_ROOT: '/PeTTa/repos/OmegaClaw-Core'
+          PROJECT_ROOT: '/PeTTa/repos/Omega'
         run: |
-          docker exec -e PETTA_PATH=${PETTA_PATH} omegaclaw ${PROJECT_ROOT}/tests/mettatest.sh
+          docker exec -e PETTA_PATH=${PETTA_PATH} omega ${PROJECT_ROOT}/tests/mettatest.sh
           ./tests/pytest.sh
 
       - name: Autotests - Phase 1 (Blocking Checks)
@@ -138,12 +138,12 @@ jobs:
           python ../src/helper.py
           pytest -s -v @run_mandatory
         env:
-          OMEGACLAW_CONTAINER: ${{ env.AUTOTESTS_OMEGACLAW_CONTAINER }}
+          OMEGA_CONTAINER: ${{ env.AUTOTESTS_OMEGA_CONTAINER }}
 
       - name: Autotests - Phase 2 (Non-Blocking Checks)
         continue-on-error: true
         working-directory: Autotests
         run: pytest -s -v @run_optional
         env:
-          OMEGACLAW_CONTAINER: ${{ env.AUTOTESTS_OMEGACLAW_CONTAINER }}
-          OMEGACLAW_GIT_TOKEN: ${{ secrets.CICD_GITHUB_PAT }}
+          OMEGA_CONTAINER: ${{ env.AUTOTESTS_OMEGA_CONTAINER }}
+          OMEGA_GIT_TOKEN: ${{ secrets.CICD_GITHUB_PAT }}

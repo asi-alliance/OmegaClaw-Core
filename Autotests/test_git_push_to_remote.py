@@ -1,7 +1,7 @@
 """Agent clones a remote, adds a unique file, commits and pushes.
 
-Needs OMEGACLAW_GIT_TOKEN (skipped otherwise).
-Optionally OMEGACLAW_GIT_REMOTE — defaults to OmegaSing/Test-Repopo.
+Needs OMEGA_GIT_TOKEN (skipped otherwise).
+Optionally OMEGA_GIT_REMOTE — defaults to OmegaSing/Test-Repopo.
 """
 import json
 import time
@@ -49,7 +49,7 @@ def _api_base(remote_url):
 def test_git_push_to_remote():
     token = get_git_token()
     if not token:
-        pytest.skip("OMEGACLAW_GIT_TOKEN not set")
+        pytest.skip("OMEGA_GIT_TOKEN not set")
     remote = get_git_remote()
     api = _api_base(remote)
     branch = f"qa/run-{int(time.time())}"
@@ -71,7 +71,7 @@ def test_git_push_to_remote():
         c.ok("pre-create dir", TARGET_DIR)
 
         unique_file = f"qa-run-{c.run_id}.txt"
-        marker = f"omegaclaw push run {c.run_id}"
+        marker = f"omega push run {c.run_id}"
         c.add_cleanup_marker(marker)
         start_ts = int(time.time()) - 1
 

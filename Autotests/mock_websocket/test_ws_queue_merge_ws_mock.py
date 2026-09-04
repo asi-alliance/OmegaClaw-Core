@@ -26,7 +26,7 @@ def _wait_for_reply(ws, needle, timeout):
 
 def test_ws_queue_merge_ws_mock(llm, ws):
     with Checker("ws queue merge A | B | C") as c:
-        print(f"\n=== OmegaClaw: ws queue merge (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: ws queue merge (run-id {c.run_id}) ===", flush=True)
 
         c.step("wait for agent WebSocket connection")
         if not ws.wait_for_connection(timeout=60):

@@ -226,7 +226,7 @@ def test_endpoint_rewrites_websocket_schemes(oc):
 
 def test_request_target_prefers_the_proxy_and_sends_no_token(oc, monkeypatch):
     monkeypatch.setattr(oc, "config_get_by_key", lambda key, default=None: "http://localhost:8080/")
-    monkeypatch.setenv("OMEGACLAW_OPENCLAW_TOKEN", "must-not-be-used")
+    monkeypatch.setenv("OMEGA_OPENCLAW_TOKEN", "must-not-be-used")
     url, headers = oc._request_target("http://gw:18789")
     assert url == "http://localhost:8080/openclaw" + oc.RESPONSES_PATH
     assert headers == {}
@@ -234,7 +234,7 @@ def test_request_target_prefers_the_proxy_and_sends_no_token(oc, monkeypatch):
 
 def test_request_target_falls_back_to_a_direct_call_with_the_token(oc, monkeypatch):
     monkeypatch.setattr(oc, "config_get_by_key", lambda key, default=None: None)
-    monkeypatch.setenv("OMEGACLAW_OPENCLAW_TOKEN", "s3cret")
+    monkeypatch.setenv("OMEGA_OPENCLAW_TOKEN", "s3cret")
     url, headers = oc._request_target("http://gw:18789")
     assert url == "http://gw:18789" + oc.RESPONSES_PATH
     assert headers == {"Authorization": "Bearer s3cret"}
@@ -242,7 +242,7 @@ def test_request_target_falls_back_to_a_direct_call_with_the_token(oc, monkeypat
 
 def test_request_target_refuses_when_it_cannot_authenticate(oc, monkeypatch):
     monkeypatch.setattr(oc, "config_get_by_key", lambda key, default=None: None)
-    monkeypatch.setenv("OMEGACLAW_OPENCLAW_TOKEN", "   ")
+    monkeypatch.setenv("OMEGA_OPENCLAW_TOKEN", "   ")
     with pytest.raises(oc.OpenClawError):
         oc._request_target("http://gw:18789")
 

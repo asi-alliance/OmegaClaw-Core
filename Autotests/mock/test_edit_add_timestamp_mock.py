@@ -23,7 +23,7 @@ INITIAL_CONTENT = "This is a test note.\n"
 
 def test_edit_add_timestamp_mock(llm, comm):
     with Checker("edit add timestamp (mock)", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: add timestamp mock (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: add timestamp mock (run-id {c.run_id}) ===",
               flush=True)
 
         c.verify_clean()

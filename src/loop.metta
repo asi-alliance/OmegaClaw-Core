@@ -17,7 +17,8 @@
           (configure maxOutputToken 6000)
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
-          (configure memoryDirectory ./)
+          (configure memoryDirectory
+               (joinPath ((py-call (helper.projectRootDirectory)) memory)))
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))
@@ -43,6 +44,15 @@
                          " HISTORY: " (getHistory) 
                          " TIME: " (get_time_as_string)))))
 
+(= (addTelegramPromptExtension)
+   (if (== (commchannel) telegram)
+       (let $path (joinPath ((memoryDirectory) "tg_prompt.txt"))
+            (if (exists-file $path)
+                (add-prompt-extension tg-prompt (read-file $path))
+                (progn (log WARN "loop" (TELEGRAM_PROMPT_NOT_FOUND: $path))
+                       ())))
+       ()))
+
 (= (getPromptExtensions)
    (join (newline) (collapse (prompt-extension $_))))
 
@@ -54,9 +64,9 @@
                                           (progn (change-state! &error $new) (ALERT_FAILED $a $b))))
                  ($else $sexpr))))
 
-(= (omegaclaw)
-   (omegaclaw 1))
-(= (omegaclaw $k)
+(= (omega)
+   (omega 1))
+(= (omega $k)
    (progn (if (== $k 1) (progn (initConfig)
                                (initLoop)
                                (initLogger)
@@ -65,6 +75,7 @@
                                (initKnowledge)
                                (initPlugins)
                                (initChannels)
+                               (addTelegramPromptExtension)
                                (commChannelSend (version))
                                (llmProviderStart (provider)))
                         (change-state! &loops (- (get-state &loops) 1)))
@@ -105,4 +116,4 @@
                       (sleep (sleepInterval))
                       (cut)
                       (gc)
-                      (omegaclaw (+ 1 $k))))))
+                      (omega (+ 1 $k))))))

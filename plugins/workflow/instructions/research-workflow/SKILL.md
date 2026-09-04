@@ -1,9 +1,9 @@
 ---
 name: research-workflow
-description: End-to-end research workflow for OmegaClaw. Iterative planning,
+description: End-to-end research workflow for Omega. Iterative planning,
   data acquisition, experiments, and write-up.
 ---
-# Research Workflow (OmegaClaw)
+# Research Workflow (Omega)
 This workflow guides you through problem definition, online research,
 and creating a detailed execution plan. Once the user approves the plan,
 it replaces these instructions and you follow it step by step.
@@ -30,7 +30,7 @@ Next are instructions and MeTTa  functions  that should be performed step by ste
                   "search online for related methods and data sources")`
 ### Step 2 — Research and create plan
 - Search online for related methods and data sources:
-  `(tavily-search "query")`
+  `(websearch "query")`
 - Save findings:
   `(let $d (researchDir) (write-file (strings-concat ($d "/<research-name>/01_theory.md")) "content"))`
 - `(research-step <research-name>_in_quotes "theory-saved" "sources: X methods: Y"

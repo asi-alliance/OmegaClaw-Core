@@ -26,8 +26,6 @@ STATIC_LLM_COMMANDS = {
     "search",
     "send",
     "shell",
-    "tavily-search",
-    "technical-analysis",
     "version",
     "websearch",
     "write-file",
@@ -65,7 +63,7 @@ def extract_timestamp(line):
 
 def around_time(needle_time_str, k):
     needle_time_str = needle_time_str.replace(r'\"', '').replace('"', '').strip()
-    filename = "repos/OmegaClaw-Core/memory/history.metta"
+    filename = "repos/Omega/memory/history.metta"
     target = datetime.strptime(needle_time_str, "%Y-%m-%d %H:%M:%S")
     best_lineno = None
     best_line = None
@@ -208,18 +206,18 @@ def projectRootDirectory():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _format_omegaclaw_version(version: str) -> str | None:
+def _format_omega_version(version: str) -> str | None:
     version = version.strip()
     if not version:
         return None
-    if version.startswith("OmegaClaw version="):
+    if version.startswith("Omega version="):
         return version
-    if version.startswith("OmegaClaw "):
-        version = version[len("OmegaClaw "):]
-    return f"OmegaClaw version={version}"
+    if version.startswith("Omega "):
+        version = version[len("Omega "):]
+    return f"Omega version={version}"
 
 
-def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
+def omega_version(repo_root: str | os.PathLike | None = None) -> str:
     """Return the checkout version, falling back to the baked version file."""
     root = Path(repo_root) if repo_root is not None else Path(projectRootDirectory())
 
@@ -237,14 +235,14 @@ def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
             timeout=3,
         )
         if result.returncode == 0:
-            version = _format_omegaclaw_version(result.stdout)
+            version = _format_omega_version(result.stdout)
             if version is not None:
                 return version
     except (OSError, subprocess.TimeoutExpired):
         pass
 
     try:
-        version = _format_omegaclaw_version(
+        version = _format_omega_version(
             (root / "version").read_text(encoding="utf-8")
         )
         if version is not None:
@@ -252,19 +250,19 @@ def omegaclaw_version(repo_root: str | os.PathLike | None = None) -> str:
     except OSError:
         pass
 
-    return "OmegaClaw unknown"
+    return "Omega unknown"
 
 
-def test_omegaclaw_version():
+def test_omega_version():
     with TemporaryDirectory() as directory:
         root = Path(directory)
-        assert omegaclaw_version(root) == "OmegaClaw unknown"
+        assert omega_version(root) == "Omega unknown"
 
         (root / "version").write_text("v1.2.3-4-g1234567\n", encoding="utf-8")
-        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3-4-g1234567"
+        assert omega_version(root) == "Omega version=v1.2.3-4-g1234567"
 
-        (root / "version").write_text("OmegaClaw v1.2.3\n", encoding="utf-8")
-        assert omegaclaw_version(root) == "OmegaClaw version=v1.2.3"
+        (root / "version").write_text("Omega v1.2.3\n", encoding="utf-8")
+        assert omega_version(root) == "Omega version=v1.2.3"
 
 
 def test_balance_parenthesis():
@@ -309,5 +307,5 @@ def test_balance_parenthesis():
         '((Error UNKNOWN_SKILL_CALL "workflow-load-instructions test-workflow"))'
 
 if __name__ == "__main__":
-    test_omegaclaw_version()
+    test_omega_version()
     test_balance_parenthesis()

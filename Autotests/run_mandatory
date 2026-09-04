@@ -28,8 +28,6 @@ mock/test_search_invalid_mock.py
 mock/test_search_weather_mock.py
 mock/test_skill_metta_mock.py
 mock/test_skill_pin_mock.py
-mock/test_tavily_search_mock.py
-mock/test_technical_analysis_mock.py
 mock/test_transition_episodes_after_eviction_mock.py
 mock/test_transition_metta_to_remember_mock.py
 mock/test_transition_pin_to_remember_mock.py

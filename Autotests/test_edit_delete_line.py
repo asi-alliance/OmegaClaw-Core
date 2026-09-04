@@ -1,5 +1,5 @@
 """
-Test: OmegaClaw deletes the second line from a 3-line file.
+Test: Omega deletes the second line from a 3-line file.
 
 Run:
     pytest test_edit_delete_line.py -s
@@ -19,7 +19,7 @@ LINE3 = "Third line"
 
 def test_edit_delete_line():
     with Checker("edit delete line", cleanup_dirs=[TARGET_DIR]) as c:
-        print(f"\n=== OmegaClaw: delete second line (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: delete second line (run-id {c.run_id}) ===", flush=True)
 
         c.verify_clean()
 

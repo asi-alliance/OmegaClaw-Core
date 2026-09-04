@@ -1,6 +1,6 @@
-# OmegaClaw Documentation
+# Omega Documentation
 
-This directory contains the full documentation for OmegaClaw. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
+This directory contains the full documentation for Omega. Every page is a sibling file — no subdirectories. Filename prefixes identify the section:
 
 - `intro-*` — conceptual introduction
 - `tutorial-NN-*` — numbered, task-oriented walkthroughs
@@ -12,9 +12,9 @@ If you are new, read the Introduction in order, then pick tutorials that match w
 
 ## Introduction
 
-Start here to understand what OmegaClaw is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
+Start here to understand what Omega is, the hybrid reasoning thesis, how the pieces fit together, and how to get it running.
 
-- [introduction.md](./introduction.md) — What OmegaClaw is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
+- [introduction.md](./introduction.md) — What Omega is, the hybrid thesis, architecture, core vocabulary, design goals, and honest limits (merged conceptual intro).
 - [installation instruction](/README.md#installation) — Manual MeTTa setup, environment variables, API keys.
 
 ---
@@ -28,7 +28,6 @@ Numbered in suggested reading order. Each tutorial is self-contained.
 - [tutorial-03-writing-a-custom-skill.md](./tutorial-03-writing-a-custom-skill.md) — Add a new MeTTa skill end-to-end
 - [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md) — Build a new communication channel adapter
 - [tutorial-05-reasoning-with-nal-pln.md](./tutorial-05-reasoning-with-nal-pln.md) — Invoke NAL and PLN through `(metta ...)` with worked examples
-- [tutorial-06-remote-agentverse-skills.md](./tutorial-06-remote-agentverse-skills.md) — Delegate work to remote Agentverse agents
 - [tutorial-07-grounded-reasoning.md](./tutorial-07-grounded-reasoning.md) — External grounding — the primary reliability mitigation
 - [tutorial-08-reliable-reasoning.md](./tutorial-08-reliable-reasoning.md) — Strategy playbook — chain depth, revision, thresholds, anti-patterns
 
@@ -52,13 +51,21 @@ User-facing MeTTa skills the agent invokes. Each page follows the template **Sig
 - [reference-skills-io.md](./reference-skills-io.md) — `shell`, `read-file`, `write-file`, `write-file-b64`, `append-file`
 - [reference-skills-communication.md](./reference-skills-communication.md) — `send`, `receive`, `websearch`
 - [reference-skills-reasoning.md](./reference-skills-reasoning.md) — `metta` (NAL/PLN invocation surface)
-- [reference-skills-remote-agents.md](./reference-skills-remote-agents.md) — `tavily-search`, `technical-analysis`
 
 ### Configuration & Adapters
 
 - [reference-configuration.md](./reference-configuration.md) — `configure` form and all runtime parameters
 - [reference-channels.md](./reference-channels.md) — IRC, Telegram, Slack, Mattermost, WebSocket, and websearch adapters plus the channel contract
-- [reference-python-bridges.md](./reference-python-bridges.md) — `lib_llm_ext.py`, `src/agentverse.py`, `src/helper.py`, `src/skills.pl`
+- [reference-python-bridges.md](./reference-python-bridges.md) — `lib_llm_ext.py`, `src/helper.py`, `src/skills.pl`
+- [reference-memory-portability.md](./reference-memory-portability.md) — Operator backup, restore, and archive-transfer workflow
+
+### Plugin API
+
+- [reference-plugin-api.md](./reference-plugin-api.md) - Plugin API documentation
+
+### Plugin publishing
+
+- [reference-plugins-publishing.md](./reference-plugins-publishing.md) — how to submit a plugin for the catalog
 
 ### Internals
 

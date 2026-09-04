@@ -13,7 +13,8 @@ filesystem_policy:
   - /sys/devices/system
   - /PeTTa
   read_write:
-  - /PeTTa/repos/OmegaClaw-Core/memory
+  - /PeTTa/repos/Omega/memory
+  - /memory-transfer
   - /tmp
   - /dev/null
   - /opt/huggingface

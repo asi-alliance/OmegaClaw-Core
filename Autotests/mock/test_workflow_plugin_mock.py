@@ -32,7 +32,7 @@ WORKFLOW_SKILL = "test-skill"
 DEMO_MESSAGE = "This is a test workflow demonstration"
 
 RESEARCH_WORKFLOW = "research-workflow"
-RESEARCH_DIR = "/PeTTa/repos/OmegaClaw-Core/memory/workflow_space/research"
+RESEARCH_DIR = "/PeTTa/repos/Omega/memory/workflow_space/research"
 RESEARCH_NAME = "qa-research-autotest"
 
 
@@ -60,7 +60,7 @@ class TestWorkflowPlugin:
 
     def test_load_and_skill(self, llm, comm):
         with Checker("workflow load + skill (mock)") as c:
-            print(f"\n=== OmegaClaw: workflow load + skill (run-id {c.run_id}) ===",
+            print(f"\n=== Omega: workflow load + skill (run-id {c.run_id}) ===",
                   flush=True)
             c.add_cleanup_marker(str(c.run_id))
             c.add_cleanup_marker(str(c.run_id + 1))
@@ -107,7 +107,7 @@ class TestWorkflowPlugin:
         # skill is gone and no longer produces output. This does not depend on
         # the unload confirmation message.
         with Checker("workflow unload removes its skill (mock)") as c:
-            print(f"\n=== OmegaClaw: workflow unload (run-id {c.run_id}) ===",
+            print(f"\n=== Omega: workflow unload (run-id {c.run_id}) ===",
                   flush=True)
             c.add_cleanup_marker(str(c.run_id))
             c.add_cleanup_marker(str(c.run_id + 1))
@@ -153,7 +153,7 @@ class TestWorkflowPlugin:
     def test_research_workflow(self, llm, comm):
         project = f"{RESEARCH_DIR}/{RESEARCH_NAME}"
         with Checker("research-workflow start (mock)", cleanup_dirs=[project]) as c:
-            print(f"\n=== OmegaClaw: research-workflow (run-id {c.run_id}) ===",
+            print(f"\n=== Omega: research-workflow (run-id {c.run_id}) ===",
                   flush=True)
             c.add_cleanup_marker(str(c.run_id))
             c.add_cleanup_marker(str(c.run_id + 1))

@@ -1,14 +1,14 @@
 # Internals — `src/loop.metta`
 
-The heart of OmegaClaw. One function, `omegaclaw`, tail-recurses forever.
+The heart of Omega. One function, `omega`, tail-recurses forever.
 
 ## Entry
 
 ```metta
-(= (omegaclaw) (omegaclaw 1))
+(= (omega) (omega 1))
 ```
 
-Outer `run.metta` simply calls `(omegaclaw)`.
+Outer `run.metta` simply calls `(omega)`.
 
 ## On turn 1 (`$k == 1`)
 
@@ -42,7 +42,7 @@ Also creates shared state slots:
 10. **Record** — `addToHistory` appends human message + response + any errors to `memory/history.metta`, provided something new happened.
 11. **Save last results** — into `&lastresults` for the next turn's prompt.
 12. **Sleep** — `(sleep (sleepInterval))`.
-13. **Recurse** — `(omegaclaw (+ 1 $k))`.
+13. **Recurse** — `(omega (+ 1 $k))`.
 
 ## Idle behavior
 

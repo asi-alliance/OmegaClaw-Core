@@ -39,7 +39,7 @@ def chromadb_vector_count():
 
 def test_transition_pin_to_remember_mock(llm, comm):
     with Checker("pin -> remember transition (mock)") as c:
-        print(f"\n=== OmegaClaw: pin->remember transition (run-id {c.run_id}) ===",
+        print(f"\n=== Omega: pin->remember transition (run-id {c.run_id}) ===",
               flush=True)
 
         marker = f"candidate-set-{c.run_id}"

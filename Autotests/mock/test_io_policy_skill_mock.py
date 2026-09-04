@@ -12,12 +12,12 @@ from helpers import Checker, dexec, make_prompt, wait_for_skill_call
 
 
 JSON_POLICY_OUTPUT_PATH = "/tmp/policy_out.json"
-YAML_POLICY_INPUT_PATH = "/PeTTa/repos/OmegaClaw-Core/profile/policy.yaml"
+YAML_POLICY_INPUT_PATH = "/PeTTa/repos/Omega/profile/policy.yaml"
 
 
 def test_get_io_policy_mock(llm, comm):
     with Checker("get-io-policy skill mock") as c:
-        print(f"\n=== OmegaClaw: get-io-policy mock (run-id {c.run_id}) ===", flush=True)
+        print(f"\n=== Omega: get-io-policy mock (run-id {c.run_id}) ===", flush=True)
         
         ####################################
         # Phase 1: check isolated skill call

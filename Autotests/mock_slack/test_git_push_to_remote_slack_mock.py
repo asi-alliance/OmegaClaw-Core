@@ -4,7 +4,7 @@ Mock variant of test_git_push_to_remote.
 The mocked LLM response performs the full clone + branch + write +
 commit + push sequence in a single shell call. Cloning and pushing
 still require network access plus a real GitHub PAT
-(OMEGACLAW_GIT_TOKEN) вЂ” the mock controls only the LLM dispatch.
+(OMEGA_GIT_TOKEN) вЂ” the mock controls only the LLM dispatch.
 
 Run:
     pytest test_git_push_to_remote_mock.py -s
@@ -57,7 +57,7 @@ def _api_base(remote_url):
 def test_git_push_to_remote_slack_mock(llm, sl):
     token = get_git_token()
     if not token:
-        pytest.skip("OMEGACLAW_GIT_TOKEN not set")
+        pytest.skip("OMEGA_GIT_TOKEN not set")
     remote = get_git_remote()
     api = _api_base(remote)
     branch = f"qa/run-{int(time.time())}-mock"
@@ -84,7 +84,7 @@ def test_git_push_to_remote_slack_mock(llm, sl):
         c.ok("pre-create dir", TARGET_DIR)
 
         unique_file = f"qa-run-{c.run_id}.txt"
-        marker = f"omegaclaw push run {c.run_id}"
+        marker = f"omega push run {c.run_id}"
         c.add_cleanup_marker(marker)
         start_ts = int(time.time()) - 1
 
