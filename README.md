@@ -72,7 +72,7 @@ Ensure that you have [Docker installed](https://docs.docker.com/engine/install/)
 
 Run Omega using the next command:
 ```
-curl -fsSL https://raw.githubusercontent.com/singnet/Omega/refs/heads/main/scripts/omega | bash -s -- singularitynet/omega:latest
+ curl -fsSL https://github.com/singnet/Omega/raw/refs/tags/v0.1.19/scripts/omegaclaw | bash -s -- singularitynet/omega:v0.1.19
 ```
 
 To run a specific version of Omega set version in `TAG` environment variable and run the following command:
@@ -82,12 +82,12 @@ export TAG=<version>; curl -fsSL  https://github.com/singnet/Omega/raw/refs/tags
 
 To stop the Omega Docker container:
 ```
-docker stop omega
+docker stop omegaclaw
 ```
 
 To restart the Omega Docker container:
 ```
-docker start omega
+docker start omegaclaw
 ```
 
 To reset Omega's memory:
