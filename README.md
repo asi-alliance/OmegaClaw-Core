@@ -75,6 +75,11 @@ Run Omega using the next command:
 export TAG=<version>; curl -fsSL  https://github.com/singnet/Omega/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
 ```
 
+To run a specific version of Omega set version in `TAG` environment variable and run the following command:
+```
+export TAG=<version>; curl -fsSL  https://github.com/singnet/Omega/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
+```
+
 To stop the Omega Docker container:
 ```
 docker stop omegaclaw
