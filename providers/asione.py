@@ -54,7 +54,7 @@ class ASIOneProviderImpl(llm.AIProvider):
 
             raw = response.choices[0].message.content
             llm._log_raw(self._name, self._model_name, raw)
-            llm._log_completion(self._name, self._model_name, response)
+            llm._log_chat_completion(self._name, self._model_name, response)
             if not raw:
                 logger.warning("LLM returned an empty response")
                 raw = llm._llm_empty_response_command()

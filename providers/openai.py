@@ -57,7 +57,7 @@ class OpenAIProviderImpl(llm.AIProvider):
 
             raw = response.output_text or ""
             llm._log_raw(self._name, self._model_name, raw)
-            llm._log_completion(self._name, self._model_name, response)
+            llm._log_responses_completion(self._name, self._model_name, response)
             if not raw:
                 logger.warning("LLM returned an empty response")
                 raw = llm._llm_empty_response_command()

@@ -18,8 +18,8 @@ logger = get_logger(__name__)
 def _log_raw(provider: str, model: str, raw: str) -> None:
     logger.debug(f"[LLM_RAW] provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
 
-def _log_completion(provider: str, model: str, response) -> None:
-    """Report how the completion budget was actually spent."""
+def _log_chat_completion(provider: str, model: str, response) -> None:
+    """Report how the completion budget was actually spent (Chat Completions API)."""
     finish_reason = getattr(response.choices[0], "finish_reason", None)
     usage = getattr(response, "usage", None)
     details = getattr(usage, "completion_tokens_details", None)
@@ -31,6 +31,24 @@ def _log_completion(provider: str, model: str, response) -> None:
         f"cached_tokens={getattr(prompt_details, 'cached_tokens', None)} "
         f"completion_tokens={getattr(usage, 'completion_tokens', None)} "
         f"reasoning_tokens={getattr(details, 'reasoning_tokens', None)} "
+    )
+    logger.debug(line)
+
+def _log_responses_completion(provider: str, model: str, response) -> None:
+    """Report how the completion budget was actually spent (Responses API).
+    """
+    incomplete_details = getattr(response, "incomplete_details", None)
+    usage = getattr(response, "usage", None)
+    input_details = getattr(usage, "input_tokens_details", None)
+    output_details = getattr(usage, "output_tokens_details", None)
+    line = (
+        f"[LLM_USAGE] provider={provider} model={model} "
+        f"status={getattr(response, 'status', None)} "
+        f"incomplete_reason={getattr(incomplete_details, 'reason', None)} "
+        f"input_tokens={getattr(usage, 'input_tokens', None)} "
+        f"cached_tokens={getattr(input_details, 'cached_tokens', None)} "
+        f"output_tokens={getattr(usage, 'output_tokens', None)} "
+        f"reasoning_tokens={getattr(output_details, 'reasoning_tokens', None)} "
     )
     logger.debug(line)
 
@@ -157,7 +175,7 @@ class AIProvider(AbstractAIProvider):
 
             raw = response.choices[0].message.content or ""
             _log_raw(self._name, self._model_name, raw)
-            _log_completion(self._name, self._model_name, response)
+            _log_chat_completion(self._name, self._model_name, response)
             if not raw:
                 logger.warning("LLM returned an empty response")
                 raw = _llm_empty_response_command()
