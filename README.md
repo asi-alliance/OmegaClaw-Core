@@ -72,7 +72,7 @@ Ensure that you have [Docker installed](https://docs.docker.com/engine/install/)
 
 Run Omega using the next command:
 ```
-export TAG=<version>; curl -fsSL  https://github.com/singnet/Omega/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
+curl -fsSL https://raw.githubusercontent.com/singnet/Omega/refs/heads/main/scripts/omega | bash -s -- singularitynet/omega:latest
 ```
 
 To run a specific version of Omega set version in `TAG` environment variable and run the following command:
