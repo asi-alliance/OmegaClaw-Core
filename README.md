@@ -72,7 +72,7 @@ Ensure that you have [Docker installed](https://docs.docker.com/engine/install/)
 
 Run Omega using the next command:
 ```
-curl -fsSL https://github.com/singnet/Omega/raw/refs/tags/v0.1.19/scripts/omegaclaw | bash -s -- singularitynet/omega:v0.1.19
+export TAG=<version>; curl -fsSL  https://github.com/singnet/Omega/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
 ```
 
 To stop the Omega Docker container:
