@@ -5,25 +5,14 @@
 !(import! &self (library lib_llm.metta))
 !(import! &self ./src/loop)
 
-; Stub the sections contextVolatileTail reads so the ordering is the only variable.
-(= (getHistory) "HIST")
-(= (maxFeedback) 100)
-!(change-state! &lastresults "RESULT")
+; orderContextTail is a pure function of the two section strings, so the ordering
+; can be checked directly without loop state or the global flag.
 
-; Importing ./src/loop adds the (empty) placeholder; drop it so the flag has a
-; single, deterministic value for each case (initLoop's configure does the same).
-!(remove-atom &self (= (stableContextOrder) (empty)))
+; Flag off (default): the volatile results section stays ahead of HISTORY, which
+; keeps the assembled prompt byte-for-byte identical to the original layout.
+!(test (orderContextTail False "RESULT" "HIST")
+       (py-str (" LAST_SKILL_USE_RESULTS: " "RESULT" " HISTORY: " "HIST")))
 
-; --- flag OFF (default): tail must stay byte-for-byte identical to the old layout ---
-!(add-atom &self (= (stableContextOrder) False))
-!(test (contextVolatileTail)
-       (py-str (" LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))
-                " HISTORY: " (getHistory))))
-!(remove-atom &self (= (stableContextOrder) False))
-
-; --- flag ON: HISTORY moves ahead of the volatile results section ---
-!(add-atom &self (= (stableContextOrder) True))
-!(test (contextVolatileTail)
-       (py-str (" HISTORY: " (getHistory)
-                " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback)))))
-!(remove-atom &self (= (stableContextOrder) True))
+; Flag on: HISTORY moves ahead of the volatile results section.
+!(test (orderContextTail True "RESULT" "HIST")
+       (py-str (" HISTORY: " "HIST" " LAST_SKILL_USE_RESULTS: " "RESULT")))

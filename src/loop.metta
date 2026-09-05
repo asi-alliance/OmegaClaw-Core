@@ -52,11 +52,17 @@
 ; the prefix stays byte-identical and can be served from cache. Default is off, in which
 ; case the tail is byte-for-byte identical to the original layout.
 (= (contextVolatileTail)
-   (if (stableContextOrder)
-       (py-str (" HISTORY: " (getHistory)
-                " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))))
-       (py-str (" LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))
-                " HISTORY: " (getHistory)))))
+   (orderContextTail (stableContextOrder)
+                     (last_chars (get-state &lastresults) (maxFeedback))
+                     (getHistory)))
+
+; Section ordering, kept separate from the state reads above so it can be checked
+; on its own. Flag off keeps the results section ahead of HISTORY (the original
+; layout); flag on puts HISTORY first so the stable part sits in the cache prefix.
+(= (orderContextTail $stable $results $history)
+   (if $stable
+       (py-str (" HISTORY: " $history " LAST_SKILL_USE_RESULTS: " $results))
+       (py-str (" LAST_SKILL_USE_RESULTS: " $results " HISTORY: " $history))))
 
 (= (addTelegramPromptExtension)
    (if (== (commchannel) telegram)
