@@ -7,11 +7,13 @@
 (= (wakeupInterval) (empty))
 (= (memoryDirectory) (empty))
 (= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
+(= (stableContextOrder) (empty)) ; order prompt sections stable->volatile so providers can reuse the cached prefix
 
 (= (initLoop)
    (progn (configure maxNewInputLoops 50) ;20
           (configure maxWakeLoops 1)
           (configure spamShield False)
+          (configure stableContextOrder False)
           (configure sleepInterval 1) ;10
           (configure provider Anthropic)
           (configure maxOutputToken 6000)
@@ -40,9 +42,21 @@
                          " toolName4 arg4" (newline)
                          " toolName5 arg5" (newline)
                          " SAVE_PERMANENT_FILES_DIR: " (memoryDirectory)
-                         " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))
-                         " HISTORY: " (getHistory) 
+                         (contextVolatileTail)
                          " TIME: " (get_time_as_string)))))
+
+; LAST_SKILL_USE_RESULTS changes every cycle and is one of the largest sections,
+; so keeping it before HISTORY ends the provider's reusable cache prefix right after
+; the static head. With stableContextOrder on, HISTORY (which shifts far less between
+; consecutive calls) comes first and the volatile results section goes last, so more of
+; the prefix stays byte-identical and can be served from cache. Default is off, in which
+; case the tail is byte-for-byte identical to the original layout.
+(= (contextVolatileTail)
+   (if (stableContextOrder)
+       (py-str (" HISTORY: " (getHistory)
+                " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))))
+       (py-str (" LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback))
+                " HISTORY: " (getHistory)))))
 
 (= (addTelegramPromptExtension)
    (if (== (commchannel) telegram)
